@@ -13,6 +13,7 @@ import messageRoutes from './routes/messages.js';
 import groupRoutes from './routes/groups.js';
 import mediaRoutes from './routes/media.js';
 import { setupSocketHandlers } from './socket/index.js';
+import { setupCallHandlers } from './socket/call.js';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ const io = new Server(httpServer, {
 });
 
 setupSocketHandlers(io);
+setupCallHandlers(io);
 
 // Database and server
 const PORT = process.env.PORT || 3001;
