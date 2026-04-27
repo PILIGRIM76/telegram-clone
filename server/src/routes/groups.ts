@@ -123,4 +123,62 @@ router.delete('/:id/leave', authMiddleware, async (req: AuthRequest, res: Respon
   }
 });
 
+// Создание канала (broadcast)
+router.post('/channel', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description } = req.body;
+    const user = req.user as any;
+
+    const group = new Group({
+      name,
+      description,
+      ownerId: user._id,
+      adminIds: [user._id],
+      memberIds: [],
+      isChannel: true,
+      invitedLink: uuidv4(),
+    });
+
+    await group.save();
+
+    res.status(201).json({ group });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Подписка на канал
+router.post('/:id/subscribe', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = req.user as any;
+
+    const group = await Group.findByIdAndUpdate(
+      req.params.id,
+      { $addToSet: { memberIds: user._id } },
+      { new: true }
+    ).populate('memberIds', 'username displayName avatarUrl');
+
+    res.json({ group });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Отписка от канала
+router.delete('/:id/unsubscribe', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = req.user as any;
+
+    const group = await Group.findByIdAndUpdate(
+      req.params.id,
+      { $pull: { memberIds: user._id } },
+      { new: true }
+    );
+
+    res.json({ group });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;
