@@ -10,6 +10,11 @@ export interface IMessage extends Document {
   replyTo?: Types.ObjectId;
   isEdited: boolean;
   isDeleted: boolean;
+  reactions: Array<{
+    emoji: string;
+    userId: Types.ObjectId;
+    createdAt: Date;
+  }>;
   readBy: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +61,11 @@ const messageSchema = new Schema<IMessage>({
     type: Boolean,
     default: false,
   },
+  reactions: [{
+    emoji: { type: String, required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+  }],
   readBy: [{
     type: Schema.Types.ObjectId,
     ref: 'User',
