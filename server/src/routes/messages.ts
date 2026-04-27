@@ -1,10 +1,9 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { Message } from '../models/Message.js';
 
 const router = Router();
 
-// Получение сообщений чата
 router.get('/:chatId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { chatId } = req.params;
@@ -27,10 +26,9 @@ router.get('/:chatId', authMiddleware, async (req: AuthRequest, res: Response) =
   }
 });
 
-// Отправка сообщения (HTTP fallback)
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { chatId, content, type = 'text', mediaUrl } = req.body;
+    const { chatId, content, type = 'text', mediaUrl, replyTo } = req.body;
     const user = req.user as any;
 
     const message = new Message({
@@ -39,6 +37,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       content,
       type,
       mediaUrl,
+      replyTo,
     });
 
     await message.save();
@@ -50,7 +49,6 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Редактирование сообщения
 router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { content } = req.body;
@@ -75,7 +73,6 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Удаление сообщения
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user as any;
@@ -94,6 +91,51 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     await message.save();
 
     res.json({ message });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.post('/:id/reaction', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { emoji } = req.body;
+    const user = req.user as any;
+    const userId = user._id;
+
+    const message = await Message.findById(req.params.id);
+    
+    if (!message) {
+      return res.status(404).json({ error: 'Сообщение не найдено' });
+    }
+
+    const existingIndex = message.reactions.findIndex(
+      r => r.userId.toString() === userId.toString() && r.emoji === emoji
+    );
+
+    if (existingIndex >= 0) {
+      message.reactions.splice(existingIndex, 1);
+    } else {
+      message.reactions.push({ emoji, userId, createdAt: new Date() });
+    }
+
+    await message.save();
+
+    res.json({ message });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.get('/:id/reactions', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const message = await Message.findById(req.params.id)
+      .populate('reactions.userId', 'username displayName avatarUrl');
+
+    if (!message) {
+      return res.status(404).json({ error: 'Сообщ��ние не найдено' });
+    }
+
+    res.json({ reactions: message.reactions });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
