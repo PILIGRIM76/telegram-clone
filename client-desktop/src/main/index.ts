@@ -1,13 +1,14 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false;
 
 const isDev = !app.isPackaged;
 
-function createWindow() {
+function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -15,6 +16,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Telegram Clone',
     icon: path.join(__dirname, '../../build/icon.png'),
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -22,7 +24,10 @@ function createWindow() {
     },
   });
 
-  // Загрузка URL
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
@@ -30,42 +35,95 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../../client-web/out/index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // Сворачивание в трей
   mainWindow.on('close', (event) => {
-    if (tray) {
+    if (!isQuitting && tray) {
       event.preventDefault();
       mainWindow?.hide();
     }
   });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  mainWindow.on('unresponsive', () => {
+    console.log('[Desktop] Window became unresponsive');
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error(`[Desktop] Failed to load: ${errorCode} - ${errorDescription}`);
+  });
 }
 
-function createTray() {
-  const icon = nativeImage.createEmpty();
+function createTray(): void {
+  const iconPath = path.join(__dirname, '../../build/icon.png');
+  let icon: nativeImage;
+  
+  try {
+    icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) {
+      icon = nativeImage.createEmpty();
+    }
+  } catch {
+    icon = nativeImage.createEmpty();
+  }
+  
   tray = new Tray(icon);
   
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Открыть', click: () => mainWindow?.show() },
-    { label: 'Выход', click: () => { tray = null; app.quit(); } }
+    { 
+      label: 'Открыть Telegram Clone', 
+      click: () => mainWindow?.show() 
+    },
+    { type: 'separator' },
+    { 
+      label: 'Новое сообщение', 
+      accelerator: 'CmdOrCtrl+N',
+      click: () => {
+        mainWindow?.show();
+        mainWindow?.webContents.send('new-message');
+      }
+    },
+    { type: 'separator' },
+    { 
+      label: 'Выход', 
+      click: () => { 
+        isQuitting = true; 
+        app.quit(); 
+      } 
+    }
   ]);
   
   tray.setToolTip('Telegram Clone');
   tray.setContextMenu(contextMenu);
   
-  tray.on('double-click', () => mainWindow?.show());
+  tray.on('double-click', () => {
+    mainWindow?.show();
+  });
 }
 
-function createMenu() {
+function createMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'Файл',
       submenu: [
-        { label: 'Новое сообщение', accelerator: 'CmdOrCtrl+N' },
+        { 
+          label: 'Новое сообщение', 
+          accelerator: 'CmdOrCtrl+N',
+          click: () => mainWindow?.webContents.send('new-message')
+        },
         { type: 'separator' },
-        { label: 'Выход', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
+        { 
+          label: 'Настройки', 
+          accelerator: 'CmdOrCtrl+,',
+          click: () => mainWindow?.webContents.send('open-settings')
+        },
+        { type: 'separator' },
+        { 
+          label: 'Выход', 
+          accelerator: 'CmdOrCtrl+Q', 
+          click: () => { isQuitting = true; app.quit(); } 
+        }
       ]
     },
     {
@@ -76,13 +134,15 @@ function createMenu() {
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },
-        { role: 'paste' }
+        { role: 'paste' },
+        { role: 'selectAll' }
       ]
     },
     {
       label: 'Вид',
       submenu: [
         { role: 'reload' },
+        { role: 'forceReload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'resetZoom' },
@@ -93,9 +153,36 @@ function createMenu() {
       ]
     },
     {
+      label: 'Окно',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        { 
+          label: 'Всегда сверху', 
+          type: 'checkbox',
+          checked: false,
+          click: (menuItem) => {
+            mainWindow?.setAlwaysOnTop(menuItem.checked);
+          }
+        },
+        { type: 'separator' },
+        { role: 'close' }
+      ]
+    },
+    {
       label: 'Помощь',
       submenu: [
-        { label: 'О программе', click: () => shell.openExternal('https://github.com/PILIGRIM76/telegram-clone') }
+        { 
+          label: 'О программе', 
+          click: () => {
+            mainWindow?.webContents.send('show-about');
+          }
+        },
+        { 
+          label: 'Документация', 
+          click: () => shell.openExternal('https://github.com/PILIGRIM76/telegram-clone')
+        }
       ]
     }
   ];
@@ -104,31 +191,112 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-// Auto-update
-function setupAutoUpdater() {
-  autoUpdater.checkForUpdatesAndNotify();
-  
-  autoUpdater.on('update-available', () => {
-    mainWindow?.webContents.send('update-available');
-  });
-  
-  autoUpdater.on('update-downloaded', () => {
-    mainWindow?.webContents.send('update-downloaded');
+function registerGlobalShortcuts(): void {
+  globalShortcut.register('CmdOrCtrl+Shift+T', () => {
+    mainWindow?.show();
   });
 }
 
-// IPC handlers
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[Desktop] Checking for updates...');
+  });
+  
+  autoUpdater.on('update-available', (info) => {
+    console.log('[Desktop] Update available:', info.version);
+    mainWindow?.webContents.send('update-available', info);
+    
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Доступно обновление',
+        body: `Версия ${info.version} доступна для загрузки`,
+      }).show();
+    }
+  });
+  
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Desktop] No update available');
+  });
+  
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-progress', progress);
+  });
+  
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[Desktop] Update downloaded:', info.version);
+    mainWindow?.webContents.send('update-downloaded', info);
+    
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Обновление готово',
+        body: 'Перезапустите приложение для установки',
+      }).show();
+    }
+  });
+  
+  autoUpdater.on('error', (error) => {
+    console.error('[Desktop] Auto-updater error:', error);
+  });
+  
+  autoUpdater.checkForUpdates().catch(console.error);
+}
+
 ipcMain.handle('get-version', () => app.getVersion());
-ipcMain.handle('install-update', () => autoUpdater.quitAndInstall());
+
+ipcMain.handle('get-app-path', () => app.getPath('userData'));
+
+ipcMain.handle('show-notification', (_, { title, body }: { title: string; body: string }) => {
+  if (Notification.isSupported()) {
+    new Notification({ title, body }).show();
+  }
+});
+
+ipcMain.handle('download-update', () => {
+  autoUpdater.downloadUpdate().catch(console.error);
+});
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
+});
+
+ipcMain.handle('minimize-window', () => {
+  mainWindow?.minimize();
+});
+
+ipcMain.handle('maximize-window', () => {
+  if (mainWindow?.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow?.maximize();
+  }
+});
+
+ipcMain.handle('close-window', () => {
+  mainWindow?.close();
+});
+
+ipcMain.handle('is-maximized', () => {
+  return mainWindow?.isMaximized() || false;
+});
 
 app.whenReady().then(() => {
   createWindow();
   createMenu();
   createTray();
+  registerGlobalShortcuts();
   
   if (!isDev) {
     setupAutoUpdater();
   }
+  
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -137,8 +305,10 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('activate', () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
