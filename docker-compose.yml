@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: telegram-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: telegram
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - telegram-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: telegram-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - telegram-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: telegram-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongodb:27017/telegram
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=telegram-secret-key-change-me
+      - CORS_ORIGIN=http://localhost:3000
+      - SOCKET_CORS_ORIGIN=http://localhost:3000
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - telegram-network
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+networks:
+  telegram-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
