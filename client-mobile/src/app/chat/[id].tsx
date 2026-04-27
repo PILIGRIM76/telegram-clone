@@ -1,19 +1,99 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { api } from '../../lib/api';
+import { useAppStore } from '../../store';
+import { io, Socket } from 'socket.io-client';
+
+interface Message {
+  _id: string;
+  sender: string;
+  content: string;
+  media?: string;
+  createdAt: string;
+}
+
+interface ChatData {
+  _id: string;
+  name: string;
+}
 
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams();
-  const [messages, setMessages] = useState([]);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const flatListRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const flatListRef = useRef<FlatList>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const user = useAppStore((state) => state.user);
+  const addMessage = useAppStore((state) => state.addMessage);
 
-  const sendMessage = () => {
+  useEffect(() => {
+    loadChat();
+    connectSocket();
+    
+    return () => {
+      socketRef.current?.disconnect();
+    };
+  }, [id]);
+
+  const loadChat = async () => {
+    try {
+      const response = await api.get<{ messages: Message[]; chat: ChatData }>(`/chats/${id}`);
+      setMessages(response.messages);
+    } catch (error) {
+      console.error('Failed to load chat:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const connectSocket = () => {
+    const socket = io('http://10.0.2.2:3001', {
+      auth: { token: localStorage.getItem('token') },
+      transports: ['websocket'],
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join-chat', id);
+    });
+
+    socket.on('new-message', (message: Message) => {
+      setMessages((prev) => [...prev, message]);
+      addMessage(id, { ...message, chatId: id, isOwn: message.sender === user?._id });
+    });
+
+    socketRef.current = socket;
+  };
+
+  const sendMessage = async () => {
     if (!input.trim()) return;
-    // Отправка через socket
-    setInput('');
+
+    try {
+      await api.post(`/chats/${id}/messages`, { content: input });
+      setInput('');
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось отправить');
+    }
+  };
+
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isOwn = item.sender === user?._id;
+    
+    return (
+      <View style={[styles.message, isOwn && styles.messageOwn]}>
+        {item.media && (
+          <Image source={{ uri: item.media }} style={styles.media} />
+        )}
+        <Text style={styles.messageText}>{item.content}</Text>
+        <Text style={styles.messageTime}>
+          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
+    );
   };
 
   return (
@@ -21,6 +101,8 @@ export default function ChatScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <Stack.Screen options={{ headerShown: false }} />
+      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← Назад</Text>
@@ -32,16 +114,10 @@ export default function ChatScreen() {
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <View style={[styles.message, item.isOwn && styles.messageOwn]}>
-            <Text style={styles.messageText}>{item.content}</Text>
-            <Text style={styles.messageTime}>
-              {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-        )}
+        renderItem={renderMessage}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
         ListEmptyComponent={
-          <Text style={styles.empty}>Нет сообщений</Text>
+          !loading && <Text style={styles.empty}>Нет сообщений</Text>
         }
       />
 
@@ -104,6 +180,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     textAlign: 'right',
+  },
+  media: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   empty: {
     color: '#888',
