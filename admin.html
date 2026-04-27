@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель Telegram Clone</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: white; min-height: 100vh; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 2rem; }
+    .login-box { max-width: 400px; margin: 100px auto; padding: 2rem; background: #1a1a1a; border-radius: 12px; }
+    input { width: 100%; padding: 12px; margin-bottom: 1rem; background: #2a2a2a; border: 1px solid #333; border-radius: 8px; color: white; font-size: 1rem; }
+    button { width: 100%; padding: 12px; background: #229ED9; border: none; border-radius: 8px; color: white; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1a8ac4; }
+    .error { color: #ef4444; margin-bottom: 1rem; text-align: center; }
+    .dashboard { display: none; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: #1a1a1a; padding: 1.5rem; border-radius: 12px; }
+    .stat-card .number { font-size: 2rem; font-weight: bold; }
+    .stat-card .label { color: #888; margin-top: 0.5rem; }
+    .menu { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .menu-item { background: #1a1a1a; padding: 1.5rem; border-radius: 12px; cursor: pointer; }
+    .menu-item:hover { background: #222; }
+    .menu-item h3 { margin-bottom: 0.5rem; }
+    .menu-item p { color: #888; font-size: 0.875rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: #1a1a1a; border-bottom: 1px solid #333; }
+    .logout { background: none; border: 1px solid #444; width: auto; padding: 8px 16px; }
+  </style>
+</head>
+<body>
+  <!-- Login Form -->
+  <div id="login" class="login-box">
+    <h1 style="text-align: center;">Админ-панель</h1>
+    <p id="error" class="error"></p>
+    <input type="email" id="email" placeholder="Email" value="admin@telegram.local">
+    <input type="password" id="password" placeholder="Пароль" value="admin123">
+    <button onclick="login()">Войти</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="dashboard">
+    <div class="header">
+      <h1>Админ-панель</h1>
+      <button class="logout" onclick="logout()">Выход</button>
+    </div>
+    <div class="container">
+      <div class="stats">
+        <div class="stat-card">
+          <div class="number" id="usersCount">-</div>
+          <div class="label">Пользователей</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="chatsCount">-</div>
+          <div class="label">Чатов</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="messagesCount">-</div>
+          <div class="label">Сообщений</div>
+        </div>
+      </div>
+      <div class="menu">
+        <div class="menu-item">
+          <h3>Пользователи</h3>
+          <p>Управление пользователями</p>
+        </div>
+        <div class="menu-item">
+          <h3>Чаты</h3>
+          <p>Управление чатами</p>
+        </div>
+        <div class="menu-item">
+          <h3>Группы</h3>
+          <p>Управление группами</p>
+        </div>
+        <div class="menu-item">
+          <h3>Настройки</h3>
+          <p>Настройки системы</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3001';
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const error = document.getElementById('error');
+
+      try {
+        const res = await fetch(API_URL + '/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          error.textContent = data.error || 'Ошибка входа';
+          return;
+        }
+
+        const data = await res.json();
+        localStorage.setItem('adminToken', data.token);
+        showDashboard();
+      } catch (e) {
+        error.textContent = 'Не удалось подключиться к серверу';
+      }
+    }
+
+    function showDashboard() {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+    }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      document.getElementById('login').style.display = 'block';
+      document.getElementById('dashboard').style.display = 'none';
+    }
+
+    // Check if already logged in
+    if (localStorage.getItem('adminToken')) {
+      showDashboard();
+    }
+  </script>
+</body>
+</html>
