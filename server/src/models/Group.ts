@@ -9,6 +9,7 @@ export interface IGroup extends Document {
   memberIds: Types.ObjectId[];
   invitedLink?: string;
   isPublic: boolean;
+  isChannel: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +50,10 @@ const groupSchema = new Schema<IGroup>({
   isPublic: {
     type: Boolean,
     default: true,
+  },
+  isChannel: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,
