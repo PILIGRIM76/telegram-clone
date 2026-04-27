@@ -1,24 +1,25 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { User } from '../models/User.js';
 
 const router = Router();
 
-// Получение списка пользователей
-router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+// Поиск пользователей
+router.get('/search', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { search } = req.query;
-    const query: any = {};
-
-    if (search) {
-      query.$or = [
-        { username: { $regex: search, $options: 'i' } },
-        { displayName: { $regex: search, $options: 'i' } },
-      ];
+    const { q } = req.query;
+    
+    if (!q) {
+      return res.json({ users: [] });
     }
 
-    const users = await User.find(query)
-      .select('-password')
-      .limit(20);
+    const users = await User.find({
+      $or: [
+        { username: { $regex: q, $options: 'i' } },
+        { displayName: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+      ],
+    }).select('-password').limit(20);
 
     res.json({ users });
   } catch (error) {
@@ -26,42 +27,26 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Получение пользователя по ID
-router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
+// Все пользователи (для админа)
+router.get('/all', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-
-    if (!user) {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
-
-    res.json({ user });
+    const users = await User.find().select('-password');
+    res.json({ users, count: users.length });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
 
-// Обновление профиля
-router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response) => {
+// Статистика пользователей
+router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const user = req.user as any;
-    const { displayName, avatarUrl, bio } = req.body;
-
-    if (displayName) user.displayName = displayName;
-    if (avatarUrl) user.avatarUrl = avatarUrl;
-    if (bio !== undefined) user.bio = bio;
-
-    await user.save();
-
+    const total = await User.countDocuments();
+    const online = await User.countDocuments({ isOnline: true });
+    
     res.json({
-      user: {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-        bio: user.bio,
-      },
+      total,
+      online,
+      offline: total - online,
     });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка сервера' });
