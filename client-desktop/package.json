@@ -1,7 +1,7 @@
 {
   "name": "telegram-clone-desktop",
   "version": "1.0.0",
-  "description": "Telegram Clone Desktop",
+  "description": "Telegram Clone Desktop App",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "npm run build && electron .",
@@ -9,12 +9,13 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
+  "author": "PILIGRIM76",
+  "license": "MIT",
   "dependencies": {
-    "electron": "^28.1.0",
     "electron-updater": "^6.1.7"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
+    "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
     "typescript": "^5.3.3"
   },
@@ -24,9 +25,13 @@
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
