@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CipherLink Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #0891b2, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #0891b2;
+            border-bottom-color: #0891b2;
+        }
+
+        .tab-content {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            border: 1px solid #334155;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            background: #334155;
+            font-weight: 600;
+        }
+
+        .table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .table tr:hover {
+            background: #1e293b;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-online {
+            background: #10b98120;
+            color: #10b981;
+        }
+
+        .status-offline {
+            background: #ef444420;
+            color: #ef4444;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #0891b2;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #06b6d4;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #f87171;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            color: white;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #0891b2;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #10b98120;
+            border: 1px solid #10b981;
+            color: #10b981;
+        }
+
+        .alert-error {
+            background: #ef444420;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .metric-card {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+        }
+
+        .metric-title {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #0891b2;
+        }
+
+        .chart-container {
+            height: 200px;
+            background: #334155;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="header">
+            <h1>🔐 CipherLink Admin Panel</h1>
+            <p>Server Management and Monitoring</p>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="onlineUsers">0</div>
+                <div class="stat-label">Online Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeChannels">0</div>
+                <div class="stat-label">Active Channels</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalMessages">0</div>
+                <div class="stat-label">Messages (24h)</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab" onclick="switchTab('users')">Users</button>
+            <button class="tab" onclick="switchTab('channels')">Channels</button>
+            <button class="tab" onclick="switchTab('stores')">Stores</button>
+            <button class="tab" onclick="switchTab('settings')">Settings</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab" class="tab-content">
+            <h2 style="margin-bottom: 1.5rem;">System Overview</h2>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">Server Uptime</div>
+                    <div class="metric-value" id="uptime">00:00:00</div>
+                    <div class="chart-container">Uptime Chart</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">CPU Usage</div>
+                    <div class="metric-value" id="cpuUsage">0%</div>
+                    <div class="chart-container">CPU Chart</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Memory Usage</div>
+                    <div class="metric-value" id="memoryUsage">0%</div>
+                    <div class="chart-container">Memory Chart</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Network Traffic</div>
+                    <div class="metric-value" id="networkTraffic">0 MB/s</div>
+                    <div class="chart-container">Traffic Chart</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Recent Activity</h3>
+                <table class="table" style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>User</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityLog">
+                        <tr>
+                            <td>14:30:22</td>
+                            <td>User registration</td>
+                            <td>user_12345</td>
+                            <td><span class="status-badge status-online">Success</span></td>
+                        </tr>
+                        <tr>
+                            <td>14:28:15</td>
+                            <td>Message sent</td>
+                            <td>user_67890</td>
+                            <td><span class="status-badge status-online">Success</span></td>
+                        </tr>
+                        <tr>
+                            <td>14:25:43</td>
+                            <td>Channel created</td>
+                            <td>admin_user</td>
+                            <td><span class="status-badge status-online">Success</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="usersTab" class="tab-content hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Users Management</h2>
+                <button class="btn btn-primary" onclick="showAddUserModal()">Add User</button>
+            </div>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>UID</th>
+                        <th>Fingerprint</th>
+                        <th>Status</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTable">
+                    <tr>
+                        <td>uid_sample123</td>
+                        <td>ABCDEF12</td>
+                        <td><span class="status-badge status-online">Online</span></td>
+                        <td>Just now</td>
+                        <td>
+                            <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">View</button>
+                            <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 0.5rem;">Ban</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>uid_sample456</td>
+                        <td>123456AB</td>
+                        <td><span class="status-badge status-offline">Offline</span></td>
+                        <td>5 minutes ago</td>
+                        <td>
+                            <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">View</button>
+                            <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 0.5rem;">Ban</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Channels Tab -->
+        <div id="channelsTab" class="tab-content hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Channels Management</h2>
+                <button class="btn btn-primary" onclick="showAddChannelModal()">Create Channel</button>
+            </div>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Owner</th>
+                        <th>Members</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="channelsTable">
+                    <tr>
+                        <td>General Discussion</td>
+                        <td>Public discussion channel</td>
+                        <td>admin_user</td>
+                        <td>24</td>
+                        <td>2 hours ago</td>
+                        <td>
+                            <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</button>
+                            <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 0.5rem;">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Stores Tab -->
+        <div id="storesTab" class="tab-content hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Stores Management</h2>
+                <button class="btn btn-primary" onclick="showAddStoreModal()">Create Store</button>
+            </div>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Owner</th>
+                        <th>Products</th>
+                        <th>Rating</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="storesTable">
+                    <tr>
+                        <td>Tech Gadgets</td>
+                        <td>Electronics and gadgets store</td>
+                        <td>merchant_123</td>
+                        <td>15</td>
+                        <td>4.8 ★</td>
+                        <td>
+                            <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</button>
+                            <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 0.5rem;">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settingsTab" class="tab-content hidden">
+            <h2>Server Settings</h2>
+            
+            <div style="margin-top: 1.5rem;">
+                <div class="form-group">
+                    <label class="form-label">Server Port</label>
+                    <input type="number" class="form-input" value="8080">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Maximum Connections</label>
+                    <input type="number" class="form-input" value="1000">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Message Retention (hours)</label>
+                    <input type="number" class="form-input" value="24">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Rate Limit (requests/minute)</label>
+                    <input type="number" class="form-input" value="100">
+                </div>
+                
+                <button class="btn btn-primary" style="margin-top: 1rem;">Save Settings</button>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Danger Zone</h3>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-danger">Restart Server</button>
+                    <button class="btn btn-danger" style="margin-left: 1rem;">Clear All Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching functionality
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Simulate real-time data updates
+        function updateStats() {
+            document.getElementById('onlineUsers').textContent = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('totalUsers').textContent = Math.floor(Math.random() * 1000) + 500;
+            document.getElementById('activeChannels').textContent = Math.floor(Math.random() * 20) + 5;
+            document.getElementById('totalMessages').textContent = Math.floor(Math.random() * 10000) + 1000;
+            
+            // Update metrics
+            document.getElementById('uptime').textContent = '2 days, 14:32:15';
+            document.getElementById('cpuUsage').textContent = (Math.random() * 30 + 10).toFixed(1) + '%';
+            document.getElementById('memoryUsage').textContent = (Math.random() * 40 + 20).toFixed(1) + '%';
+            document.getElementById('networkTraffic').textContent = (Math.random() * 5 + 1).toFixed(1) + ' MB/s';
+        }
+
+        // Initialize dashboard
+        setInterval(updateStats, 5000);
+        updateStats();
+
+        // Modal functions (placeholders)
+        function showAddUserModal() {
+            alert('Add User modal would appear here');
+        }
+
+        function showAddChannelModal() {
+            alert('Add Channel modal would appear here');
+        }
+
+        function showAddStoreModal() {
+            alert('Add Store modal would appear here');
+        }
+
+        // Simulate activity log updates
+        setInterval(() => {
+            const logBody = document.getElementById('activityLog');
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>${new Date().toLocaleTimeString()}</td>
+                <td>System event</td>
+                <td>system</td>
+                <td><span class="status-badge status-online">Success</span></td>
+            `;
+            logBody.insertBefore(newRow, logBody.firstChild);
+            
+            // Keep only last 10 entries
+            if (logBody.children.length > 10) {
+                logBody.removeChild(logBody.lastChild);
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

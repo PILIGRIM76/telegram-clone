@@ -16,6 +16,12 @@ export const resources = {
     back_to_create: "Back to Create",
     invalid_key: "Invalid Identity Key format.",
     
+    // Server Settings
+    server_settings: "Server Connection",
+    server_ip_label: "Server IP Address (LAN)",
+    server_ip_placeholder: "e.g. 192.168.1.15",
+    save_reload: "Save & Reload",
+    
     // Sidebar
     chats_title: "Chats",
     archive_title: "Archive",
@@ -49,6 +55,11 @@ export const resources = {
     add_contact: "Add Contact",
     search_uid: "Enter UID or invite link",
     
+    // Updates
+    check_updates: "Update from GitHub",
+    update_desc: "Pull latest changes from repository",
+    updating: "Updating...",
+    
     // Common
     cancel: "Cancel",
     create: "Create",
@@ -69,6 +80,12 @@ export const resources = {
     import_submit: "Восстановить",
     back_to_create: "Назад к созданию",
     invalid_key: "Неверный формат ключа.",
+    
+    // Server Settings
+    server_settings: "Настройки Сервера",
+    server_ip_label: "IP-адрес сервера (Локальная сеть)",
+    server_ip_placeholder: "Например: 192.168.1.15",
+    save_reload: "Сохранить и Перезагрузить",
     
     // Sidebar
     chats_title: "Чаты",
@@ -102,6 +119,11 @@ export const resources = {
     group_name: "Название группы",
     add_contact: "Добавить контакт",
     search_uid: "Введите UID или ссылку",
+    
+    // Updates
+    check_updates: "Обновить через GitHub",
+    update_desc: "Скачать последние изменения",
+    updating: "Обновление...",
     
     // Common
     cancel: "Отмена",

@@ -56,10 +56,25 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
 
   const orderProduct = (txid: string) => {
       if (!selectedProduct || !result) return;
-      // In a real app, we'd trigger an order creation here or in App.tsx
+      
+      const orderPayload = {
+          type: 'order',
+          product: selectedProduct,
+          txid: txid,
+          status: 'new',
+          orderId: crypto.randomUUID(),
+          createdAt: Date.now()
+      };
+
+      // Add contact first
       onAddContact(`Store ${result.store?.name || 'Seller'}`, result.uid);
       
-      alert('Contact added. Please send TXID to the seller in chat to confirm order.');
+      // Send Order Message
+      apiService.sendMessage(result.uid, `New Order: ${selectedProduct.name}`, { 
+          payload: orderPayload 
+      });
+      
+      alert('Order placed! Check chat for details.');
       onClose();
   };
   
@@ -229,4 +244,3 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
 };
 
 export default AddContactModal;
-    

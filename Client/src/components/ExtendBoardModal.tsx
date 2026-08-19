@@ -80,4 +80,3 @@ const ExtendBoardModal: React.FC<ExtendBoardModalProps> = ({ boardId, onClose, o
 };
 
 export default ExtendBoardModal;
-    

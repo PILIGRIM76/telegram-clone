@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import type { Identity, Contact, Chat, Group } from '../types';
+import type { Identity, Contact, Chat, Group, Message } from '../types';
 import MessageInput from './MessageInput';
 import MessageItem from './MessageItem';
 import MessageTimerSelection from './MessageTimerSelection';
@@ -21,13 +21,9 @@ interface ChatWindowProps {
   onSetTimer: (seconds: number | undefined) => void;
   onDeleteMessage: (id: string) => void;
   onVerify: () => void;
-  
-  // Handlers passed from App
   onEditMessage: (messageId: string, newText: string) => void;
   onReactMessage: (messageId: string, emoji: string) => void;
   onForwardMessage: (messageId: string, targetId: string, originalText: string, originalMedia?: string, originalMediaType?: any) => void;
-  
-  // Data for forward modal
   allContacts: Contact[];
   allGroups: Group[];
 }
@@ -51,10 +47,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [isTimerSelectionOpen, setIsTimerSelectionOpen] = useState(false);
   
-  // Interaction States
-  const [replyingTo, setReplyingTo] = useState<any>(null);
-  const [editingMessage, setEditingMessage] = useState<any>(null);
-  const [forwardingMessage, setForwardingMessage] = useState<any>(null);
+  // Interaction states
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<{ message: Message, text: string } | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<{ message: Message, text: string } | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -62,6 +58,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   useEffect(() => {
     scrollToBottom();
+    // Send read status for DMs
     if (!('name' in partner)) {
        apiService.sendMessage((partner as Contact).uid, '', { type: 'read' });
     }
@@ -85,15 +82,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       }
   };
 
-  const handleSendWrapper = (text: string, media?: string, mediaType?: any, payload?: any) => {
+  const handleMessageAction = (action: string, message: Message, extra?: any) => {
+      if (action === 'reply') setReplyingTo(message);
+      if (action === 'edit') setEditingMessage({ message, text: message.text });
+      if (action === 'forward') setForwardingMessage({ message, text: message.text });
+      if (action === 'delete') onDeleteMessage(message.id);
+      if (action === 'react') onReactMessage(message.id, extra);
+  };
+
+  const handleSend = (text: string, media?: string, mediaType?: 'image' | 'video' | 'audio', payload?: any) => {
       if (editingMessage) {
           onEditMessage(editingMessage.message.id, text);
           setEditingMessage(null);
       } else {
-          onSendMessage(text, media, mediaType, { 
-              ...payload, 
-              replyTo: replyingTo ? { id: replyingTo.id, text: replyingTo.text || `[${replyingTo.mediaType}]`, senderId: replyingTo.senderId } : undefined 
-          });
+          // If replying, attach replyTo context
+          const finalPayload = replyingTo ? { ...payload, replyTo: { id: replyingTo.id, text: replyingTo.text, senderId: replyingTo.senderId } } : payload;
+          onSendMessage(text, media, mediaType, finalPayload);
           setReplyingTo(null);
       }
   };
@@ -119,11 +123,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <h3 className="font-bold text-lg text-white truncate">{partnerName}</h3>
                 {verified && <ShieldCheckIcon className="w-4 h-4 text-green-500 ml-2" />}
             </div>
+            
             {partnerTyping ? (
               <p className="text-xs text-cyan-400 animate-pulse">... typing ...</p>
             ) : (
               <div className="flex items-center text-xs text-slate-400">
-                  {isGroup ? <span>{ (partner as Group).members.length } members</span> : <span className={verified ? "text-green-400" : "text-slate-500"}>{verified ? 'Identity verified' : 'Identity not verified'}</span>}
+                  {isGroup ? (
+                      <span>{ (partner as Group).members.length } members</span>
+                  ) : (
+                      <span className={verified ? "text-green-400" : "text-slate-500"}>
+                          {verified ? 'Identity verified' : 'Identity not verified'}
+                      </span>
+                  )}
               </div>
             )}
         </div>
@@ -141,13 +152,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     <div className="absolute right-0 top-full mt-2 z-20">
                         <MessageTimerSelection 
                             currentValue={chat.disappearTimer}
-                            onSelect={(sec) => { onSetTimer(sec); setIsTimerSelectionOpen(false); }}
+                            onSelect={(sec) => {
+                                onSetTimer(sec);
+                                setIsTimerSelectionOpen(false);
+                            }}
                         />
                     </div>
                 )}
             </div>
+
+            {!isGroup && !verified && (
+                <button onClick={onVerify} className="p-2 text-slate-400 hover:text-white" title="Verify">
+                    <QrCodeIcon className="w-5 h-5" />
+                </button>
+            )}
+
             {isGroup && (partner as Group).type === 'private' && (
-                 <button onClick={copyInvite} className="p-2 text-slate-400 hover:text-white" title="Invite link"><ShareIcon className="w-5 h-5" /></button>
+                 <button onClick={copyInvite} className="p-2 text-slate-400 hover:text-white" title="Invite link">
+                     <ShareIcon className="w-5 h-5" />
+                 </button>
             )}
         </div>
       </header>
@@ -162,10 +185,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 message={msg}
                 currentIdentity={currentUserIdentity}
                 onTimerExpire={() => onDeleteMessage(msg.id)}
-                onReply={(m, t) => setReplyingTo({...m, text: t})}
-                onEdit={(m, t) => setEditingMessage({message: m, text: t})}
-                onReact={onReactMessage}
-                onForward={(m, t) => setForwardingMessage({message: m, text: t})}
+                onAction={handleMessageAction}
               />
           ))}
           <div ref={messagesEndRef} />
@@ -173,7 +193,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
       
       <MessageInput 
-        onSendMessage={handleSendWrapper}
+        onSendMessage={handleSend}
         onTyping={setPartnerTyping}
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
@@ -189,7 +209,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               onForward={(targetId) => {
                   onForwardMessage(forwardingMessage.message.id, targetId, forwardingMessage.text, forwardingMessage.message.media, forwardingMessage.message.mediaType);
                   setForwardingMessage(null);
-                  alert('Forwarded!');
               }}
           />
       )}

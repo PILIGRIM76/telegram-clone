@@ -1,0 +1,50 @@
+{
+  "name": "@cipherlink/database-server",
+  "version": "1.0.0",
+  "description": "CipherLink Database Server with PostgreSQL support",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev src/server.ts",
+    "start": "node dist/server.js",
+    "migrate": "prisma migrate dev",
+    "studio": "prisma studio",
+    "test": "jest",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "express-rate-limit": "^6.8.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.1",
+    "ws": "^8.13.0",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.3.1",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/express": "^4.17.17",
+    "@types/cors": "^2.8.13",
+    "@types/bcryptjs": "^2.4.2",
+    "@types/jsonwebtoken": "^9.0.2",
+    "@types/ws": "^8.5.5",
+    "@types/uuid": "^9.0.0",
+    "@types/multer": "^1.4.7",
+    "typescript": "^5.0.0",
+    "ts-node-dev": "^2.0.0",
+    "prisma": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "keywords": ["messaging", "database", "postgresql", "prisma"],
+  "author": "CipherLink Team",
+  "license": "MIT"
+}

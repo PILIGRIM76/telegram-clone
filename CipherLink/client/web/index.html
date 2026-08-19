@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CipherLink - Secure Messenger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Authentication Screen */
+        .auth-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100vh;
+            padding: 1rem;
+        }
+
+        .auth-card {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 100%;
+            max-width: 24rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 1px solid #334155;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .auth-icon {
+            font-size: 2.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-subtitle {
+            color: #94a3b8;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+
+        .tab-active {
+            background-color: #0891b2;
+            color: white;
+        }
+
+        .tab-inactive {
+            background-color: #334155;
+            color: #cbd5e1;
+        }
+
+        .input-field {
+            width: 100%;
+            background-color: #334155;
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #0891b2;
+        }
+
+        .btn {
+            width: 100%;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #0891b2;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #06b6d4;
+        }
+
+        .btn-secondary {
+            background-color: #a855f7;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #c084fc;
+        }
+
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Main App Container (Hidden by default) */
+        .main-app-container {
+            display: none;
+            height: 100vh;
+            width: 100%;
+        }
+
+        .main-app-container.visible {
+            display: flex;
+        }
+
+        /* Sidebar Menu */
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            display: none;
+        }
+
+        .sidebar-menu {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100%;
+            background-color: #1e293b;
+            z-index: 2001;
+            transition: left 0.3s ease;
+            border-right: 1px solid #334155;
+            overflow-y: auto;
+        }
+
+        .sidebar-menu.open {
+            left: 0;
+        }
+
+        .menu-header {
+            padding: 1rem;
+            background-color: #334155;
+            border-bottom: 1px solid #475569;
+        }
+
+        .close-menu {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            float: right;
+        }
+
+        .menu-item {
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: background-color 0.2s;
+        }
+
+        .menu-item:hover {
+            background-color: #334155;
+        }
+
+        .menu-item-icon {
+            font-size: 1.25rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .hamburger {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 2002;
+            background-color: #0891b2;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-size: 1.25rem;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-content {
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .main-content.menu-open {
+            margin-left: 300px;
+        }
+
+        /* Chat Interface */
+        .chat-header {
+            padding: 1rem;
+            background-color: #1e293b;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            max-width: 75%;
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            justify-content: flex-end;
+        }
+
+        .message.received {
+            align-self: flex-start;
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            padding: 0.75rem 1rem;
+            border-radius: 1.5rem;
+            color: white;
+            word-break: break-word;
+        }
+
+        .message.sent .message-bubble {
+            background-color: #0891b2;
+            border-radius: 1.5rem 1.5rem 0 1.5rem;
+        }
+
+        .message.received .message-bubble {
+            background-color: #334155;
+            border-radius: 1.5rem 1.5rem 1.5rem 0;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
+            text-align: right;
+        }
+
+        .input-area {
+            padding: 1rem;
+            background-color: #1e293b;
+            border-top: 1px solid #334155;
+        }
+
+        .message-input-container {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .message-input {
+            flex: 1;
+            background-color: #334155;
+            border: 1px solid #475569;
+            border-radius: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            color: white;
+            outline: none;
+        }
+
+        .message-input:focus {
+            border-color: #0891b2;
+        }
+
+        .send-button {
+            background-color: #0891b2;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .welcome-content {
+            text-align: center;
+        }
+
+        .welcome-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .welcome-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-text {
+            color: #94a3b8;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Group Modal Styles */
+        .group-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .group-content {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid #334155;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .group-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .group-members-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #334155;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .group-member-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            background: #1e293b;
+            border-radius: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .member-avatar {
+            width: 32px;
+            height: 32px;
+            background: #0891b2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.75rem;
+            margin-right: 0.75rem;
+        }
+
+        .member-info {
+            flex: 1;
+        }
+
+        .member-name {
+            color: white;
+            font-weight: 500;
+        }
+
+        .member-fingerprint {
+            color: #94a3b8;
+            font-size: 0.75rem;
+        }
+
+        .remove-member {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .profile-content {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid #334155;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #0891b2, #a855f7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto 1rem;
+        }
+
+        .profile-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        .profile-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #f1f5f9;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .qr-code-container {
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            display: inline-block;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .profile-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-copy {
+            background-color: #0891b2;
+            color: white;
+        }
+
+        .btn-export {
+            background-color: #8b5cf6;
+            color: white;
+        }
+
+        .btn-close {
+            background-color: #64748b;
+            color: white;
+        }
+
+        /* Standard Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid #334155;
+        }
+
+        .contact-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            background-color: #334155;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .user-name {
+            font-weight: 600;
+        }
+
+        .user-id {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Authentication Screen (Visible by default) -->
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-icon">🔐</div>
+                <h1 class="auth-title">CipherLink</h1>
+                <p class="auth-subtitle">Secure Anonymous Messaging</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button id="newAccountTab" class="auth-tab tab-active" onclick="switchAuthTab('new')">New Account</button>
+                <button id="restoreTab" class="auth-tab tab-inactive" onclick="switchAuthTab('restore')">Restore</button>
+            </div>
+
+            <div id="newAccountForm">
+                <p style="color: #cbd5e1; font-size: 0.875rem; margin-bottom: 1rem; text-align: center;">
+                    Your identity will be generated with a 12-word seed phrase.
+                </p>
+                <button class="btn btn-primary" onclick="createNewIdentity()" style="margin-bottom: 1rem;">
+                    Create New Identity
+                </button>
+                <button class="btn" onclick="devLogin()" style="background-color: #f59e0b; color: white; width: 100%;">
+                    🔧 Dev Quick Login
+                </button>
+            </div>
+
+            <div id="restoreForm" class="hidden">
+                <textarea 
+                    id="seedPhraseInput"
+                    class="input-field" 
+                    placeholder="Enter your 12-word seed phrase"
+                    rows="3"
+                ></textarea>
+                <input 
+                    type="password" 
+                    id="passwordInput"
+                    class="input-field" 
+                    placeholder="Enter password"
+                >
+                <button 
+                    id="restoreButton"
+                    class="btn btn-secondary" 
+                    onclick="restoreIdentity()"
+                    disabled
+                >
+                    Restore Identity
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container (Hidden by default) -->
+    <div id="mainAppContainer" class="main-app-container">
+        <!-- Hamburger Menu Button -->
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
+
+        <!-- Sidebar Menu Overlay -->
+        <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+        
+        <!-- Sidebar Menu -->
+        <div class="sidebar-menu" id="sidebarMenu">
+            <div class="menu-header">
+                <h2 style="color: white; margin: 0;">Menu</h2>
+                <button class="close-menu" onclick="closeMenu()">×</button>
+            </div>
+            
+            <div class="menu-item" onclick="showProfile()">
+                <span class="menu-item-icon">👤</span>
+                <span>My Profile</span>
+            </div>
+            
+            <div class="menu-item" onclick="showWallet()">
+                <span class="menu-item-icon">💰</span>
+                <span>Wallet</span>
+            </div>
+            
+            <div class="menu-item" onclick="showCreateGroupModal()">
+                <span class="menu-item-icon">👥</span>
+                <span>Create Group</span>
+            </div>
+            
+            <div class="menu-item" onclick="showCreateChatModal()">
+                <span class="menu-item-icon">💬</span>
+                <span>Create Chat</span>
+            </div>
+            
+            <div class="menu-item" onclick="showCreateChannelModal()">
+                <span class="menu-item-icon">📺</span>
+                <span>Create Channel</span>
+            </div>
+            
+            <div class="menu-item" onclick="showFavorites()">
+                <span class="menu-item-icon">⭐</span>
+                <span>Favorites</span>
+            </div>
+            
+            <div class="menu-item" onclick="showSettings()">
+                <span class="menu-item-icon">⚙️</span>
+                <span>Settings</span>
+            </div>
+            
+            <div class="menu-item" onclick="inviteFriends()">
+                <span class="menu-item-icon">🔗</span>
+                <span>Invite Friends</span>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content" id="mainContent">
+            <!-- Chat Interface -->
+            <div style="flex: 1; display: flex; flex-direction: column;">
+                <div id="chatHeader" class="chat-header hidden">
+                    <div style="display: flex; align-items: center;">
+                        <div class="contact-avatar" id="chatAvatar">C</div>
+                        <div>
+                            <div class="user-name" id="chatName">Contact Name</div>
+                            <div class="user-id">Online</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="welcomeScreen" class="welcome-screen">
+                    <div class="welcome-content">
+                        <div class="welcome-icon">💬</div>
+                        <h2 class="welcome-title">Welcome to CipherLink</h2>
+                        <p class="welcome-text">Click ☰ to open menu and start chatting</p>
+                    </div>
+                </div>
+
+                <div id="messagesArea" class="messages-area hidden"></div>
+
+                <div id="inputArea" class="input-area hidden">
+                    <div class="message-input-container">
+                        <input 
+                            type="text" 
+                            id="messageInput"
+                            class="message-input" 
+                            placeholder="Type a message..."
+                            onkeypress="handleKeyPress(event)"
+                        >
+                        <button 
+                            id="sendButton"
+                            class="send-button" 
+                            onclick="sendMessage()"
+                            disabled
+                        >
+                            ➤
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Channel Modal (Inside main app container) -->
+        <div id="createChannelModal" class="modal hidden">
+            <div class="modal-content">
+                <h2 style="margin-bottom: 1.5rem; color: white; text-align: center;">Create New Channel</h2>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Channel Name</label>
+                    <input 
+                        type="text" 
+                        id="channelName"
+                        class="input-field" 
+                        placeholder="Enter channel name"
+                        style="width: 100%;"
+                    >
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Description</label>
+                    <textarea 
+                        id="channelDescription"
+                        class="input-field" 
+                        placeholder="Enter channel description"
+                        rows="3"
+                        style="width: 100%; resize: vertical;"
+                    ></textarea>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">
+                        <input type="checkbox" id="channelPublic" style="margin-right: 0.5rem;"> Public Channel
+                    </label>
+                    <p style="font-size: 0.875rem; color: #94a3b8; margin-top: 0.25rem;">
+                        Public channels can be joined by anyone. Private channels require invitation.
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 1rem;">
+                    <button 
+                        class="btn" 
+                        onclick="closeCreateChannelModal()"
+                        style="flex: 1; background-color: #64748b; color: white;"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        class="btn btn-primary" 
+                        onclick="createChannel()"
+                        style="flex: 1;"
+                    >
+                        Create Channel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Modal -->
+        <div id="profileModal" class="profile-modal hidden">
+            <div class="profile-content">
+                <div class="profile-header">
+                    <div class="profile-avatar" id="profileAvatar">U</div>
+                    <h2 style="color: white; margin-bottom: 0.5rem;" id="profileName">Anonymous User</h2>
+                    <p style="color: #94a3b8;">Your Profile Information</p>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">User ID:</span>
+                    <span class="info-value" id="profileUid">XXXXXXXX</span>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">Fingerprint:</span>
+                    <span class="info-value" id="profileFingerprint">XXXXXXXX</span>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">Public Key:</span>
+                    <span class="info-value" id="profilePublicKey" style="font-size: 0.75rem;">pub_xxxxxxxxxxxxxxxx</span>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">Registration ID:</span>
+                    <span class="info-value" id="profileRegId">XXXX</span>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">Seed Phrase:</span>
+                    <span class="info-value" id="profileSeed" style="font-size: 0.75rem; color: #f59e0b;">Click to reveal</span>
+                </div>
+
+                <div class="profile-info-item">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value" style="color: #10b981;">✅ Online</span>
+                </div>
+
+                <div style="text-align: center; margin: 1.5rem 0;">
+                    <p style="color: #94a3b8; margin-bottom: 0.5rem;">Share your profile via QR code:</p>
+                    <div class="qr-code-container">
+                        <div id="profileQR" style="width: 150px; height: 150px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; color: #64748b;">
+                            QR Code Placeholder
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <button class="profile-btn btn-copy" onclick="copyProfileInfo()">
+                        📋 Copy Info
+                    </button>
+                    <button class="profile-btn btn-export" onclick="exportIdentity()">
+                        💾 Export
+                    </button>
+                    <button class="profile-btn btn-close" onclick="closeProfileModal()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Group Modal -->
+        <div id="createGroupModal" class="group-modal hidden">
+            <div class="group-content">
+                <div class="group-header">
+                    <h2 style="color: white; margin-bottom: 0.5rem;">Create New Group</h2>
+                    <p style="color: #94a3b8;">Set up your secure group chat</p>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Group Name</label>
+                    <input 
+                        type="text" 
+                        id="groupName"
+                        class="input-field" 
+                        placeholder="Enter group name"
+                        style="width: 100%;"
+                    >
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Description</label>
+                    <textarea 
+                        id="groupDescription"
+                        class="input-field" 
+                        placeholder="Group description (optional)"
+                        rows="2"
+                        style="width: 100%; resize: vertical;"
+                    ></textarea>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Group Type</label>
+                    <select id="groupType" class="input-field" style="width: 100%;">
+                        <option value="private">Private Group (Invite only)</option>
+                        <option value="public">Public Group (Anyone can join)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #cbd5e1;">Add Members</label>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <input 
+                            type="text" 
+                            id="memberInput"
+                            class="input-field" 
+                            placeholder="Enter user ID or fingerprint"
+                            style="flex: 1;"
+                        >
+                        <button 
+                            class="btn" 
+                            onclick="addMemberToGroup()"
+                            style="background-color: #0891b2; color: white; padding: 0.75rem;"
+                        >
+                            Add
+                        </button>
+                    </div>
+                    
+                    <div class="group-members-list" id="groupMembersList">
+                        <div style="text-align: center; color: #94a3b8; padding: 1rem;">
+                            No members added yet
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem;">
+                    <button 
+                        class="btn" 
+                        onclick="closeCreateGroupModal()"
+                        style="flex: 1; background-color: #64748b; color: white;"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        class="btn btn-primary" 
+                        onclick="createGroup()"
+                        style="flex: 1;"
+                    >
+                        Create Group
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentState = {
+            identity: null,
+            contacts: [],
+            messages: [],
+            activeContact: null,
+            channels: [],
+            activeChannel: null,
+            activeTab: 'contacts',
+            ws: null,  // WebSocket connection
+            apiUrl: 'http://localhost:3001/api'  // Database server API
+        };
+
+        // API functions
+        async function registerUser(uid, publicKey, fingerprint) {
+            try {
+                const response = await fetch(`${currentState.apiUrl}/users/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        uid,
+                        publicKey,
+                        fingerprint
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Registration failed');
+                }
+                
+                return data.user;
+            } catch (error) {
+                console.error('API Registration error:', error);
+                throw error;
+            }
+        }
+
+        async function createChannelAPI(name, description, isPublic = false) {
+            try {
+                const response = await fetch(`${currentState.apiUrl}/channels`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        ownerId: currentState.identity.uid,
+                        isPublic
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Channel creation failed');
+                }
+                
+                return data.channel;
+            } catch (error) {
+                console.error('API Channel creation error:', error);
+                throw error;
+            }
+        }
+
+        async function getUserChannels() {
+            try {
+                const response = await fetch(`${currentState.apiUrl}/users/${currentState.identity.uid}/channels`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch channels');
+                }
+                
+                return data.channels || [];
+            } catch (error) {
+                console.error('API Get channels error:', error);
+                return [];
+            }
+        }
+
+        async function sendMessageAPI(content, type = 'text') {
+            try {
+                const messageData = {
+                    fromUid: currentState.identity.uid,
+                    content,
+                    type
+                };
+                
+                // Add recipient based on current context
+                if (currentState.activeContact) {
+                    const contact = currentState.contacts.find(c => c.uid === currentState.activeContact);
+                    if (contact) {
+                        messageData.toUid = contact.uid;
+                    }
+                } else if (currentState.activeChannel) {
+                    messageData.channelId = currentState.activeChannel;
+                }
+                
+                const response = await fetch(`${currentState.apiUrl}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(messageData)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to send message');
+                }
+                
+                return data.message;
+            } catch (error) {
+                console.error('API Send message error:', error);
+                throw error;
+            }
+        }
+
+        function connectWebSocket() {
+            if (!currentState.identity) return;
+            
+            try {
+                const wsUrl = `ws://localhost:3001?uid=${encodeURIComponent(currentState.identity.uid)}`;
+                currentState.ws = new WebSocket(wsUrl);
+                
+                currentState.ws.onopen = function(event) {
+                    console.log('WebSocket connected');
+                };
+                
+                currentState.ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+                
+                currentState.ws.onclose = function(event) {
+                    console.log('WebSocket disconnected');
+                    // Attempt to reconnect
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                currentState.ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                };
+            } catch (error) {
+                console.error('WebSocket connection failed:', error);
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'message_received':
+                    // Add received message to state
+                    currentState.messages.push(data.message);
+                    if (data.message.from === currentState.activeContact || 
+                        data.message.channelId === currentState.activeChannel) {
+                        renderMessages();
+                    }
+                    break;
+                case 'message_sent':
+                    // Message sent confirmation
+                    console.log('Message sent:', data.message);
+                    break;
+                case 'user_online':
+                    // Update user status
+                    console.log('User online:', data.uid);
+                    break;
+            }
+        }
+        const CryptoUtils = {
+            generateKeyPair() {
+                const pubKey = 'pub_' + Math.random().toString(36).substring(2, 15);
+                const privKey = 'priv_' + Math.random().toString(36).substring(2, 15);
+                return { publicKey: pubKey, privateKey: privKey };
+            },
+
+            generateSeedPhrase() {
+                const words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima'];
+                return words.join(' ');
+            },
+
+            generateFingerprint(key) {
+                let hash = 0;
+                for (let i = 0; i < key.length; i++) {
+                    const char = key.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash |= 0;
+                }
+                return Math.abs(hash).toString(16).substring(0, 8).toUpperCase().padStart(8, '0');
+            }
+        };
+
+        // Auth functions
+        function switchAuthTab(tab) {
+            document.getElementById('newAccountTab').className = tab === 'new' ? 'auth-tab tab-active' : 'auth-tab tab-inactive';
+            document.getElementById('restoreTab').className = tab === 'restore' ? 'auth-tab tab-active' : 'auth-tab tab-inactive';
+            
+            document.getElementById('newAccountForm').className = tab === 'new' ? '' : 'hidden';
+            document.getElementById('restoreForm').className = tab === 'restore' ? '' : 'hidden';
+        }
+
+        function createNewIdentity() {
+            try {
+                const keyPair = CryptoUtils.generateKeyPair();
+                const seedPhrase = CryptoUtils.generateSeedPhrase();
+                const fingerprint = CryptoUtils.generateFingerprint(keyPair.publicKey);
+                
+                const uid = 'uid_' + Math.random().toString(36).substring(2, 12);
+                
+                // Register with database server
+                registerUser(uid, keyPair.publicKey, fingerprint)
+                    .then(user => {
+                        currentState.identity = {
+                            id: user.id,
+                            uid: user.uid,
+                            identityKey: keyPair,
+                            seedPhrase,
+                            fingerprint: user.fingerprint
+                        };
+                        
+                        // Connect WebSocket
+                        connectWebSocket();
+                        
+                        showMainApp();
+                    })
+                    .catch(error => {
+                        console.error('Registration failed:', error);
+                        alert('Failed to register user: ' + error.message);
+                    });
+            } catch (error) {
+                console.error('Failed to create identity:', error);
+            }
+        }
+
+        function restoreIdentity() {
+            const seedPhrase = document.getElementById('seedPhraseInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            if (!seedPhrase || !password) return;
+            
+            // In real implementation, derive keys from seed
+            createNewIdentity();
+        }
+
+        function devLogin() {
+            console.log('🔧 Dev quick login activated');
+            
+            // Create a test identity for development
+            currentState.identity = {
+                uid: 'dev_user_' + Date.now(),
+                identityKey: {
+                    publicKey: 'dev_pub_key_' + Date.now(),
+                    privateKey: 'dev_priv_key_' + Date.now()
+                },
+                seedPhrase: 'development test seed phrase for quick access',
+                fingerprint: 'DEV' + Date.now().toString().slice(-4)
+            };
+            
+            showMainApp();
+            
+            // Add a sample contact and channel automatically
+            setTimeout(() => {
+                addSampleContact();
+                addSampleChannel();
+            }, 500);
+        }
+
+        // UI functions
+        function showMainApp() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('mainAppContainer').classList.add('visible');
+        }
+
+        // Menu functions
+        function toggleMenu() {
+            const menu = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('menuOverlay');
+            const mainContent = document.getElementById('mainContent');
+            
+            menu.classList.toggle('open');
+            mainContent.classList.toggle('menu-open');
+            
+            if (menu.classList.contains('open')) {
+                overlay.style.display = 'block';
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+
+        function closeMenu() {
+            const menu = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('menuOverlay');
+            const mainContent = document.getElementById('mainContent');
+            
+            menu.classList.remove('open');
+            mainContent.classList.remove('menu-open');
+            overlay.style.display = 'none';
+        }
+
+        // Menu item functions
+        function showProfile() {
+            if (!currentState.identity) {
+                alert('Please log in first');
+                return;
+            }
+            closeMenu();
+            openProfileModal();
+        }
+
+        function showCreateGroupModal() {
+            if (!currentState.identity) {
+                alert('Please log in first');
+                return;
+            }
+            closeMenu();
+            openCreateGroupModal();
+        }
+
+        // Group functions
+        let groupMembers = [];
+
+        function openCreateGroupModal() {
+            document.getElementById('createGroupModal').classList.remove('hidden');
+            document.getElementById('groupName').focus();
+            groupMembers = [];
+            updateGroupMembersList();
+        }
+
+        function closeCreateGroupModal() {
+            document.getElementById('createGroupModal').classList.add('hidden');
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDescription').value = '';
+            document.getElementById('groupType').value = 'private';
+            document.getElementById('memberInput').value = '';
+            groupMembers = [];
+        }
+
+        function addMemberToGroup() {
+            const memberInput = document.getElementById('memberInput');
+            const memberId = memberInput.value.trim();
+            
+            if (!memberId) {
+                alert('Please enter a user ID or fingerprint');
+                return;
+            }
+            
+            // Check if member already added
+            if (groupMembers.some(m => m.id === memberId)) {
+                alert('Member already added');
+                return;
+            }
+            
+            // Add member (in real app, would validate against contacts)
+            const newMember = {
+                id: memberId,
+                name: `User ${memberId.substring(0, 4)}`,
+                fingerprint: memberId.length > 8 ? memberId.substring(0, 8) + '...' : memberId
+            };
+            
+            groupMembers.push(newMember);
+            memberInput.value = '';
+            updateGroupMembersList();
+        }
+
+        function removeMemberFromGroup(memberId) {
+            groupMembers = groupMembers.filter(m => m.id !== memberId);
+            updateGroupMembersList();
+        }
+
+        function updateGroupMembersList() {
+            const container = document.getElementById('groupMembersList');
+            
+            if (groupMembers.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 1rem;">No members added yet</div>';
+                return;
+            }
+            
+            container.innerHTML = groupMembers.map(member => `
+                <div class="group-member-item">
+                    <div class="member-avatar">${member.name.charAt(0)}</div>
+                    <div class="member-info">
+                        <div class="member-name">${member.name}</div>
+                        <div class="member-fingerprint">${member.fingerprint}</div>
+                    </div>
+                    <button class="remove-member" onclick="removeMemberFromGroup('${member.id}')">
+                        Remove
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function createGroup() {
+            const name = document.getElementById('groupName').value.trim();
+            const description = document.getElementById('groupDescription').value.trim();
+            const type = document.getElementById('groupType').value;
+            
+            if (!name) {
+                alert('Please enter a group name');
+                return;
+            }
+            
+            if (groupMembers.length === 0) {
+                alert('Please add at least one member');
+                return;
+            }
+            
+            // Always add creator as member
+            const creatorMember = {
+                id: currentState.identity.uid,
+                name: 'You (Creator)',
+                fingerprint: currentState.identity.fingerprint
+            };
+            
+            if (!groupMembers.some(m => m.id === creatorMember.id)) {
+                groupMembers.unshift(creatorMember);
+            }
+            
+            const newGroup = {
+                id: 'group_' + Date.now(),
+                name: name,
+                description: description || 'No description',
+                type: type,
+                owner: currentState.identity.uid,
+                members: groupMembers,
+                createdAt: Date.now(),
+                isAdmin: true
+            };
+            
+            // In real implementation, would save to state/store
+            console.log('Created group:', newGroup);
+            
+            closeCreateGroupModal();
+            alert(`Group "${name}" created successfully with ${groupMembers.length} members!`);
+        }
+
+        function openProfileModal() {
+            if (!currentState.identity) return;
+            
+            // Update profile information
+            document.getElementById('profileAvatar').textContent = 
+                currentState.identity.uid.substring(0, 2).toUpperCase();
+            document.getElementById('profileName').textContent = 'Anonymous User';
+            document.getElementById('profileUid').textContent = currentState.identity.uid;
+            document.getElementById('profileFingerprint').textContent = currentState.identity.fingerprint;
+            document.getElementById('profilePublicKey').textContent = 
+                currentState.identity.identityKey.publicKey.substring(0, 20) + '...';
+            document.getElementById('profileRegId').textContent = 
+                currentState.identity.uid.substring(0, 4).toUpperCase();
+            
+            // Seed phrase reveal functionality
+            const seedElement = document.getElementById('profileSeed');
+            seedElement.textContent = '••••••••••••';
+            seedElement.style.cursor = 'pointer';
+            seedElement.onclick = function() {
+                if (confirm('Show your seed phrase? This is sensitive information!')) {
+                    this.textContent = currentState.identity.seedPhrase;
+                    this.style.color = '#ef4444';
+                    this.onclick = null;
+                }
+            };
+            
+            // QR Code generation (placeholder)
+            const qrElement = document.getElementById('profileQR');
+            qrElement.textContent = 'QR: ' + currentState.identity.uid.substring(0, 8);
+            
+            document.getElementById('profileModal').classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.add('hidden');
+        }
+
+        function copyProfileInfo() {
+            if (!currentState.identity) return;
+            
+            const profileText = `CipherLink Profile:
+User ID: ${currentState.identity.uid}
+Fingerprint: ${currentState.identity.fingerprint}
+Public Key: ${currentState.identity.identityKey.publicKey}
+Registration ID: ${currentState.identity.uid.substring(0, 4).toUpperCase()}`;
+            
+            // Fallback for browsers that don't support clipboard API
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(profileText).then(() => {
+                    alert('Profile information copied to clipboard!');
+                }).catch(() => {
+                    fallbackCopyTextToClipboard(profileText);
+                });
+            } else {
+                fallbackCopyTextToClipboard(profileText);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('Profile information copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy to clipboard. Please copy manually:\n\n' + text);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function exportIdentity() {
+            if (!currentState.identity) return;
+            
+            const exportData = {
+                uid: currentState.identity.uid,
+                fingerprint: currentState.identity.fingerprint,
+                publicKey: currentState.identity.identityKey.publicKey,
+                registrationId: currentState.identity.uid.substring(0, 4).toUpperCase(),
+                exportDate: new Date().toISOString()
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `cipherlink_profile_${currentState.identity.uid.substring(0, 8)}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            alert('Profile exported successfully!');
+        }
+
+        function showWallet() {
+            if (!currentState.identity) return;
+            closeMenu();
+            alert('Wallet section would open here');
+        }
+
+        function showCreateChatModal() {
+            if (!currentState.identity) return;
+            closeMenu();
+            alert('Create Chat modal would open here');
+        }
+
+        function showCreateChannelModal() {
+            if (!currentState.identity) {
+                alert('Please log in first');
+                return;
+            }
+            closeMenu();
+            document.getElementById('createChannelModal').classList.remove('hidden');
+            document.getElementById('channelName').focus();
+        }
+
+        function showFavorites() {
+            if (!currentState.identity) return;
+            closeMenu();
+            alert('Favorites section would open here');
+        }
+
+        function showSettings() {
+            if (!currentState.identity) return;
+            closeMenu();
+            alert('Settings section would open here');
+        }
+
+        function inviteFriends() {
+            if (!currentState.identity) return;
+            closeMenu();
+            alert('Invite friends functionality would open here');
+        }
+
+        function closeCreateChannelModal() {
+            document.getElementById('createChannelModal').classList.add('hidden');
+            document.getElementById('channelName').value = '';
+            document.getElementById('channelDescription').value = '';
+            document.getElementById('channelPublic').checked = false;
+        }
+
+        function createChannel() {
+            const name = document.getElementById('channelName').value.trim();
+            const description = document.getElementById('channelDescription').value.trim();
+            const isPublic = document.getElementById('channelPublic').checked;
+            
+            if (!name) {
+                alert('Please enter a channel name');
+                return;
+            }
+
+            const newChannel = {
+                id: 'chan_' + Date.now(),
+                name: name,
+                description: description || 'No description',
+                owner: currentState.identity.uid,
+                members: [currentState.identity.uid],
+                isPublic: isPublic,
+                createdAt: Date.now()
+            };
+
+            currentState.channels.push(newChannel);
+            closeCreateChannelModal();
+            
+            // Auto-select the new channel
+            setTimeout(() => {
+                selectChannel(newChannel);
+            }, 100);
+        }
+
+        function selectChannel(channel) {
+            currentState.activeChannel = channel.id;
+            currentState.activeContact = null;
+            updateMainView();
+        }
+
+        function updateMainView() {
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const chatHeader = document.getElementById('chatHeader');
+            const messagesArea = document.getElementById('messagesArea');
+            const inputArea = document.getElementById('inputArea');
+            
+            if (currentState.activeContact || currentState.activeChannel) {
+                welcomeScreen.classList.add('hidden');
+                chatHeader.classList.remove('hidden');
+                messagesArea.classList.remove('hidden');
+                inputArea.classList.remove('hidden');
+                
+                if (currentState.activeContact) {
+                    const contact = currentState.contacts.find(c => c.uid === currentState.activeContact);
+                    if (contact) {
+                        document.getElementById('chatAvatar').textContent = contact.name.charAt(0);
+                        document.getElementById('chatName').textContent = contact.name;
+                    }
+                } else if (currentState.activeChannel) {
+                    const channel = currentState.channels.find(c => c.id === currentState.activeChannel);
+                    if (channel) {
+                        document.getElementById('chatAvatar').textContent = '#';
+                        document.getElementById('chatName').textContent = channel.name;
+                    }
+                }
+                renderMessages();
+            } else {
+                welcomeScreen.classList.remove('hidden');
+                chatHeader.classList.add('hidden');
+                messagesArea.classList.add('hidden');
+                inputArea.classList.add('hidden');
+            }
+        }
+
+        function addSampleContact() {
+            const sampleContact = {
+                uid: 'sample_' + Date.now(),
+                name: 'Sample Contact ' + (currentState.contacts.length + 1),
+                publicKey: 'sample_pub_key_' + Date.now(),
+                fingerprint: 'SAMPLE' + Date.now().toString().slice(-4),
+                isVerified: false
+            };
+            
+            currentState.contacts.push(sampleContact);
+        }
+
+        function addSampleChannel() {
+            const sampleChannel = {
+                id: 'sample_chan_' + Date.now(),
+                name: 'General Discussion',
+                description: 'Welcome to our community channel!',
+                owner: 'system',
+                members: [currentState.identity.uid],
+                isPublic: true,
+                createdAt: Date.now()
+            };
+            
+            currentState.channels.push(sampleChannel);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || (!currentState.activeContact && !currentState.activeChannel)) return;
+            
+            // Send via API
+            sendMessageAPI(content)
+                .then(message => {
+                    // Add to local state for immediate display
+                    currentState.messages.push({
+                        id: message.id,
+                        from: message.sender.uid,
+                        to: message.receiver?.uid || message.channelId,
+                        content: message.content,
+                        timestamp: new Date(message.timestamp).getTime(),
+                        type: message.type
+                    });
+                    
+                    input.value = '';
+                    updateSendButton();
+                    renderMessages();
+                })
+                .catch(error => {
+                    console.error('Failed to send message:', error);
+                    alert('Failed to send message: ' + error.message);
+                });
+        }
+
+        function renderMessages() {
+            const messagesArea = document.getElementById('messagesArea');
+            messagesArea.innerHTML = '';
+            
+            const contactMessages = currentState.messages.filter(msg => 
+                msg.to === currentState.activeContact || msg.to === currentState.activeChannel
+            );
+            
+            contactMessages.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${message.from === currentState.identity.uid ? 'sent' : 'received'}`;
+                
+                messageElement.innerHTML = `
+                    <div class="message-bubble">
+                        <div>${message.content}</div>
+                        <div class="message-time">
+                            ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    </div>
+                `;
+                
+                messagesArea.appendChild(messageElement);
+            });
+            
+            // Scroll to bottom
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function updateSendButton() {
+            const input = document.getElementById('messageInput');
+            const button = document.getElementById('sendButton');
+            button.disabled = !input.value.trim();
+        }
+
+        // Event listeners
+        document.getElementById('messageInput').addEventListener('input', updateSendButton);
+
+        document.getElementById('seedPhraseInput').addEventListener('input', () => {
+            const seedPhrase = document.getElementById('seedPhraseInput').value;
+            const password = document.getElementById('passwordInput').value;
+            document.getElementById('restoreButton').disabled = !(seedPhrase && password);
+        });
+
+        document.getElementById('passwordInput').addEventListener('input', () => {
+            const seedPhrase = document.getElementById('seedPhraseInput').value;
+            const password = document.getElementById('passwordInput').value;
+            document.getElementById('restoreButton').disabled = !(seedPhrase && password);
+        });
+    </script>
+</body>
+</html>

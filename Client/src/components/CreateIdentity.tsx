@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
 import { useTranslation } from '../contexts/LanguageContext';
 import type { Identity } from '../types';
+import { apiService } from '../services/apiService';
 
 interface CreateIdentityProps {
   onAuth: (identity?: Identity) => void;
@@ -13,6 +15,10 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onAuth }) => {
   const [isImportMode, setIsImportMode] = useState(false);
   const [importString, setImportString] = useState('');
   const [error, setError] = useState('');
+  
+  // Server Settings State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [serverIp, setServerIp] = useState(apiService.getBaseUrl().replace('http://', '').replace(':8080', ''));
 
   const handleCreate = () => {
       onAuth(); // No argument means create new
@@ -31,8 +37,58 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onAuth }) => {
       }
   };
 
+  const saveServerSettings = () => {
+      if (serverIp) {
+          apiService.setServerUrl(serverIp);
+          window.location.reload();
+      }
+  };
+
+  if (isSettingsOpen) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-900">
+            <div className="max-w-md w-full p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg text-center border border-slate-700">
+                <h2 className="text-2xl font-bold text-white">{t('server_settings')}</h2>
+                <div className="text-left">
+                    <label className="text-sm text-slate-400 mb-1 block">{t('server_ip_label')}</label>
+                    <input 
+                        value={serverIp}
+                        onChange={e => setServerIp(e.target.value)}
+                        placeholder={t('server_ip_placeholder')}
+                        className="w-full bg-slate-900 p-3 rounded text-white border border-slate-600 focus:border-cyan-500 outline-none"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">Current default: 192.168.100.3</p>
+                </div>
+                <div className="flex space-x-2">
+                    <button 
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="flex-1 py-3 bg-slate-700 text-white rounded hover:bg-slate-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button 
+                        onClick={saveServerSettings}
+                        className="flex-1 py-3 bg-cyan-600 text-white rounded hover:bg-cyan-700"
+                    >
+                        {t('save_reload')}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-900">
+    <div className="flex items-center justify-center min-h-screen bg-slate-900 relative">
+      
+      <button 
+        onClick={() => setIsSettingsOpen(true)}
+        className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors"
+        title="Server Settings"
+      >
+          <SettingsIcon className="w-6 h-6" />
+      </button>
+
       <div className="max-w-md w-full p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg text-center border border-slate-700">
         <div className="flex justify-center">
           <ShieldCheckIcon className="w-16 h-16 text-cyan-400" />
@@ -60,6 +116,34 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onAuth }) => {
                     >
                       {t('login_btn')}
                     </button>
+                    
+                    {/* Development Mode - Free Entry */}
+                    <div className="pt-4 border-t border-slate-700">
+                        <p className="text-xs text-slate-500 mb-2">Режим разработки</p>
+                        <div className="space-y-2">
+                            <button
+                              onClick={() => {
+                                  console.log('Simple dev login clicked');
+                                  onAuth();
+                              }}
+                              className="w-full px-4 py-2 text-sm font-semibold text-yellow-300 bg-yellow-900/30 rounded-md hover:bg-yellow-900/50 transition-colors border border-yellow-700/50"
+                            >
+                              🔧 Быстрый вход (dev)
+                            </button>
+                            
+                            <button
+                              onClick={() => {
+                                  // Pre-filled import for testing
+                                  setImportString('{"uid":"test_user_123","publicKey":"pub_test_key","privateKey":"priv_test_key","username":"Test User","keyFingerprint":"TEST1234"}');
+                                  setIsImportMode(true);
+                              }}
+                              className="w-full px-4 py-2 text-sm font-semibold text-blue-300 bg-blue-900/30 rounded-md hover:bg-blue-900/50 transition-colors border border-blue-700/50"
+                            >
+                              🧪 Тестовая личность
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Только для тестирования</p>
+                    </div>
                 </div>
             </>
         ) : (

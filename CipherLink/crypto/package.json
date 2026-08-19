@@ -1,0 +1,30 @@
+{
+  "name": "@cipherlink/crypto-core",
+  "version": "1.0.0",
+  "description": "Cryptographic core for CipherLink messenger",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.11",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "keywords": ["cryptography", "signal-protocol", "messaging", "encryption"],
+  "author": "CipherLink Team",
+  "license": "MIT"
+}

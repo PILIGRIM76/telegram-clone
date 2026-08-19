@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Store, Product, Order, Identity } from '../types';
 import { apiService } from '../services/apiService';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -208,4 +208,3 @@ const StoreManagementModal: React.FC<StoreManagementModalProps> = ({ identity, o
 };
 
 export default StoreManagementModal;
-    

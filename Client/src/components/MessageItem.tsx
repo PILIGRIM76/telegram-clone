@@ -1,10 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
-import type { Message, Identity, Reaction } from '../types';
+import React, { useEffect, useState, useRef } from 'react';
+import type { Message, Identity } from '../types';
 import { decrypt } from '../services/cryptoService';
 import { ClockIcon } from './icons/ClockIcon';
 import { GiftIcon } from './icons/GiftIcon';
 import { ReplyIcon } from './icons/ReplyIcon';
+import { TrashIcon } from './icons/TrashIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { ShareIcon } from './icons/ShareIcon';
 
@@ -12,10 +13,7 @@ interface MessageItemProps {
     message: Message;
     currentIdentity: Identity;
     onTimerExpire: () => void;
-    onReply: (message: Message, decryptedText: string) => void;
-    onEdit: (message: Message, decryptedText: string) => void;
-    onForward: (message: Message, decryptedText: string) => void;
-    onReact: (messageId: string, emoji: string) => void;
+    onAction?: (action: string, message: Message, extra?: any) => void;
 }
 
 const statusText = {
@@ -24,19 +22,17 @@ const statusText = {
   'read': '✓✓',
 };
 
-const REACTIONS_LIST = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const reactionsList = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onTimerExpire, onReply, onEdit, onForward, onReact }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onTimerExpire, onAction }) => {
     const [visible, setVisible] = useState(true);
-    const [showReactions, setShowReactions] = useState(false);
-    
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     const sentByMe = message.senderId === currentIdentity.uid;
     const isSystem = message.type === 'system';
 
-    // Decrypt
     const text = isSystem ? message.text : decrypt(message.text, currentIdentity.privateKey);
 
-    // Disappearing logic
     useEffect(() => {
         if (message.disappearIn && message.timerSetAt) {
             const passed = (Date.now() - message.timerSetAt) / 1000;
@@ -55,6 +51,28 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
         }
     }, [message, onTimerExpire]);
 
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        if (showMenu) document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [showMenu]);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (onAction && !isSystem) setShowMenu(true);
+    };
+
+    const handleActionClick = (action: string, extra?: any) => {
+        if (onAction) {
+            onAction(action, { ...message, text }, extra);
+        }
+        setShowMenu(false);
+    };
+
     if (!visible) return <div className="transition-all duration-500 opacity-0 h-0 overflow-hidden"></div>;
 
     if (isSystem) {
@@ -67,13 +85,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
         );
     }
 
-    // Group reactions
-    const reactionCounts = (message.reactions || []).reduce((acc, r) => {
-        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    // Order Logic
     if (message.payload && message.payload.type === 'order') {
         return (
             <div className={`flex ${sentByMe ? 'justify-end' : 'justify-start'}`}>
@@ -86,7 +97,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
         )
     }
 
-    // Gift Logic
     if (message.payload && message.payload.type === 'gift') {
         const gift = message.payload.gift;
         return (
@@ -122,130 +132,98 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
 
     return (
         <div 
-            className={`flex ${sentByMe ? 'justify-end' : 'justify-start'} group mb-1 relative`}
-            onMouseLeave={() => setShowReactions(false)}
+            className={`flex ${sentByMe ? 'justify-end' : 'justify-start'} group relative`}
+            onContextMenu={handleContextMenu}
         >
-            <div className="flex flex-col max-w-[85%] md:max-w-[70%]">
+            <div
+                className={`relative max-w-[85%] md:max-w-[70%] px-4 py-2 rounded-2xl shadow-sm ${
+                    sentByMe
+                        ? 'bg-cyan-600 text-white rounded-br-none'
+                        : 'bg-slate-700 text-slate-200 rounded-bl-none'
+                }`}
+            >
+                {message.replyTo && (
+                    <div className={`text-xs mb-1 p-1 border-l-2 border-slate-300/50 ${sentByMe ? 'bg-black/10' : 'bg-black/20'} rounded-r`}>
+                        <p className="font-bold opacity-70">Reply to:</p>
+                        <p className="truncate opacity-70">{message.replyTo.text}</p>
+                    </div>
+                )}
+
+                {message.isForwarded && (
+                    <div className="text-[10px] italic opacity-70 mb-1 flex items-center">
+                        <ShareIcon className="w-3 h-3 mr-1" /> Forwarded
+                    </div>
+                )}
+
+                {message.media && (
+                    <div className="mb-2 -mx-2 mt-[-4px]">
+                        {message.mediaType === 'image' ? (
+                            <img src={message.media} className="rounded-lg max-h-64 object-cover w-full" alt="Attachment" />
+                        ) : message.mediaType === 'audio' ? (
+                            <audio src={message.media} controls className="w-full mt-2" />
+                        ) : (
+                            <video src={message.media} controls className="rounded-lg max-h-64 w-full bg-black/20" />
+                        )}
+                    </div>
+                )}
+
+                {text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{text}</p>}
                 
-                {/* Actions Toolbar */}
-                <div className={`flex ${sentByMe ? 'flex-row-reverse' : 'flex-row'} items-center mb-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 space-x-1`}>
-                    <div className="relative">
-                        <button 
-                            onClick={() => setShowReactions(!showReactions)}
-                            className="bg-slate-700/50 hover:bg-slate-600 p-1 rounded-full text-slate-300 mx-1"
-                            title="React"
-                        >
-                            <span className="text-xs">😀</span>
-                        </button>
-                        {showReactions && (
-                            <div className={`absolute bottom-full ${sentByMe ? 'right-0' : 'left-0'} mb-2 bg-slate-800 border border-slate-600 rounded-full p-1 flex shadow-lg z-10`}>
-                                {REACTIONS_LIST.map(emoji => (
-                                    <button 
-                                        key={emoji}
-                                        onClick={() => { onReact(message.id, emoji); setShowReactions(false); }}
-                                        className="hover:bg-slate-700 p-1 rounded-full text-lg transition-transform hover:scale-125"
-                                    >
-                                        {emoji}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                {message.isEdited && <span className="text-[10px] opacity-60 italic ml-1">(edited)</span>}
+
+                {message.reactions && message.reactions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                        {message.reactions.map((r, i) => (
+                            <span key={i} className="bg-black/20 text-xs px-1 rounded-full">{r.emoji}</span>
+                        ))}
                     </div>
+                )}
 
-                    <button 
-                        onClick={() => onReply(message, text)}
-                        className="bg-slate-700/50 hover:bg-slate-600 p-1 rounded-full text-slate-300"
-                        title="Reply"
-                    >
-                        <ReplyIcon className="w-4 h-4" />
-                    </button>
-                    
-                    <button 
-                        onClick={() => onForward(message, text)}
-                        className="bg-slate-700/50 hover:bg-slate-600 p-1 rounded-full text-slate-300"
-                        title="Forward"
-                    >
-                        <ShareIcon className="w-4 h-4" />
-                    </button>
-
-                    {sentByMe && !message.media && (
-                        <button 
-                            onClick={() => onEdit(message, text)}
-                            className="bg-slate-700/50 hover:bg-slate-600 p-1 rounded-full text-slate-300"
-                            title="Edit"
-                        >
-                            <PencilIcon className="w-3 h-3" />
-                        </button>
+                <div className="flex items-center justify-end space-x-1 mt-1 select-none">
+                    {message.disappearIn && (
+                         <ClockIcon className="w-3 h-3 opacity-70" />
                     )}
-                </div>
-
-                <div
-                    className={`relative px-4 py-2 rounded-2xl shadow-sm ${
-                        sentByMe
-                            ? 'bg-cyan-600 text-white rounded-br-none'
-                            : 'bg-slate-700 text-slate-200 rounded-bl-none'
-                    }`}
-                >
-                    {/* Forwarded Label */}
-                    {message.isForwarded && (
-                        <p className="text-[10px] italic opacity-70 mb-1 flex items-center">
-                            <ShareIcon className="w-3 h-3 mr-1" /> Forwarded
-                        </p>
-                    )}
-
-                    {/* Reply Context */}
-                    {message.replyTo && (
-                        <div className={`text-xs mb-2 p-2 rounded border-l-4 ${sentByMe ? 'bg-cyan-700 border-cyan-300' : 'bg-slate-800 border-cyan-500'} bg-opacity-30`}>
-                            <p className="font-bold opacity-80 mb-0.5 truncate">{message.replyTo.senderId === currentIdentity.uid ? 'You' : 'User ' + message.replyTo.senderId.slice(0,6)}</p>
-                            <p className="opacity-70 truncate">{message.replyTo.text}</p>
-                        </div>
-                    )}
-
-                    {/* Media */}
-                    {message.media && (
-                        <div className="mb-2 -mx-2 mt-[-4px]">
-                            {message.mediaType === 'image' ? (
-                                <img src={message.media} className="rounded-lg max-h-64 object-cover w-full" alt="Attachment" />
-                            ) : message.mediaType === 'video' ? (
-                                <video src={message.media} controls className="rounded-lg max-h-64 w-full bg-black/20" />
-                            ) : message.mediaType === 'audio' ? (
-                                <audio src={message.media} controls className="w-full mt-2" />
-                            ) : null}
-                        </div>
-                    )}
-
-                    {text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{text}</p>}
-                    
-                    {/* Metadata: Time, Edited, Status */}
-                    <div className="flex items-center justify-end space-x-1 mt-1 select-none">
-                        {message.isEdited && <span className="text-[10px] opacity-60 mr-1">(edited)</span>}
-                        
-                        {message.disappearIn && (
-                             <ClockIcon className="w-3 h-3 opacity-70" />
-                        )}
-                        <span className="text-[10px] opacity-70">
-                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <span className="text-[10px] opacity-70">
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {sentByMe && message.status && (
+                        <span className={`text-[10px] ${message.status === 'read' ? 'text-cyan-200' : 'opacity-70'}`}>
+                             {statusText[message.status]}
                         </span>
-                        {sentByMe && message.status && (
-                            <span className={`text-[10px] ${message.status === 'read' ? 'text-cyan-200' : 'opacity-70'}`}>
-                                 {statusText[message.status]}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Reactions Display */}
-                    {Object.keys(reactionCounts).length > 0 && (
-                        <div className="absolute -bottom-3 left-2 flex space-x-1">
-                            {Object.entries(reactionCounts).map(([emoji, count]) => (
-                                <div key={emoji} className="bg-slate-800 border border-slate-600 rounded-full px-1.5 py-0.5 text-[10px] shadow-sm flex items-center text-slate-300">
-                                    <span>{emoji}</span>
-                                    {count > 1 && <span className="ml-1 font-bold">{count}</span>}
-                                </div>
-                            ))}
-                        </div>
                     )}
                 </div>
             </div>
+
+            {showMenu && (
+                <div 
+                    ref={menuRef}
+                    className={`absolute z-20 bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 w-40 text-sm ${sentByMe ? 'right-0 mr-10' : 'left-0 ml-10'} top-0`}
+                >
+                    <div className="grid grid-cols-6 gap-1 p-2 border-b border-slate-700">
+                        {reactionsList.map(emoji => (
+                            <button key={emoji} onClick={() => handleActionClick('react', emoji)} className="hover:bg-slate-700 rounded p-1 text-center">
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => handleActionClick('reply')} className="w-full text-left px-3 py-2 hover:bg-slate-700 text-slate-200 flex items-center">
+                        <ReplyIcon className="w-4 h-4 mr-2" /> Reply
+                    </button>
+                    <button onClick={() => handleActionClick('forward')} className="w-full text-left px-3 py-2 hover:bg-slate-700 text-slate-200 flex items-center">
+                        <ShareIcon className="w-4 h-4 mr-2" /> Forward
+                    </button>
+                    {sentByMe && (
+                        <>
+                            <button onClick={() => handleActionClick('edit')} className="w-full text-left px-3 py-2 hover:bg-slate-700 text-slate-200 flex items-center">
+                                <PencilIcon className="w-4 h-4 mr-2" /> Edit
+                            </button>
+                            <button onClick={() => handleActionClick('delete')} className="w-full text-left px-3 py-2 hover:bg-slate-700 text-red-400 flex items-center">
+                                <TrashIcon className="w-4 h-4 mr-2" /> Delete
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

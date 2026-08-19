@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест кнопки</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 min-h-screen flex items-center justify-center">
+    <div class="text-center p-8 bg-slate-800 rounded-lg">
+        <h1 class="text-2xl font-bold text-white mb-4">Тест кнопки</h1>
+        <p id="message" class="text-slate-300 mb-6">Нажмите кнопку ниже</p>
+        <button 
+            onclick="handleClick()"
+            class="px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
+        >
+            🔧 Тестовая кнопка
+        </button>
+    </div>
+
+    <script>
+        function handleClick() {
+            console.log('Button clicked!');
+            document.getElementById('message').textContent = 'Кнопка работает! ' + new Date().toLocaleTimeString();
+        }
+    </script>
+</body>
+</html>
