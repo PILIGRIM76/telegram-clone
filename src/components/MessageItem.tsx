@@ -19,11 +19,19 @@ const statusText = {
 
 const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onTimerExpire }) => {
     const [visible, setVisible] = useState(true);
+    const [decryptedText, setDecryptedText] = useState<string>('');
     const sentByMe = message.senderId === currentIdentity.uid;
     const isSystem = message.type === 'system';
 
-    // Расшифровка
-    const text = isSystem ? message.text : decrypt(message.text, currentIdentity.privateKey);
+    useEffect(() => {
+        if (isSystem) {
+            setDecryptedText(message.text);
+        } else {
+            decrypt(message.text, currentIdentity.privateKey)
+                .then(text => setDecryptedText(text))
+                .catch(() => setDecryptedText('[Decryption failed]'));
+        }
+    }, [message, currentIdentity, isSystem]);
 
     // Логика исчезающих сообщений
     useEffect(() => {
@@ -50,7 +58,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
         return (
             <div className="flex justify-center my-2">
                 <div className="bg-slate-700/50 text-slate-400 text-xs px-3 py-1 rounded-full border border-slate-700">
-                    {text}
+                    {decryptedText}
                 </div>
             </div>
         );
@@ -62,7 +70,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
             <div className={`flex ${sentByMe ? 'justify-end' : 'justify-start'}`}>
                 <div className="bg-slate-700 border border-indigo-500/50 p-3 rounded-lg max-w-xs">
                      <p className="text-xs text-indigo-300 font-bold mb-1">ORDER #{message.payload.orderId.slice(-4)}</p>
-                     <p className="text-sm text-white mb-2">{text}</p>
+                     <p className="text-sm text-white mb-2">{decryptedText}</p>
                      <div className="text-xs text-slate-400">Status: {message.payload.status}</div>
                 </div>
             </div>
@@ -123,7 +131,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
                     </div>
                 )}
 
-                {text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{text}</p>}
+                {text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{decryptedText}</p>}
                 
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
                     {message.disappearIn && (

@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const { db, STORAGE_TYPE } = require('./db/index.js');
 
 const app = express();
 app.use(express.json({ limit: '10mb' })); // Увеличен лимит для изображений
@@ -18,6 +19,7 @@ const пользователи = new Map(); // { uid: { публичныйКлю
 const группы = new Map(); // { id: { название, участники[], idВладельца, тип, токен } }
 const офлайнСообщения = new Map();
 
+console.log('[DB] Инициализация слоя данных, тип:', STORAGE_TYPE);
 console.log('Сервер ШифроСвязь запускается...');
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---

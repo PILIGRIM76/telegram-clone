@@ -1,4 +1,28 @@
 
+export interface AuthResult {
+    success: boolean;
+    user?: User;
+    error?: string;
+    message?: string;
+    requires2FA?: boolean;
+    sessionToken?: string;
+    qrCode?: string;
+    secret?: string;
+}
+
+export interface TwoFactorSetup {
+    success?: boolean;
+    error?: string;
+    secret: string;
+    qrCode: string;
+    manualKey: string;
+}
+
+export interface User {
+    uid: string;
+    имяПользователя?: string;
+}
+
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 export type OrderStatus = 'new' | 'processing' | 'shipped' | 'completed' | 'paid' | 'cancelled';
 

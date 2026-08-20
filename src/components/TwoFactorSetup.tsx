@@ -1,6 +1,6 @@
 // TwoFactorSetup Component for 2FA UI
 import React, { useState } from 'react';
-import { generateSecret, generateBackupCodes } from '../services/authService';
+import { setup2FA } from '../services/auth';
 
 interface TwoFactorSetupProps {
   enabled: boolean;
@@ -19,12 +19,17 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [showCodes, setShowCodes] = useState(false);
 
-  const handleEnable = () => {
-    const secret = generateSecret(username);
-    const codes = generateBackupCodes(10);
-    setBackupCodes(codes);
-    setShowCodes(true);
-    onEnable(secret, codes);
+  const handleEnable = async () => {
+    try {
+      const setup = await setup2FA(username);
+      setQrCode(setup.qrCode);
+      const codes = Array.from({length: 10}, () => Math.random().toString(36).substring(2, 8).toUpperCase());
+      setBackupCodes(codes);
+      setShowCodes(true);
+      onEnable(setup.secret, codes);
+    } catch (error) {
+      console.error('Failed to setup 2FA:', error);
+    }
   };
 
   const handleDisable = () => {

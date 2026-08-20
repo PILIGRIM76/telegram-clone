@@ -1,10 +1,11 @@
 // Register page with 2FA support
 import React, { useState } from 'react';
-import { generateSecret, generateQRCode, generateBackupCodes, verifyTotp } from '../services/authService';
+import { authenticateWith2FA, setup2FA, verifyTOTP } from '../services/auth';
 import type { AuthResult } from '../types';
 
 interface RegisterProps {
   onRegister: (result: AuthResult) => void;
+  onShowLogin?: () => void;
 }
 
 export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
@@ -17,33 +18,31 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
   const [totpCode, setTotpCode] = useState('');
 
   const handleEnable2FA = async () => {
-    const secret = generateSecret(email);
-    setOtpSecret(secret);
-    
-    const result = await generateQRCode(secret, email, 'AntiPiry');
-    if (result.success) {
-      setQrCode(result.data!);
-      const codes = generateBackupCodes(10);
+    try {
+      const setup = await setup2FA(email);
+      setOtpSecret(setup.secret);
+      setQrCode(setup.qrCode);
+      const codes = Array.from({length: 10}, () => Math.random().toString(36).substring(2, 8).toUpperCase());
       setBackupCodes(codes);
       setShow2FASetup(true);
-    } else {
-      console.error('Failed to generate QR code:', result.error);
+    } catch (error) {
+      console.error('Failed to setup 2FA:', error);
     }
   };
 
   const handleVerify2FA = () => {
-    if (verifyTotp(totpCode, otpSecret)) {
+    if (verifyTOTP(otpSecret, totpCode)) {
       onRegister({ success: true, message: 'Registration completed with 2FA' });
     } else {
       onRegister({ success: false, error: 'Invalid TOTP code', message: 'Неверный код TOTP' });
     }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (show2FASetup) {
       handleVerify2FA();
     } else {
-      handleEnable2FA();
+      await handleEnable2FA();
     }
   };
 
