@@ -131,7 +131,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
                     </div>
                 )}
 
-                {text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{decryptedText}</p>}
+                {message.text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{decryptedText}</p>}
                 
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
                     {message.disappearIn && (

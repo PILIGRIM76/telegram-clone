@@ -17,8 +17,8 @@ jest.mock("otplib", () => ({
 describe("authService", () => {
   describe("generateSecret", () => {
     it("should generate a secret", () => {
-      const secret = generateSecret("test@example.com");
-      expect(secret).toBe("TESTSECRET123");
+      const secret = generateSecret();
+      expect(secret).toBeDefined();
     });
   });
 

@@ -21,9 +21,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onShowRegister }) => {
     const result = await authenticateWith2FA(
       email,
       password,
-      twoFactorEnabled ? totpCode : undefined,
-      twoFactorEnabled,
-      twoFactorEnabled ? secret : undefined
+      twoFactorEnabled ? totpCode : undefined
     );
     setLoading(false);
     onLogin(result);

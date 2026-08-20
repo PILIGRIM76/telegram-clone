@@ -35,6 +35,46 @@ class ApiService {
     return response.json();
   }
 
+  async findStoreByInvite(token: string): Promise<any> {
+    const response = await fetch(API_URL + '/store/invite/' + token);
+    if (!response.ok) throw new Error('Invalid invitation');
+    return response.json();
+  }
+
+  async updateBoard(boardId: string, data: any): Promise<void> {
+    const response = await fetch(API_URL + '/boards/' + boardId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating board');
+  }
+
+  async deleteAnnouncement(boardId: string, announcementId: string): Promise<void> {
+    const response = await fetch(API_URL + '/boards/' + boardId + '/announcements/' + announcementId, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting announcement');
+  }
+
+  async editAnnouncement(boardId: string, data: any): Promise<void> {
+    const response = await fetch(API_URL + '/boards/' + boardId + '/announcements/' + data.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ announcement: data })
+    });
+    if (!response.ok) throw new Error('Error editing announcement');
+  }
+
+  async addAnnouncement(uid: string, boardId: string, announcement: any, txid?: string): Promise<void> {
+    const response = await fetch(API_URL + '/boards/' + boardId + '/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, announcement, txid })
+    });
+    if (!response.ok) throw new Error('Error adding announcement');
+  }
+
   connect(uid: string) {
     if (this.ws) this.disconnect();
     this.ws = new WebSocket(WS_URL + '?uid=' + uid);
