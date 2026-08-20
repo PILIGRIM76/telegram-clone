@@ -2,6 +2,7 @@
 import type { Identity, Contact, Chat, Message, Group, Store, NoticeBoard, AuthResult } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useTranslation } from './contexts/LanguageContext';
+import { useWebSocketStatus } from './hooks/useWebSocketStatus';
 import LanguageSelector from './components/LanguageSelector';
 import CreateIdentity from './components/CreateIdentity';
 import { Register } from './components/Register';
@@ -54,6 +55,9 @@ const App: React.FC = () => {
     setAuthView('login');
   };
 
+  // WebSocket status
+  const { status, statusText } = useWebSocketStatus();
+
   // Auth screens - show login/register views before main app
   if (authView === 'login') {
     return (
@@ -74,7 +78,13 @@ const App: React.FC = () => {
   // Main app content (authenticated view)
   return (
     <div className="bg-slate-900 text-white min-h-screen">
-      <h1 className="text-2xl p-4">AntiPiry - Telegram Clone Secure</h1>
+      <div className="flex justify-between items-center p-4 bg-slate-800">
+        <h1 className="text-2xl">AntiPiry - Telegram Clone Secure</h1>
+        <div className="flex items-center space-x-2 text-sm">
+          <span className="font-mono">{statusText}</span>
+          <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-green-500' : status === 'connecting' ? 'bg-blue-500' : status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+        </div>
+      </div>
       <button onClick={handleLogout} className="m-4 p-2 bg-red-500 rounded">Logout</button>
     </div>
   );
