@@ -1,6 +1,6 @@
 // Login page with 2FA support
 import React, { useState } from 'react';
-import { authenticateWith2FA } from '../services/authService';
+import { authenticateWith2FA } from '../services/auth';
 import type { AuthResult } from '../types';
 
 interface LoginProps {
