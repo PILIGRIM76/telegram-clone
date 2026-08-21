@@ -1,4 +1,6 @@
 import type { Message, Store, Group, NoticeBoard } from '../types';
+import { encryptMessage, decryptMessage } from '../crypto/encryption';
+import * as nacl from 'tweetnacl';
 
 const BASE_URL = process.env.VITE_API_URL || 'http://localhost:8080';
 const API_URL = BASE_URL.replace(/\/+$/, '');
@@ -10,6 +12,28 @@ class ApiService {
   private openListeners: (() => void)[] = [];
   private closeListeners: (() => void)[] = [];
   private errorListeners: ((error: any) => void)[] = [];
+
+  // E2EE Keys
+  private myKeyPair: { publicKey: Uint8Array; secretKey: Uint8Array } | null = null;
+  private myPublicKeyBase64: string = '';
+  private recipientPublicKey: Uint8Array | null = null;
+
+  // Инициализация ключей E2EE
+  initKeys(): void {
+    this.myKeyPair = nacl.box.keyPair();
+    this.myPublicKeyBase64 = btoa(String.fromCharCode(...this.myKeyPair.publicKey));
+  }
+
+  // Установить публичный ключ получателя
+  setRecipientPublicKey(publicKeyBase64: string): void {
+    const binary = atob(publicKeyBase64);
+    this.recipientPublicKey = new Uint8Array(binary.split('').map(c => c.charCodeAt(0)));
+  }
+
+  private base64ToKey(base64: string): Uint8Array {
+    const binary = atob(base64);
+    return new Uint8Array(binary.split('').map(c => c.charCodeAt(0)));
+  }
 
   async register(uid: string, publicKey: string): Promise<void> {
     const response = await fetch(API_URL + '/register', {
@@ -81,10 +105,28 @@ class ApiService {
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      let content = data.content || '';
+
+      // E2EE: Дешифрование сообщения
+      if (data.encryptedContent && this.myKeyPair) {
+        try {
+          const recipientKey = this.myKeyPair.secretKey;
+          const senderKey = this.base64ToKey(data.senderPublicKey);
+          content = decryptMessage(
+            this.base64ToKey(data.encryptedContent),
+            this.base64ToKey(data.nonce),
+            recipientKey,
+            senderKey
+          );
+        } catch (e) {
+          console.error('Decryption failed, showing raw data');
+        }
+      }
+
       const message: Message = {
         id: crypto.randomUUID(),
         senderId: data.from,
-        text: data.content,
+        text: content,
         timestamp: data.timestamp,
         groupId: data.groupId,
         type: data.type,
@@ -112,9 +154,27 @@ class ApiService {
     if (this.ws) { this.ws.close(); this.ws = null; }
   }
 
-  sendMessage(to: string, content: string, extraOptions: Partial<Message> = {}) {
+  // E2EE: Отправка зашифрованных сообщений
+  sendMessage(to: string, content: string, recipientPublicKeyBase64: string, extraOptions: Partial<Message> = {}) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
+      if (recipientPublicKeyBase64 && this.myKeyPair) {
+        const recipientKey = this.base64ToKey(recipientPublicKeyBase64);
+        const encrypted = encryptMessage(
+          content,
+          recipientKey,
+          this.myKeyPair.secretKey
+        );
+
+        this.ws.send(JSON.stringify({
+          to,
+          encryptedContent: btoa(String.fromCharCode(...encrypted.encrypted)),
+          nonce: btoa(String.fromCharCode(...encrypted.nonce)),
+          senderPublicKey: this.myPublicKeyBase64,
+          ...extraOptions
+        }));
+      } else {
+        this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
+      }
     }
   }
 
