@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  chatId      String
+  sender      String
+  content     String
+  timestamp   Int
+  isEncrypted Boolean  @default(false)
+  
+  @@index([chatId, timestamp])
+}

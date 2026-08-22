@@ -28,7 +28,30 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_PATH=/app/data/cipherlink.db
+      - DATABASE_URL=postgresql://cipherlink:cipherlink_password@postgres:5432/cipherlink_db?schema=public
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - cipherlink-network
+
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: cipherlink
+      POSTGRES_PASSWORD: cipherlink_password
+      POSTGRES_DB: cipherlink_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - cipherlink-network
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
     networks:
       - cipherlink-network
 
@@ -53,6 +76,8 @@ networks:
 
 volumes:
   sqlite-data:
+    driver: local
+  postgres-data:
     driver: local
   # minio-data:
   #   driver: local
