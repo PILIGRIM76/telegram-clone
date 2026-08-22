@@ -12,6 +12,7 @@ import { QrCodeIcon } from './icons/QrCodeIcon';
 import { apiService } from '../services/apiService';
 import { useTypingIndicator } from '../hooks/useTypingIndicator';
 import { useMessageHistory } from '../hooks/useMessageHistory';
+import { obsidianSync } from '../services/obsidianSync';
 
 interface ChatWindowProps {
   partner: Contact | Group;
@@ -138,6 +139,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                      <ShareIcon className="w-5 h-5" />
                  </button>
             )}
+
+            <button 
+                onClick={async () => {
+                  try {
+                    const path = await obsidianSync.exportChatToMarkdown({
+                      chatId: chatId,
+                      participant: partnerName
+                    });
+                    alert(`Экспортировано в: ${path}`);
+                  } catch (err) {
+                    console.error('Export failed:', err);
+                    alert('Ошибка экспорта');
+                  }
+                }}
+                style={{ padding: '6px 12px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                title="Экспорт в Obsidian"
+            >
+                🧠 Экспорт в Obsidian
+            </button>
         </div>
       </header>
       
