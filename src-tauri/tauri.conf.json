@@ -1,0 +1,40 @@
+﻿{
+  "tauri": {
+    "bundle": {
+      "beforeBuildCommand": "npm run build",
+      "devPath": "http://localhost:5173",
+      "dist": "dist",
+      "targets": [
+        "deb",
+        "rpm"
+      ]
+    },
+    "build": {
+      "active": true,
+      "icons": [
+        "src-tauri/icons/32x32.png",
+        "src-tauri/icons/128x128.png",
+        "src-tauri/icons/128x128@2x.png",
+        "src-tauri/icons/svgs/128px-icon.svg"
+      ],
+      "identifier": "com.cipherlink.app",
+      "name": "CipherLink",
+      "shortName": "CipherLink",
+      "version": "1.1.0"
+    },
+    "app": {
+      "windows": [
+        {
+          "title": "CipherLink",
+          "width": 1000,
+          "height": 800,
+          "resizable": true,
+          "fullscreen": false
+        }
+      ],
+      "security": {
+        "csp": null
+      }
+    }
+  }
+}

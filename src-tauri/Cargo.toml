@@ -1,0 +1,10 @@
+﻿[package]
+name = "app"
+version = "0.1.0"
+description = "CipherLink Desktop App"
+authors = ["You"]
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2.0", features = ["window", "api-all"] }
