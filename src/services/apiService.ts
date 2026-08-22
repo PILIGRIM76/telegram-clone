@@ -12,6 +12,7 @@ class ApiService {
   private openListeners: (() => void)[] = [];
   private closeListeners: (() => void)[] = [];
   private errorListeners: ((error: any) => void)[] = [];
+  private typingListeners: ((chatId: string) => void)[] = [];
 
   // E2EE Keys
   private myKeyPair: { publicKey: Uint8Array; secretKey: Uint8Array } | null = null;
@@ -135,6 +136,11 @@ class ApiService {
         timerSetAt: data.timerSetAt
       };
       this.messageListeners.forEach(cb => cb(message));
+
+      // Обработка события "печитает"
+      if (data.type === 'typing') {
+        this.typingListeners.forEach(cb => cb(data.chatId));
+      }
     };
 
     this.ws.onopen = () => {
@@ -186,6 +192,22 @@ class ApiService {
   onOpen(cb: () => void) { this.openListeners.push(cb); }
   onClose(cb: () => void) { this.closeListeners.push(cb); }
   onError(cb: (error: any) => void) { this.errorListeners.push(cb); }
+
+  // Отправка события "печитает"
+  sendTypingEvent(chatId: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'typing',
+        chatId,
+        timestamp: Date.now()
+      }));
+    }
+  }
+
+  // Подписка на события "печитает"
+  onTypingEvent(callback: (chatId: string) => void): void {
+    this.typingListeners.push(callback);
+  }
 }
 
 export const apiService = new ApiService();

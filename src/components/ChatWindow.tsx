@@ -10,6 +10,7 @@ import { ClockIcon } from './icons/ClockIcon';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
 import { QrCodeIcon } from './icons/QrCodeIcon';
 import { apiService } from '../services/apiService';
+import { useTypingIndicator } from '../hooks/useTypingIndicator';
 
 interface ChatWindowProps {
   partner: Contact | Group;
@@ -33,8 +34,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onVerify
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [partnerTyping, setPartnerTyping] = useState(false);
   const [isTimerSelectionOpen, setIsTimerSelectionOpen] = useState(false);
+  const { isTyping, sendTyping } = useTypingIndicator(partner.id);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,7 +50,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [chat.messages, partner]);
   
   useEffect(() => {
-    setPartnerTyping(false);
+    // Сбрасываем состояние при смене партнёра
   }, [partner.id]);
 
   const isGroup = 'name' in partner;
@@ -86,7 +87,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 {verified && <ShieldCheckIcon className="w-4 h-4 text-green-500 ml-2" />}
             </div>
             
-            {partnerTyping ? (
+            {isTyping ? (
               <p className="text-xs text-cyan-400 animate-pulse">... typing ...</p>
             ) : (
               <div className="flex items-center text-xs text-slate-400">
@@ -155,7 +156,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       
       <MessageInput 
         onSendMessage={onSendMessage}
-        onTyping={setPartnerTyping}
+        onTyping={sendTyping}
       />
     </div>
   );
