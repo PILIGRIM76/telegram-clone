@@ -11,6 +11,7 @@ import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
 import { QrCodeIcon } from './icons/QrCodeIcon';
 import { apiService } from '../services/apiService';
 import { useTypingIndicator } from '../hooks/useTypingIndicator';
+import { useMessageHistory } from '../hooks/useMessageHistory';
 
 interface ChatWindowProps {
   partner: Contact | Group;
@@ -36,6 +37,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTimerSelectionOpen, setIsTimerSelectionOpen] = useState(false);
   const { isTyping, sendTyping } = useTypingIndicator(partner.id);
+  const chatId = 'name' in partner ? (partner as Group).id : (partner as Contact).id;
+  const { messages, hasMore, loading, loadMore } = useMessageHistory(chatId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
