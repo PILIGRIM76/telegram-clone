@@ -1,0 +1,14 @@
+﻿# Node.js
+node_modules
+dist
+.git
+.env.local
+.env.*.local
+*.log
+README.md
+DOCKER_PUSH*
+*.test.ts
+*.test.js
+__tests__
+.vscode
+.idea

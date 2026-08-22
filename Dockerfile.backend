@@ -1,0 +1,26 @@
+# Dockerfile для Node.js бэкенда
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Копируем package.json
+COPY package*.json ./
+
+# Устанавливаем зависимости
+RUN npm ci --only=production
+
+# Копируем исходный код
+COPY . .
+
+# Создаем директорию для SQLite базы данных
+RUN mkdir -p /app/data
+
+# Открываем порт 3000
+EXPOSE 3000
+
+# Переменные окружения
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Запускаем сервер
+CMD ["node", "server.js"]
