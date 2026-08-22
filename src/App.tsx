@@ -18,6 +18,7 @@ import BoardManagementModal from './components/BoardManagementModal';
 import CreateBoardModal from './components/CreateBoardModal';
 import VerificationModal from './components/VerificationModal';
 import QRScanningModal from './components/QRScanningModal';
+import FileUpload from './components/FileUpload/FileUpload';
 
 type AuthView = 'login' | 'register' | 'main';
 

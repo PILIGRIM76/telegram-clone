@@ -44,7 +44,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     scrollToBottom();
     // Отправляем сигнал "прочитано" если это личный чат
     if (!('name' in partner)) {
-       apiService.sendMessage((partner as Contact).uid, '', { type: 'read' });
+       apiService.sendMessage((partner as Contact).uid, '', '', { type: 'read' });
     }
   }, [chat.messages, partner]);
   
