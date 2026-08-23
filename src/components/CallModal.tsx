@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { playRingtone, stopRingtone, playConnectSound, playEndCallSound } from '../utils/callSounds';
 
 interface CallModalProps {
   currentUserId: string;
@@ -43,7 +44,36 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   }, [remoteStream]);
 
+  // Таймер звонка
+  const [callDuration, setCallDuration] = useState(0);
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    let interval: number | undefined;
+    if (isInCall || isCalling) {
+      interval = window.setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isInCall, isCalling]);
+
+  // Звук при входящем звонке
+  useEffect(() => {
+    if (incomingCall) {
+      playRingtone();
+      return () => stopRingtone();
+    }
+  }, [incomingCall]);
+
   const handleStartCall = () => {
+    playConnectSound();
     startCall(partnerId);
     onStartCall();
   };
@@ -78,7 +108,11 @@ export const CallModal: React.FC<CallModalProps> = ({
           </p>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
             <button
-              onClick={answerCall}
+              onClick={() => {
+                stopRingtone();
+                playConnectSound();
+                answerCall();
+              }}
               style={{
                 padding: '12px 32px',
                 background: '#10b981',
@@ -92,7 +126,11 @@ export const CallModal: React.FC<CallModalProps> = ({
               ✓ Принять
             </button>
             <button
-              onClick={rejectCall}
+              onClick={() => {
+                stopRingtone();
+                playEndCallSound();
+                rejectCall();
+              }}
               style={{
                 padding: '12px 32px',
                 background: '#ef4444',
@@ -192,7 +230,10 @@ export const CallModal: React.FC<CallModalProps> = ({
             📹
           </button>
           <button
-            onClick={endCall}
+            onClick={() => {
+              playEndCallSound();
+              endCall();
+            }}
             style={{
               width: '60px',
               height: '60px',
@@ -202,8 +243,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               border: 'none',
               fontSize: '24px',
               cursor: 'pointer'
-            }}
-          >
+            }}>
             📞
           </button>
         </div>
@@ -239,7 +279,11 @@ export const CallModal: React.FC<CallModalProps> = ({
             Вызов {partnerName}...
           </p>
           <button
-            onClick={endCall}
+            onClick={() => {
+              stopRingtone();
+              playEndCallSound();
+              endCall();
+            }}
             style={{
               marginTop: '20px',
               padding: '12px 32px',
