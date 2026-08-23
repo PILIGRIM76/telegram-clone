@@ -141,20 +141,6 @@ class ApiService {
       if (data.type === 'typing') {
         this.typingListeners.forEach(cb => cb(data.chatId));
       }
-
-      // Обработка WebRTC звонков
-      if (data.type === 'call-offer') {
-        this.emitCallEvent('offer', { from: data.from, signal: data.signal });
-      }
-      if (data.type === 'call-answer') {
-        this.emitCallEvent('answer', { from: data.from, signal: data.signal });
-      }
-      if (data.type === 'call-signal') {
-        this.emitCallEvent('signal', { from: data.from, signal: data.signal });
-      }
-      if (data.type === 'call-end') {
-        this.emitCallEvent('end', { from: data.from });
-      }
     };
 
     this.ws.onopen = () => {
@@ -207,6 +193,11 @@ class ApiService {
   onClose(cb: () => void) { this.closeListeners.push(cb); }
   onError(cb: (error: any) => void) { this.errorListeners.push(cb); }
 
+  // Подписка на события "печитает"
+  onTypingEvent(callback: (chatId: string) => void): void {
+    this.typingListeners.push(callback);
+  }
+
   // Отправка события "печитает"
   sendTypingEvent(chatId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -217,13 +208,8 @@ class ApiService {
       }));
     }
   }
-  
-  // Подписка на события "печитает"
-  onTypingEvent(callback: (chatId: string) => void): void {
-    this.typingListeners.push(callback);
-  }
 
-  // ============= WebRTC Call Signaling =============
+  // ============= WebRTC Call Signaling ============
 
   private callListeners: { [key: string]: ((data: any) => void)[] } = {};
 

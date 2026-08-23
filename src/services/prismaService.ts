@@ -1,40 +1,47 @@
 ﻿// Prisma Service - PostgreSQL + Redis integration
-// Структура для будущей миграции на PostgreSQL + Redis
+// Для тестирования используется fallback на SQLite
 
-export interface Message {
-  id: string;
-  chatId: string;
-  sender: string;
-  content: string;
-  timestamp: number;
-  isEncrypted: boolean;
-}
+import { sqliteStorage } from './sqliteStorage';
+import Redis from 'ioredis';
+import type { Message } from '../types';
+
+type LocalMessageStatus = 'sent' | 'delivered' | 'read';
+
+const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 
 export const prismaService = {
-  // Будущая реализация с PostgreSQL
-  async saveMessage(chatId: string, sender: string, content: string, timestamp: number, isEncrypted: boolean = false): Promise<Message> {
-    console.log('PostgreSQL saveMessage - placeholder');
-    return { id: 'temp', chatId, sender, content, timestamp, isEncrypted };
+  async saveMessage(chatId: string, sender: string, content: string, timestamp: number, isEncrypted: boolean = false) {
+    const message = {
+      id: crypto.randomUUID(),
+      senderId: sender,
+      text: content,
+      timestamp: timestamp.toString(),
+      type: 'user' as const,
+      media: undefined,
+      mediaType: undefined,
+      status: 'sent' as LocalMessageStatus,
+      disappearIn: undefined,
+      timerSetAt: undefined
+    } as Message;
+    // fallback на SQLite для разработки
+    return await sqliteStorage.saveMessage(message, chatId);
   },
 
-  async loadMessages(chatId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
-    console.log('PostgreSQL loadMessages - placeholder');
-    return [];
+  async loadMessages(chatId: string, limit: number = 50, offset: number = 0) {
+    // fallback на SQLite для разработки
+    return await sqliteStorage.loadMessages(chatId, limit, offset);
   },
 
-  // Redis Pub/Sub для WebSocket между инстансами
-  async publishMessage(chatId: string, message: Message): Promise<void> {
-    console.log('Redis publish - placeholder');
+  async publishMessage(chatId: string, message: any) {
+    if (redis) {
+      await redis.publish('messages:' + chatId, JSON.stringify(message));
+    }
   },
 
-  // Инициализация подключений
-  async connect(): Promise<void> {
-    console.log('Connecting to PostgreSQL and Redis...');
-  },
-
-  // Отключение
-  async disconnect(): Promise<void> {
-    console.log('Disconnecting from PostgreSQL and Redis...');
+  async disconnect() {
+    if (redis) {
+      await redis.quit();
+    }
   }
 };
 
