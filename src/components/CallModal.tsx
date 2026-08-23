@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { useCallTimer } from '../hooks/useCallTimer';
 import { playRingtone, stopRingtone, playConnectSound, playEndCallSound } from '../utils/callSounds';
 
 interface CallModalProps {
@@ -163,6 +164,22 @@ export const CallModal: React.FC<CallModalProps> = ({
         flexDirection: 'column',
         zIndex: 9999
       }}>
+        {/* Таймер длительности звонка */}
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.6)',
+          padding: '8px 20px',
+          borderRadius: '20px',
+          color: 'white',
+          fontSize: '18px',
+          fontWeight: 600,
+          zIndex: 10
+        }}>
+          ⏱️ {callDuration}
+        </div>
         <div style={{ flex: 1, position: 'relative' }}>
           <video
             ref={remoteVideoRef}
