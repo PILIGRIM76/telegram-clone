@@ -19,6 +19,7 @@ import CreateBoardModal from './components/CreateBoardModal';
 import VerificationModal from './components/VerificationModal';
 import QRScanningModal from './components/QRScanningModal';
 import FileUpload from './components/FileUpload/FileUpload';
+import { checkForUpdates } from './services/tauriUpdater';
 
 type AuthView = 'login' | 'register' | 'main';
 
@@ -33,6 +34,15 @@ const App: React.FC = () => {
   const [globalMuteUntil, setGlobalMuteUntil] = useLocalStorage<number | 'forever' | null>('cipherlink-global-mute', null);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('cipherlink-theme', 'dark');
   const [authView, setAuthView] = useState<AuthView>('login');
+
+  // Check for updates on mount
+  useEffect(() => {
+    checkForUpdates().then(hasUpdated => {
+      if (hasUpdated) {
+        alert('Приложение обновлено! Перезапустите его.');
+      }
+    });
+  }, []);
 
   // Authentication handlers
   const handleLogin = (result: AuthResult) => {

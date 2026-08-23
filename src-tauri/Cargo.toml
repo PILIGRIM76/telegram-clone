@@ -1,10 +1,26 @@
-﻿[package]
-name = "app"
-version = "0.1.0"
+[package]
+name = "cipherlink"
+version = "1.1.0"
 description = "CipherLink Desktop App"
-authors = ["You"]
-license = "MIT"
+authors = ["PILIGRIM76"]
 edition = "2021"
 
+[lib]
+name = "cipherlink"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cipherlink"
+path = "src/main.rs"
+
 [dependencies]
-tauri = { version = "2.0", features = ["window", "api-all"] }
+tauri = { version = "1.8", features = ["custom-protocol", "updater"] }
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[profile.dev]
+opt-level = 2
+
+[profile.release]
+opt-level = 3

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CipherLink</string>
+    <string name="title_activity_main">CipherLink</string>
+    <string name="package_name">com.cipherlink.app</string>
+    <string name="custom_url_scheme">com.cipherlink.app</string>
+</resources>
