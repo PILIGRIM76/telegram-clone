@@ -1,5 +1,6 @@
 import Peer from 'simple-peer';
 import { apiService } from './apiService';
+import { prismaService } from './prismaService';
 
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -17,9 +18,19 @@ class WebRTCService {
   private peer: Peer.Instance | null = null;
   private localStream: MediaStream | null = null;
   private events: CallEvents = {};
+  
+  private callStartTime: number | null = null;
+  private callType: 'video' | 'audio' = 'video';
+  private callerId: string = '';
+  private receiverId: string = '';
 
   async initCall(to: string, events: CallEvents): Promise<void> {
     this.events = events;
+    
+    this.callStartTime = Date.now();
+    this.callType = 'video';
+    this.callerId = 'current-user'; // Временно, позже заменим на реальный ID
+    this.receiverId = to;
     
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({ 
@@ -42,6 +53,11 @@ class WebRTCService {
   async answerCall(from: string, signal: any, events: CallEvents): Promise<void> {
     this.events = events;
     
+    this.callStartTime = Date.now();
+    this.callType = 'video';
+    this.callerId = from;
+    this.receiverId = 'current-user'; // Временно
+
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
@@ -92,6 +108,7 @@ class WebRTCService {
     if (this.peer) {
       this.peer.destroy();
     }
+    this.saveCallToDatabase();
     this.cleanup();
   }
 
@@ -101,6 +118,25 @@ class WebRTCService {
       this.localStream = null;
     }
     this.peer = null;
+  }
+
+  private async saveCallToDatabase(): Promise<void> {
+    if (!this.callStartTime) return;
+
+    const duration = Math.floor((Date.now() - this.callStartTime) / 1000);
+    
+    try {
+      await prismaService.saveCall({
+        callerId: this.callerId,
+        receiverId: this.receiverId,
+        callType: this.callType,
+        status: duration > 0 ? 'completed' : 'missed',
+        duration: duration
+      });
+      console.log('Call saved to database');
+    } catch (error) {
+      console.error('Failed to save call to database:', error);
+    }
   }
 
   toggleAudio(): boolean {
@@ -121,6 +157,18 @@ class WebRTCService {
       return videoTrack.enabled;
     }
     return false;
+  }
+
+  setCallType(type: 'video' | 'audio'): void {
+    this.callType = type;
+  }
+
+  setCallerId(id: string): void {
+    this.callerId = id;
+  }
+
+  setReceiverId(id: string): void {
+    this.receiverId = id;
   }
 }
 

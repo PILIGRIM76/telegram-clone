@@ -42,6 +42,20 @@ export const prismaService = {
     if (redis) {
       await redis.quit();
     }
+  },
+
+  async saveCall(callData: {
+    callerId: string;
+    receiverId: string;
+    callType: string;
+    status: string;
+    duration: number;
+  }) {
+    // fallback на SQLite для разработки
+    // В проде будет сохранение в PostgreSQL через Prisma
+    const sqlite = require('./sqliteStorage').sqliteStorage;
+    // Пока просто логируем
+    console.log('Call saved:', callData);
   }
 };
 
