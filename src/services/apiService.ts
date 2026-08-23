@@ -141,6 +141,20 @@ class ApiService {
       if (data.type === 'typing') {
         this.typingListeners.forEach(cb => cb(data.chatId));
       }
+
+      // Обработка WebRTC звонков
+      if (data.type === 'call-offer') {
+        this.emitCallEvent('offer', { from: data.from, signal: data.signal });
+      }
+      if (data.type === 'call-answer') {
+        this.emitCallEvent('answer', { from: data.from, signal: data.signal });
+      }
+      if (data.type === 'call-signal') {
+        this.emitCallEvent('signal', { from: data.from, signal: data.signal });
+      }
+      if (data.type === 'call-end') {
+        this.emitCallEvent('end', { from: data.from });
+      }
     };
 
     this.ws.onopen = () => {
@@ -203,10 +217,66 @@ class ApiService {
       }));
     }
   }
-
+  
   // Подписка на события "печитает"
   onTypingEvent(callback: (chatId: string) => void): void {
     this.typingListeners.push(callback);
+  }
+
+  // ============= WebRTC Call Signaling =============
+
+  private callListeners: { [key: string]: ((data: any) => void)[] } = {};
+
+  onCallEvent(event: string, callback: (data: any) => void): void {
+    if (!this.callListeners[event]) {
+      this.callListeners[event] = [];
+    }
+    this.callListeners[event].push(callback);
+  }
+
+  sendCallOffer(to: string, signal: any): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'call-offer',
+        to,
+        signal
+      }));
+    }
+  }
+
+  sendCallAnswer(to: string, signal: any): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'call-answer',
+        to,
+        signal
+      }));
+    }
+  }
+
+  sendCallSignal(to: string, signal: any): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'call-signal',
+        to,
+        signal
+      }));
+    }
+  }
+
+  sendCallEnd(to: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'call-end',
+        to
+      }));
+    }
+  }
+
+  emitCallEvent(event: string, data: any): void {
+    if (this.callListeners[event]) {
+      this.callListeners[event].forEach(cb => cb(data));
+    }
   }
 }
 

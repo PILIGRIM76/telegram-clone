@@ -1,4 +1,5 @@
 
+import CallModal from './CallModal';
 import React, { useRef, useEffect, useState } from 'react';
 import type { Identity, Contact, Chat, Group } from '../types';
 import MessageInput from './MessageInput';
@@ -90,6 +91,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <h3 className="font-bold text-lg text-white truncate">{partnerName}</h3>
                 {verified && <ShieldCheckIcon className="w-4 h-4 text-green-500 ml-2" />}
             </div>
+            
+            {!isGroup && (
+              <CallModal 
+                currentUserId="current-user" 
+                partnerId={(partner as Contact).id} 
+                partnerName={partnerName}
+                onStartCall={() => console.log('Call started')}
+              />
+            )}
             
             {isTyping ? (
               <p className="text-xs text-cyan-400 animate-pulse">... typing ...</p>
