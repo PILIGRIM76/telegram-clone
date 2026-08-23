@@ -18,3 +18,16 @@ model Message {
   
   @@index([chatId, timestamp])
 }
+
+model Call {
+  id          String   @id @default(uuid())
+  callerId    String
+  receiverId  String
+  callType    String   // "video" или "audio"
+  status      String   // "completed", "missed", "rejected"
+  duration    Int      @default(0) // в секундах
+  createdAt   DateTime @default(now())
+  
+  @@index([callerId, createdAt])
+  @@index([receiverId, createdAt])
+}
