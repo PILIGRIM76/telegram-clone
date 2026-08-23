@@ -1,5 +1,6 @@
 
 import CallModal from './CallModal';
+import CallHistory from './CallHistory';
 import React, { useRef, useEffect, useState } from 'react';
 import type { Identity, Contact, Chat, Group } from '../types';
 import MessageInput from './MessageInput';
@@ -38,6 +39,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTimerSelectionOpen, setIsTimerSelectionOpen] = useState(false);
+  const [showCallHistory, setShowCallHistory] = useState(false);
   const { isTyping, sendTyping } = useTypingIndicator(partner.id);
   const chatId = 'name' in partner ? (partner as Group).id : (partner as Contact).id;
   const { messages, hasMore, loading, loadMore } = useMessageHistory(chatId);
@@ -167,7 +169,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 title="Экспорт в Obsidian"
             >
                 🧠 Экспорт в Obsidian
-            </button>
+              </button>
+              
+              {!isGroup && (
+                <button
+                  onClick={() => setShowCallHistory(true)}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  title="История звонков"
+                >
+                  📋 История
+                </button>
+              )}
         </div>
       </header>
       
@@ -191,6 +211,51 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         onSendMessage={onSendMessage}
         onTyping={sendTyping}
       />
+      
+      {showCallHistory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9998
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowCallHistory(false)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#f3f4f6',
+                border: 'none',
+                fontSize: '18px',
+                cursor: 'pointer',
+                zIndex: 10
+              }}
+            >
+              ✕
+            </button>
+            <CallHistory currentUserId="current-user" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
