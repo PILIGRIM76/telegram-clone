@@ -4,8 +4,9 @@
 import { sqliteStorage } from './sqliteStorage';
 import Redis from 'ioredis';
 import type { Message } from '../types';
+import { PrismaClient } from '../generated/prisma';
 
-type LocalMessageStatus = 'sent' | 'delivered' | 'read';
+const prisma = new PrismaClient();
 
 const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 
@@ -19,7 +20,7 @@ export const prismaService = {
       type: 'user' as const,
       media: undefined,
       mediaType: undefined,
-      status: 'sent' as LocalMessageStatus,
+      status: 'sent' as const,
       disappearIn: undefined,
       timerSetAt: undefined
     } as Message;
@@ -44,18 +45,58 @@ export const prismaService = {
     }
   },
 
-  async saveCall(callData: {
+  async saveCall(data: {
     callerId: string;
     receiverId: string;
     callType: string;
     status: string;
     duration: number;
   }) {
-    // fallback на SQLite для разработки
-    // В проде будет сохранение в PostgreSQL через Prisma
-    const sqlite = require('./sqliteStorage').sqliteStorage;
-    // Пока просто логируем
-    console.log('Call saved:', callData);
+    return await prisma.call.create({
+      data: {
+        callerId: data.callerId,
+        receiverId: data.receiverId,
+        callType: data.callType,
+        status: data.status,
+        duration: data.duration
+      }
+    });
+  },
+
+  async getCallHistory(userId: string, limit: number = 50, offset: number = 0) {
+    return await prisma.call.findMany({
+      where: {
+        OR: [
+          { callerId: userId },
+          { receiverId: userId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset
+    });
+  },
+
+  async getMissedCalls(userId: string) {
+    return await prisma.call.findMany({
+      where: {
+        receiverId: userId,
+        status: 'missed'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  },
+
+  async getCallsWithUser(userId: string, partnerId: string) {
+    return await prisma.call.findMany({
+      where: {
+        OR: [
+          { callerId: userId, receiverId: partnerId },
+          { callerId: partnerId, receiverId: userId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
   }
 };
 
