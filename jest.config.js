@@ -1,9 +1,10 @@
-﻿const { createDefaultPreset } = require("ts-jest");
+const { createDefaultPreset } = require("ts-jest");
 
 const tsJestTransformCfg = createDefaultPreset().transform;
 
 module.exports = {
-  testEnvironment: "node",
+  testEnvironment: "jsdom",
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transform: {
     ...tsJestTransformCfg,
   },
