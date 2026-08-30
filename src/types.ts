@@ -43,6 +43,7 @@ export interface Contact {
   name: string;
   verified: boolean;
   keyFingerprint?: string;
+  publicKey?: string; // Phase 7.6: JWK-строка публичного ключа для E2EE шифрования
   mutedUntil?: number | 'forever';
   archived?: boolean;
 }

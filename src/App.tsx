@@ -84,7 +84,7 @@ const App: React.FC = () => {
     // TODO: Phase 7.6 - Загрузка истории сообщений с сервера через apiService.getMessages(chatId)
   };
 
-  const handleAddContact = async (name: string, uid: string) => {
+  const handleAddContact = async (name: string, uid: string, publicKey?: string) => {
     // Проверка на дубликат
     if (safeContacts.some(c => c.uid === uid)) {
       alert('Контакт с таким UID уже существует');
@@ -96,6 +96,7 @@ const App: React.FC = () => {
       uid,
       name,
       verified: false,
+      publicKey, // Phase 7.6: опционально — JWK-строка публичного ключа получателя
       archived: false
     };
 
@@ -152,18 +153,34 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string, media?: string, mediaType?: 'image' | 'video', payload?: any) => {
     if (!selectedChatId || !identity) return;
 
-    // TODO: Phase 7.6 - Integrate real E2EE encryption here using cryptoService.encrypt
-    // const encryptedText = await encrypt(text, recipientPublicKey);
-    const storedText = text; // Временная заглушка для проверки UI
+    // Phase 7.6.1: Реальное E2EE шифрование через cryptoService.encrypt (RSA-OAEP)
+    // Определяем publicKey партнёра. Если это Contact без ключа или Group — fallback на свой ключ.
+    const partnerPublicKey = partner && 'publicKey' in partner ? partner.publicKey : undefined;
+    const targetPublicKey = partnerPublicKey ?? identity.publicKey;
+
+    let encryptedPayload: string;
+    try {
+      // Реальный вызов RSA-OAEP шифрования (cryptoService.ts → encrypt)
+      encryptedPayload = await encrypt(text, targetPublicKey);
+    } catch (error) {
+      console.error('E2EE Шифрование не удалось:', error);
+      // Fallback: сохраняем как plaintext с пометкой, чтобы не потерять сообщение
+      encryptedPayload = `PLAINTEXT_FALLBACK:${text}`;
+    }
 
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: identity.uid,
-      text: storedText,
+      text: text, // Для локального UI (расшифровка на лету будет в 7.6.3)
       timestamp: new Date().toISOString(),
       media,
       mediaType,
-      payload,
+      payload: {
+        ...payload,
+        // Храним реальный зашифрованный пейлоад отдельно для отправки на сервер
+        encryptedPayload,
+        isEncrypted: encryptedPayload.startsWith('PLAINTEXT_FALLBACK:') ? false : true
+      },
       status: 'sent'
     };
 
@@ -175,7 +192,7 @@ const App: React.FC = () => {
     updatedChats[selectedChatId].messages = [...(updatedChats[selectedChatId].messages || []), newMessage];
     setChats(updatedChats);
 
-    // TODO: Phase 7.6 - Отправить сообщение через WebSocket здесь (apiService.sendMessage)
+    // TODO 7.6.2: apiService.sendMessage(selectedChatId, newMessage)
   };
 
   const handleSetTimer = (seconds: number | undefined) => {
