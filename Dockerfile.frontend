@@ -1,14 +1,17 @@
 # Multi-stage build для фронтенда
+# Phase 9: обновлено до node:20-alpine для консистентности
 # Этап 1: Сборка
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm ci
+# Устанавливаем зависимости (build tools для native модулей)
+RUN apk add --no-cache python3 make g++ \
+    && npm ci \
+    && apk del python3 make g++
 
 # Копируем исходный код
 COPY . .

@@ -1,13 +1,16 @@
 # Dockerfile для Node.js бэкенда
-FROM node:18-alpine
+# Phase 9: обновлено до node:20-alpine для совместимости с better-sqlite3@13
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Копируем package.json
 COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm ci --only=production
+# Устанавливаем зависимости (build tools для native модулей)
+RUN apk add --no-cache python3 make g++ \
+    && npm ci --only=production \
+    && apk del python3 make g++
 
 # Копируем исходный код
 COPY . .
@@ -15,12 +18,13 @@ COPY . .
 # Создаем директорию для SQLite базы данных
 RUN mkdir -p /app/data
 
-# Открываем порт 3000
-EXPOSE 3000
+# Открываем порт 4000
+EXPOSE 4000
 
 # Переменные окружения
 ENV NODE_ENV=production
-ENV PORT=3000
+# Phase 9: PORT=4000 (3100/3000 заняты electro и ШифроСвязь)
+ENV PORT=4000
 
 # Запускаем сервер
 CMD ["node", "server.js"]

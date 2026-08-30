@@ -7,11 +7,11 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "80:80"
+      - "4100:80"  # Phase 9: 4100 (ШифроСвязь заняла 3100/8181, electro-manager — 80/3000)
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=http://backend:3000
+      - REACT_APP_API_URL=http://backend:4000
     networks:
       - cipherlink-network
 
@@ -21,13 +21,13 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     ports:
-      - "3000:3000"
+      - "4000:4000"  # Phase 9: 4000 (ШифроСвязь заняла 3100, electro-backend — 3000)
     volumes:
       # Монтируем SQLite базу данных для персистентности
       - sqlite-data:/app/data
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=4000
       - DATABASE_URL=postgresql://cipherlink:cipherlink_password@postgres:5432/cipherlink_db?schema=public
       - REDIS_URL=redis://redis:6379
     networks:
@@ -41,7 +41,7 @@ services:
       POSTGRES_PASSWORD: cipherlink_password
       POSTGRES_DB: cipherlink_db
     ports:
-      - "5432:5432"
+      - "5434:5432"  # Phase 9: 5434 (ШифроСвязь на 5433, electro на 5432)
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -51,7 +51,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "6381:6379"  # Phase 9: 6381 (electro на 6380)
     networks:
       - cipherlink-network
 

@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {
-    hostname: 'localhost',
+    // Phase 9: Подключение планшета RT9 к ПК по локальной сети
+    hostname: '192.168.100.4',
     android: { allowList: true },
   },
 };
