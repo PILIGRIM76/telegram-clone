@@ -27,10 +27,40 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
     useEffect(() => {
         if (isSystem) {
             setDecryptedText(message.text);
-        } else {
-            decrypt(message.text, currentIdentity.privateKey)
+            return;
+        }
+
+        // Phase 7.6.3: Умная расшифровка — НЕ дублируем работу App.tsx
+        // App.tsx уже расшифровал входящие сообщения и положил plaintext в message.text
+        // Если есть encryptedPayload И текст ещё НЕ расшифрован (например, для старых сообщений
+        // или fallback-флоу), тогда пытаемся расшифровать на лету.
+
+        const incomingPayload = message.payload as any;
+        const encryptedPayload: string | undefined = incomingPayload?.encryptedPayload;
+        const isPlaintextFallback = encryptedPayload?.startsWith?.('PLAINTEXT_FALLBACK:');
+
+        // Определяем, был ли текст уже расшифрован в App.tsx
+        // (encryptedPayload остаётся в payload, но text уже plaintext)
+        const alreadyDecrypted = message.text && message.text.length > 0
+            && (!encryptedPayload || isPlaintextFallback);
+
+        if (alreadyDecrypted) {
+            // App.tsx уже расшифровал — используем text как есть
+            setDecryptedText(message.text);
+            return;
+        }
+
+        // Fallback: если есть зашифрованный пейлоад и App.tsx не расшифровал — делаем это сами
+        if (encryptedPayload && !isPlaintextFallback && currentIdentity.privateKey) {
+            decrypt(encryptedPayload, currentIdentity.privateKey)
                 .then(text => setDecryptedText(text))
-                .catch(() => setDecryptedText('[Decryption failed]'));
+                .catch(error => {
+                    console.error('MessageItem: Ошибка расшифровки:', error);
+                    setDecryptedText('[Не удалось расшифровать]');
+                });
+        } else {
+            // Нет зашифровки — показываем как есть
+            setDecryptedText(message.text);
         }
     }, [message, currentIdentity, isSystem]);
 
@@ -133,8 +163,46 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
                 )}
 
                 {message.text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{decryptedText}</p>}
-                
+
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
+                    {/* Phase 7.6.3: UX индикаторы E2EE и статуса доставки */}
+                    {(() => {
+                        const incomingPayload = message.payload as any;
+                        const hasEncryptedPayload = !!incomingPayload?.encryptedPayload;
+                        const isPlaintextFallback = incomingPayload?.encryptedPayload?.startsWith?.('PLAINTEXT_FALLBACK:');
+                        // Расшифровано ли сообщение: либо нет encryptedPayload, либо есть, но текст уже расшифрован (≠ PLAINTEXT_FALLBACK:)
+                        const isDecrypted = !hasEncryptedPayload || !isPlaintextFallback;
+
+                        return (
+                            <>
+                                {/* 🔒 зашифровано (encryptedPayload есть, но текст не расшифрован — fallback) */}
+                                {hasEncryptedPayload && isPlaintextFallback && (
+                                    <span title="Не зашифровано (fallback)" className="text-[10px] opacity-60" aria-label="not-encrypted">
+                                        🔓⚠
+                                    </span>
+                                )}
+                                {/* 🔓 расшифровано */}
+                                {hasEncryptedPayload && isDecrypted && !isPlaintextFallback && (
+                                    <span title="E2EE: расшифровано" className="text-[10px] opacity-60" aria-label="decrypted">
+                                        🔓
+                                    </span>
+                                )}
+                                {/* 🔒 зашифровано, ещё не расшифровано */}
+                                {hasEncryptedPayload && !isDecrypted && (
+                                    <span title="E2EE: зашифровано" className="text-[10px] opacity-60" aria-label="encrypted">
+                                        🔒
+                                    </span>
+                                )}
+                                {/* ⬇ входящее */}
+                                {message.status === 'received' && (
+                                    <span title="Получено" className="text-[10px] opacity-70" aria-label="received">
+                                        ⬇
+                                    </span>
+                                )}
+                            </>
+                        );
+                    })()}
+
                     {message.disappearIn && (
                          <ClockIcon className="w-3 h-3 opacity-70" />
                     )}
