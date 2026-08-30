@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Монохромный белый вариант для тёмных тем / overlay -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#ffffff"/>
+
+  <!-- Тонкие волны -->
+  <g opacity="0.1" stroke="#0891b2" stroke-width="2" fill="none">
+    <path d="M 30 380 Q 128 340, 226 380 T 422 380 T 482 380"/>
+    <path d="M 30 410 Q 128 370, 226 410 T 422 410 T 482 410"/>
+  </g>
+
+  <!-- Замок (тело) -->
+  <rect x="160" y="220" width="192" height="200" rx="20" ry="20" fill="#0891b2"/>
+  <circle cx="256" cy="310" r="20" fill="#ffffff"/>
+  <rect x="252" y="310" width="8" height="50" fill="#ffffff"/>
+
+  <!-- Дуга замка -->
+  <path d="M 192 220 L 192 176 Q 192 130, 256 130 Q 320 130, 320 176 L 320 220"
+        fill="none" stroke="#0891b2" stroke-width="22" stroke-linecap="round"/>
+</svg>

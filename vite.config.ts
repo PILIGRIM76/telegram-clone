@@ -15,19 +15,26 @@ export default defineConfig(({ mode }) => {
       manifest: {
         name: 'CipherLink',
         short_name: 'CipherLink',
-        theme_color: '#7c3aed',
+        description: 'Защищённый мессенджер с E2EE шифрованием',
+        theme_color: '#0891b2',
+        background_color: '#0e7490',
         display: 'standalone',
         icons: [
           {
-            src: '/icon-192x192.png',
+            src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/icon-512x512.png',
+            src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
+          },
+          {
+            src: '/favicon-48x48.png',
+            sizes: '48x48',
+            type: 'image/png'
           }
         ]
       }

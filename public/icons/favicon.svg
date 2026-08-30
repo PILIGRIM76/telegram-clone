@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Упрощённый favicon: только замок, без градиента фона -->
+  <rect x="22" y="28" width="20" height="22" rx="3" ry="3" fill="#0891b2"/>
+  <circle cx="32" cy="37" r="2.5" fill="#ffffff"/>
+  <rect x="31" y="37" width="2" height="6" fill="#ffffff"/>
+  <path d="M 26 28 L 26 21 Q 26 14, 32 14 Q 38 14, 38 21 L 38 28"
+        fill="none" stroke="#0891b2" stroke-width="3" stroke-linecap="round"/>
+</svg>
