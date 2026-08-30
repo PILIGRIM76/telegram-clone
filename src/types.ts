@@ -23,7 +23,7 @@ export interface User {
     имяПользователя?: string;
 }
 
-export type MessageStatus = 'sent' | 'delivered' | 'read';
+export type MessageStatus = 'sent' | 'delivered' | 'read' | 'received';
 export type OrderStatus = 'new' | 'processing' | 'shipped' | 'completed' | 'paid' | 'cancelled';
 
 export interface Identity {

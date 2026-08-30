@@ -15,6 +15,7 @@ const statusText = {
   'sent': '✓',
   'delivered': '✓✓',
   'read': '✓✓', // Можно сделать синим цветом
+  'received': '⬇', // Phase 7.6.2: входящее сообщение получено
 };
 
 const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onTimerExpire }) => {

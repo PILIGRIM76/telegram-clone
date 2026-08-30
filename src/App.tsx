@@ -9,7 +9,7 @@ import { Register } from './components/Register';
 import { Login } from './components/Login';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
-import { generateIdentity, encrypt } from './services/cryptoService';
+import { generateIdentity, encrypt, decrypt } from './services/cryptoService';
 import { WelcomePlaceholder } from './components/WelcomePlaceholder';
 import { apiService } from './services/apiService';
 import ProfileDrawer from './components/ProfileDrawer';
@@ -59,6 +59,12 @@ const App: React.FC = () => {
     }
   };
 
+  // === Phase 7.5.3: Safe wrappers (для useLocalStorage T | null) ===
+  // Должны быть определены ДО useEffect и handlers, т.к. они их используют.
+  const safeContacts = contacts ?? [];
+  const safeGroups = groups ?? [];
+  const safeChats = chats ?? {};
+
   // === Phase 7.5.1: Identity Guard ===
   // Если пользователь залогинился, но Identity ещё нет — генерируем автоматически.
   // TODO: Phase 7.6 - Show seed phrase modal before saving identity
@@ -72,11 +78,71 @@ const App: React.FC = () => {
     }
   }, [authView, identity, setIdentity]);
 
-  // === Phase 7.5.3: Safe wrappers (для useLocalStorage T | null) ===
-  // Должны быть определены ДО handlers, т.к. handlers их используют.
-  const safeContacts = contacts ?? [];
-  const safeGroups = groups ?? [];
-  const safeChats = chats ?? {};
+  // === Phase 7.6.2: WebSocket подписка на входящие сообщения ===
+  // Подписываемся только если есть identity и приватный ключ для расшифровки
+  useEffect(() => {
+    if (!identity || !identity.privateKey) return;
+
+    const handleIncomingMessage = async (msg: Message) => {
+      try {
+        // 1. Определяем ID чата: для личных сообщений это ID отправителя
+        const chatId = msg.senderId || (msg.payload && (msg.payload as any).chatId);
+        if (!chatId) {
+          console.warn('Incoming message has no senderId/chatId, skipping');
+          return;
+        }
+
+        // 2. Извлекаем зашифрованный пейлоад (если есть)
+        const incomingPayload = msg.payload as any;
+        const encryptedPayload: string | undefined = incomingPayload?.encryptedPayload;
+
+        // 3. РЕАЛЬНАЯ РАСШИФРОВКА через cryptoService.decrypt (RSA-OAEP)
+        let finalText = msg.text;
+        if (encryptedPayload && !encryptedPayload.startsWith('PLAINTEXT_FALLBACK:')) {
+          try {
+            finalText = await decrypt(encryptedPayload, identity.privateKey);
+            console.log('E2EE: Входящее сообщение расшифровано');
+          } catch (decryptError) {
+            console.error('E2EE Расшифровка входящего сообщения не удалась:', decryptError);
+            // Оставляем msg.text как есть (apiService попытался расшифровать через NaCl box или это plaintext)
+          }
+        }
+
+        // 4. Формируем объект сообщения для локального state
+        const newMessage: Message = {
+          id: msg.id || crypto.randomUUID(),
+          senderId: msg.senderId,
+          text: finalText, // Расшифрованный текст для UI
+          timestamp: msg.timestamp || new Date().toISOString(),
+          media: msg.media,
+          mediaType: msg.mediaType,
+          payload: msg.payload, // Сохраняем полный payload (с encryptedPayload)
+          groupId: msg.groupId,
+          type: msg.type,
+          status: 'received' // Входящее сообщение всегда 'received'
+        };
+
+        // 5. Безопасное обновление стейта через safeChats (без функционального updater)
+        const updatedChats: Record<string, Chat> = { ...safeChats };
+        if (!updatedChats[chatId]) {
+          updatedChats[chatId] = { contactId: chatId, messages: [] };
+        }
+        updatedChats[chatId].messages = [...(updatedChats[chatId].messages || []), newMessage];
+        setChats(updatedChats);
+
+      } catch (error) {
+        console.error('Ошибка обработки входящего сообщения:', error);
+      }
+    };
+
+    // Подписываемся через существующий метод apiService.onMessage
+    apiService.onMessage(handleIncomingMessage);
+
+    // Cleanup: отписываемся при размонтировании или смене identity
+    return () => {
+      apiService.offMessage(handleIncomingMessage);
+    };
+  }, [identity, safeChats]);
 
   // === Phase 7.5.3: Handlers ===
   const handleSelectChat = (id: string) => {
