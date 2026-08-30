@@ -8,7 +8,15 @@ const config: CapacitorConfig = {
   server: {
     // Phase 9: Подключение планшета RT9 к ПК по локальной сети
     hostname: '192.168.100.4',
-    android: { allowList: true },
+    // Phase 9.5: фирменный стиль Lock + Waves — adaptive icons для Android 8+
+    android: {
+      allowList: true,
+      adaptiveIcon: {
+        // Capacitor требует именно PNG (SVG не поддерживается для native)
+        foreground: 'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png',
+        background: 'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_background.png',
+      },
+    },
   },
 };
 
