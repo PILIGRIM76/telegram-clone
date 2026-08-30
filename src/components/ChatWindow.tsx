@@ -200,7 +200,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 key={msg.id}
                 message={msg}
                 currentIdentity={currentUserIdentity}
-                onTimerExpire={() => onDeleteMessage(msg.id)}
+                onDelete={onDeleteMessage}
+                disappearTimer={chat.disappearTimer}
               />
           ))}
           <div ref={messagesEndRef} />

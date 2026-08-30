@@ -8,7 +8,8 @@ import { GiftIcon } from './icons/GiftIcon';
 interface MessageItemProps {
     message: Message;
     currentIdentity: Identity;
-    onTimerExpire: () => void;
+    onDelete?: (messageId: string) => void; // Phase 7.6.6: безопасный callback с явным id
+    disappearTimer?: number; // Phase 7.6.6: чатовый таймер в секундах (если задан — применяется ко всем сообщениям чата)
 }
 
 const statusText = {
@@ -18,7 +19,7 @@ const statusText = {
   'received': '⬇', // Phase 7.6.2: входящее сообщение получено
 };
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onTimerExpire }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onDelete, disappearTimer }) => {
     const [visible, setVisible] = useState(true);
     const [decryptedText, setDecryptedText] = useState<string>('');
     const sentByMe = message.senderId === currentIdentity.uid;
@@ -64,24 +65,50 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
         }
     }, [message, currentIdentity, isSystem]);
 
-    // Логика исчезающих сообщений
+    // Phase 7.6.6: Логика исчезающих сообщений с защитой от утечек памяти
+    // Поддерживает 2 источника таймера:
+    // 1. message.disappearIn + message.timerSetAt (per-message, устаревший)
+    // 2. disappearTimer (chat-wide, передаётся из ChatWindow)
     useEffect(() => {
-        if (message.disappearIn && message.timerSetAt) {
-            const passed = (Date.now() - message.timerSetAt) / 1000;
-            const remaining = message.disappearIn - passed;
+        // Системные сообщения никогда не удаляются
+        if (isSystem) return;
 
-            if (remaining <= 0) {
-                setVisible(false);
-                onTimerExpire();
-            } else {
-                const timer = setTimeout(() => {
-                    setVisible(false);
-                    setTimeout(onTimerExpire, 500); // Даем время на анимацию
-                }, remaining * 1000);
-                return () => clearTimeout(timer);
+        let timeUntilExpiry: number | null = null;
+
+        // Приоритет 1: чатовый таймер (новый, универсальный)
+        if (disappearTimer && disappearTimer > 0 && message.timestamp) {
+            const messageTime = new Date(message.timestamp).getTime();
+            if (!isNaN(messageTime)) {
+                timeUntilExpiry = (messageTime + disappearTimer * 1000) - Date.now();
             }
         }
-    }, [message, onTimerExpire]);
+        // Приоритет 2: per-message таймер (обратная совместимость)
+        else if (message.disappearIn && message.timerSetAt) {
+            const passed = (Date.now() - message.timerSetAt) / 1000;
+            timeUntilExpiry = (message.disappearIn - passed) * 1000;
+        }
+
+        // Если нет активного таймера — ничего не делаем
+        if (timeUntilExpiry === null) return;
+
+        // Если сообщение уже просрочено — сразу удаляем (без setTimeout)
+        if (timeUntilExpiry <= 0) {
+            if (onDelete) onDelete(message.id);
+            return;
+        }
+
+        // Устанавливаем таймер на удаление
+        const timerId = setTimeout(() => {
+            if (onDelete) {
+                onDelete(message.id);
+            }
+        }, timeUntilExpiry);
+
+        // КРИТИЧЕСКИ ВАЖНО: cleanup при размонтировании или изменении зависимостей
+        return () => {
+            clearTimeout(timerId);
+        };
+    }, [message.id, message.timestamp, message.disappearIn, message.timerSetAt, disappearTimer, isSystem, onDelete]);
 
     if (!visible) return <div className="transition-all duration-500 opacity-0 h-0 overflow-hidden"></div>;
 
@@ -203,8 +230,11 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onT
                         );
                     })()}
 
-                    {message.disappearIn && (
-                         <ClockIcon className="w-3 h-3 opacity-70" />
+                    {/* Phase 7.6.6: индикатор ⏳ для исчезающих сообщений */}
+                    {(message.disappearIn || disappearTimer) && (
+                         <span title={disappearTimer ? `Исчезнет через ${disappearTimer} сек` : 'Исчезающее сообщение'}>
+                            <ClockIcon className="w-3 h-3 opacity-70 text-yellow-300" />
+                         </span>
                     )}
                     <span className="text-[10px] opacity-70">
                         {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
