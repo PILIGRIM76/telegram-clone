@@ -59,6 +59,192 @@ const App: React.FC = () => {
     }
   };
 
+  // === Phase 7.5.1: Identity Guard ===
+  // Если пользователь залогинился, но Identity ещё нет — генерируем автоматически.
+  // TODO: Phase 7.6 - Show seed phrase modal before saving identity
+  useEffect(() => {
+    if (authView === 'main' && !identity) {
+      generateIdentity().then(newIdentity => {
+        setIdentity(newIdentity);
+      }).catch(err => {
+        console.error('Failed to generate identity:', err);
+      });
+    }
+  }, [authView, identity, setIdentity]);
+
+  // === Phase 7.5.3: Safe wrappers (для useLocalStorage T | null) ===
+  // Должны быть определены ДО handlers, т.к. handlers их используют.
+  const safeContacts = contacts ?? [];
+  const safeGroups = groups ?? [];
+  const safeChats = chats ?? {};
+
+  // === Phase 7.5.3: Handlers ===
+  const handleSelectChat = (id: string) => {
+    setSelectedChatId(id);
+    // TODO: Phase 7.6 - Загрузка истории сообщений с сервера через apiService.getMessages(chatId)
+  };
+
+  const handleAddContact = async (name: string, uid: string) => {
+    // Проверка на дубликат
+    if (safeContacts.some(c => c.uid === uid)) {
+      alert('Контакт с таким UID уже существует');
+      return;
+    }
+
+    const newContact: Contact = {
+      id: crypto.randomUUID(),
+      uid,
+      name,
+      verified: false,
+      archived: false
+    };
+
+    // Используем safeContacts, т.к. useLocalStorage не поддерживает (prev) => ...
+    setContacts([...safeContacts, newContact]);
+
+    // Создаём пустой чат для этого контакта
+    setChats({
+      ...safeChats,
+      [newContact.id]: { contactId: newContact.id, messages: [] }
+    });
+
+    // TODO: Phase 7.6 - Сохранить контакт на сервере через apiService
+  };
+
+  const handleCreateGroup = (name: string, type: 'public' | 'private') => {
+    if (!identity) return;
+
+    const groupId = `group_${crypto.randomUUID()}`;
+    const newGroup: Group = {
+      id: groupId,
+      name,
+      members: [identity.uid],
+      ownerId: identity.uid,
+      type
+    };
+
+    setGroups([...safeGroups, newGroup]);
+    setChats({
+      ...safeChats,
+      [groupId]: { contactId: groupId, messages: [] }
+    });
+    setSelectedChatId(groupId);
+
+    // TODO: Phase 7.6 - Создать группу на сервере
+  };
+
+  const handleMuteChat = (_id: string, _until: number | 'forever' | null) => {
+    // TODO: Phase 7.5.3 (next batch) - реализовать mute
+  };
+
+  const handleArchiveChat = (_id: string, _archive: boolean) => {
+    // TODO: Phase 7.5.3 (next batch) - реализовать archive
+  };
+
+  const handleOpenStore = () => {
+    // TODO: Phase 7.6 - открыть StoreManagementModal
+  };
+
+  const handleOpenBoards = () => {
+    // TODO: Phase 7.6 - открыть BoardManagementModal
+  };
+
+  const handleSendMessage = async (text: string, media?: string, mediaType?: 'image' | 'video', payload?: any) => {
+    if (!selectedChatId || !identity) return;
+
+    // TODO: Phase 7.6 - Integrate real E2EE encryption here using cryptoService.encrypt
+    // const encryptedText = await encrypt(text, recipientPublicKey);
+    const storedText = text; // Временная заглушка для проверки UI
+
+    const newMessage: Message = {
+      id: crypto.randomUUID(),
+      senderId: identity.uid,
+      text: storedText,
+      timestamp: new Date().toISOString(),
+      media,
+      mediaType,
+      payload,
+      status: 'sent'
+    };
+
+    const baseChats = safeChats;
+    const updatedChats: Record<string, Chat> = { ...baseChats };
+    if (!updatedChats[selectedChatId]) {
+      updatedChats[selectedChatId] = { contactId: selectedChatId, messages: [] };
+    }
+    updatedChats[selectedChatId].messages = [...(updatedChats[selectedChatId].messages || []), newMessage];
+    setChats(updatedChats);
+
+    // TODO: Phase 7.6 - Отправить сообщение через WebSocket здесь (apiService.sendMessage)
+  };
+
+  const handleSetTimer = (seconds: number | undefined) => {
+    if (!selectedChatId) return;
+
+    const updatedChats: Record<string, Chat> = { ...safeChats };
+    if (updatedChats[selectedChatId]) {
+      updatedChats[selectedChatId] = {
+        ...updatedChats[selectedChatId],
+        disappearTimer: seconds
+      };
+      setChats(updatedChats);
+    }
+
+    // TODO: Phase 7.6 - Реализовать автоудаление сообщений через setTimeout
+    // при установке таймера нужно запустить таймер, который будет удалять старые сообщения
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    if (!selectedChatId) return;
+
+    const updatedChats: Record<string, Chat> = { ...safeChats };
+    if (updatedChats[selectedChatId]) {
+      updatedChats[selectedChatId] = {
+        ...updatedChats[selectedChatId],
+        messages: (updatedChats[selectedChatId].messages || []).filter(
+          m => m.id !== messageId
+        )
+      };
+      setChats(updatedChats);
+    }
+
+    // TODO: Phase 7.6 - Отправить команду удаления через WebSocket
+    // apiService.deleteMessage(selectedChatId, messageId)
+  };
+
+  const handleVerify = () => {
+    // TODO: Phase 7.6 - открыть VerificationModal
+  };
+
+  const handleUpdateProfile = (name: string, avatar: string) => {
+    if (!identity) return;
+    const updatedIdentity = { ...identity, username: name, avatar };
+    setIdentity(updatedIdentity);
+    // TODO: Phase 7.6 - Обновить профиль на сервере
+  };
+
+  const handleReset = () => {
+    setIdentity(null);
+    setContacts([]);
+    setGroups([]);
+    setChats({});
+    setSelectedChatId(null);
+    setIsProfileOpen(false);
+    setAuthView('login');
+    localStorage.removeItem('cipherlink-identity'); // Очистка
+    // TODO: Phase 7.6 - Очистить сессию на сервере
+  };
+
+  // === Phase 7.5.3: Вычисляемые значения (partner и chat) ===
+  const partner = useMemo(() => {
+    if (!selectedChatId) return null;
+    const c = safeContacts.find(ct => ct.id === selectedChatId);
+    if (c) return c;
+    return safeGroups.find(g => g.id === selectedChatId) || null;
+  }, [selectedChatId, safeContacts, safeGroups]);
+
+  const currentChat = selectedChatId ? safeChats[selectedChatId] : null;
+
   const handleLogout = () => {
     localStorage.removeItem('cipherlink-authenticated');
     setIdentity(null);
@@ -86,17 +272,77 @@ const App: React.FC = () => {
     );
   }
 
-  // Main app content (authenticated view)
-  return (
-    <div className="bg-slate-900 text-white min-h-screen">
-      <div className="flex justify-between items-center p-4 bg-slate-800">
-        <h1 className="text-2xl">AntiPiry - Telegram Clone Secure</h1>
-        <div className="flex items-center space-x-2 text-sm">
-          <span className="font-mono">{statusText}</span>
-          <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-green-500' : status === 'connecting' ? 'bg-blue-500' : status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+  // === Phase 7.5.4: Guard — если нет Identity, показываем загрузку ===
+  if (authView === 'main' && !identity) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+          <p className="text-slate-400">Генерация Identity...</p>
         </div>
       </div>
-      <button onClick={handleLogout} className="m-4 p-2 bg-red-500 rounded">Logout</button>
+    );
+  }
+
+  // Main app content (authenticated view) — Phase 7.5.2: Layout
+  return (
+    <div className="flex h-screen bg-slate-900 text-white overflow-hidden">
+      {/* Левая колонка — список контактов */}
+      <div className="w-full md:w-80 lg:w-96 border-r border-slate-700 flex flex-col flex-shrink-0">
+        <ContactList
+          identity={identity!}
+          contacts={safeContacts}
+          groups={safeGroups}
+          chats={safeChats}
+          selectedChatId={selectedChatId}
+          onSelectChat={handleSelectChat}
+          onAddContact={handleAddContact}
+          onCreateGroup={handleCreateGroup}
+          onOpenProfile={() => setIsProfileOpen(true)}
+          onMuteChat={handleMuteChat}
+          onArchiveChat={handleArchiveChat}
+          onOpenStore={handleOpenStore}
+          onOpenBoards={handleOpenBoards}
+        />
+      </div>
+
+      {/* Правая колонка — чат или welcome */}
+      <div className="flex-1 flex flex-col bg-slate-800 min-w-0">
+        {selectedChatId && partner && identity ? (
+          <ChatWindow
+            partner={partner}
+            chat={currentChat || { contactId: selectedChatId, messages: [] }}
+            currentUserIdentity={identity}
+            onSendMessage={handleSendMessage}
+            onBack={() => setSelectedChatId(null)}
+            onSetTimer={handleSetTimer}
+            onDeleteMessage={handleDeleteMessage}
+            onVerify={handleVerify}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-slate-500">
+            <div className="text-center max-w-md px-4">
+              <h2 className="text-3xl font-bold text-slate-300 mb-2">CipherLink</h2>
+              <p className="text-slate-400">Выберите чат, чтобы начать общение</p>
+              <p className="text-xs text-slate-600 mt-4 font-mono">{statusText}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Profile drawer (глобальный) */}
+      {isProfileOpen && identity && (
+        <ProfileDrawer
+          identity={identity}
+          onClose={() => setIsProfileOpen(false)}
+          globalMuteUntil={globalMuteUntil}
+          setGlobalMuteUntil={setGlobalMuteUntil}
+          onReset={handleLogout}
+          onUpdateProfile={handleUpdateProfile}
+          theme={theme ?? 'dark'}
+          setTheme={setTheme}
+        />
+      )}
     </div>
   );
 };
