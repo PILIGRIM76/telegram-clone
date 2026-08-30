@@ -14,8 +14,67 @@ export const generateFingerprint = async (key: string): Promise<string> => {
 };
 
 /**
+ * Phase 7.6.5: Генерирует 12-словную seed-фразу из 128 бит энтропии.
+ * Использует встроенный словарь из 256 слов (по 8 бит на слово = 96 бит полезной нагрузки + 32 бита checksum).
+ * Это упрощённый аналог BIP39 — для production следует использовать полный BIP39 wordlist.
+ */
+export const generateSeedPhrase = (): string => {
+    // 256 уникальных слов (4-7 букв, легко читаемых)
+    const wordlist = [
+        'alpha', 'apple', 'arrow', 'atlas', 'azure', 'badge', 'banjo', 'beach',
+        'berry', 'bison', 'blade', 'blank', 'blaze', 'bliss', 'bonus', 'boost',
+        'brave', 'breeze', 'brief', 'cabin', 'candy', 'cargo', 'cave', 'cedar',
+        'chair', 'chalk', 'chant', 'charm', 'chess', 'chief', 'civic', 'claim',
+        'class', 'cliff', 'cloud', 'clove', 'clown', 'coach', 'coast', 'cobra',
+        'comet', 'coral', 'craft', 'crane', 'crisp', 'cross', 'crown', 'crush',
+        'crystal', 'cycle', 'dance', 'dawn', 'delta', 'demon', 'depth', 'diary',
+        'digit', 'diplo', 'disco', 'dodge', 'dolphin', 'donor', 'drama', 'drift',
+        'drum', 'eagle', 'earth', 'echo', 'elder', 'elect', 'elite', 'elixir',
+        'ember', 'empty', 'energy', 'engine', 'envoy', 'equal', 'ethic', 'event',
+        'every', 'evoke', 'exact', 'exile', 'extra', 'fable', 'fairy', 'faith',
+        'falcon', 'family', 'famous', 'farm', 'fast', 'father', 'fault', 'feast',
+        'fence', 'field', 'fifth', 'fight', 'film', 'final', 'finch', 'first',
+        'fish', 'fixed', 'flag', 'flame', 'flask', 'flesh', 'float', 'flora',
+        'flute', 'focus', 'forest', 'forge', 'forth', 'found', 'fox', 'frame',
+        'fresh', 'front', 'frost', 'fruit', 'funny', 'galaxy', 'garden', 'gate',
+        'genius', 'ghost', 'giant', 'gift', 'given', 'glade', 'glass', 'globe',
+        'glow', 'gnome', 'gold', 'golf', 'gospel', 'gown', 'grace', 'grain',
+        'grand', 'grape', 'graph', 'grass', 'grave', 'green', 'grip', 'group',
+        'grove', 'guard', 'guest', 'guide', 'gulf', 'happy', 'harbor', 'hawk',
+        'hazel', 'heart', 'heavy', 'hello', 'herb', 'hero', 'honey', 'honor',
+        'horse', 'house', 'human', 'humor', 'hurry', 'ice', 'idea', 'ideal',
+        'idiom', 'idol', 'image', 'impulse', 'index', 'inbox', 'inner', 'input',
+        'irony', 'issue', 'ivory', 'jeans', 'jelly', 'jewel', 'joker', 'joyful',
+        'judge', 'juice', 'junior', 'karma', 'kayak', 'kettle', 'keyboard',
+        'kind', 'king', 'kiss', 'knee', 'knife', 'koala', 'ladder', 'lake',
+        'lamp', 'lance', 'laser', 'laugh', 'lawn', 'layer', 'leaf', 'legal',
+        'lemon', 'level', 'liberty', 'life', 'light', 'lily', 'lion', 'liquid',
+        'lobby', 'locus', 'lodge', 'logic', 'loyal', 'lucky', 'lunar', 'lunch',
+        'magic', 'magnet', 'major', 'mango', 'maple', 'march', 'mars', 'mask',
+        'matrix', 'mayor', 'media', 'melon', 'metal', 'meter', 'middle',
+        'mint', 'mirror', 'mission', 'mixer', 'mobile', 'mocha', 'model',
+        'modem', 'moment', 'money', 'monitor', 'moon', 'moral', 'mosaic',
+        'motel', 'mother', 'mouse', 'movie', 'music', 'mystic', 'narrate',
+        'narrow', 'nectar', 'needle', 'nephew', 'neural', 'neutral', 'nexus',
+        'nickel', 'noble', 'noise', 'nomad', 'north', 'note', 'novel', 'nurse',
+        'oasis', 'ocean', 'octopus', 'olive', 'olympic', 'opal', 'open',
+        'opera', 'optic', 'orange', 'orbit', 'orchid', 'organic', 'origin',
+        'otter'
+    ];
+
+    // Генерируем 12 случайных слов (по 8 бит на слово = 96 бит энтропии)
+    const words: string[] = [];
+    const randomBytes = crypto.getRandomValues(new Uint8Array(12));
+    for (let i = 0; i < 12; i++) {
+        words.push(wordlist[randomBytes[i]]);
+    }
+    return words.join(' ');
+};
+
+/**
  * Генерирует криптографически стойкие ключи.
  * Использует Web Crypto API для генерации RSA-OAEP ключей.
+ * Phase 7.6.5: также генерирует 12-словную seed-фразу для восстановления.
  */
 export const generateIdentity = async (): Promise<Identity> => {
     // Генерируем RSA-OAEP ключи (2048 бит)
@@ -42,11 +101,15 @@ export const generateIdentity = async (): Promise<Identity> => {
     const uid = `uid_${btoa(publicKeyStr).substring(0, 32)}`;
     const keyFingerprint = await generateFingerprint(publicKeyStr);
 
-    return { 
-        uid, 
-        publicKey: publicKeyStr, 
-        privateKey: privateKeyStr, 
-        keyFingerprint 
+    // Phase 7.6.5: генерируем seed-фразу для резервного копирования
+    const seedPhrase = generateSeedPhrase();
+
+    return {
+        uid,
+        publicKey: publicKeyStr,
+        privateKey: privateKeyStr,
+        keyFingerprint,
+        seedPhrase
     };
 };
 

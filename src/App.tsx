@@ -13,6 +13,7 @@ import { generateIdentity, encrypt, decrypt } from './services/cryptoService';
 import { WelcomePlaceholder } from './components/WelcomePlaceholder';
 import { apiService } from './services/apiService';
 import ProfileDrawer from './components/ProfileDrawer';
+import SeedPhraseModal from './components/SeedPhraseModal';
 import StoreManagementModal from './components/StoreManagementModal';
 import BoardManagementModal from './components/BoardManagementModal';
 import CreateBoardModal from './components/CreateBoardModal';
@@ -34,6 +35,10 @@ const App: React.FC = () => {
   const [globalMuteUntil, setGlobalMuteUntil] = useLocalStorage<number | 'forever' | null>('cipherlink-global-mute', null);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('cipherlink-theme', 'dark');
   const [authView, setAuthView] = useState<AuthView>('login');
+
+  // Phase 7.6.5: временное хранилище для сгенерированной Identity до подтверждения seed-фразы
+  const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
+  const [showSeedModal, setShowSeedModal] = useState(false);
 
   // Check for updates on mount
   useEffect(() => {
@@ -65,18 +70,40 @@ const App: React.FC = () => {
   const safeGroups = groups ?? [];
   const safeChats = chats ?? {};
 
-  // === Phase 7.5.1: Identity Guard ===
-  // Если пользователь залогинился, но Identity ещё нет — генерируем автоматически.
-  // TODO: Phase 7.6 - Show seed phrase modal before saving identity
+  // === Phase 7.5.1: Identity Guard (Phase 7.6.5: требует подтверждения seed-фразы) ===
+  // Если пользователь залогинился, но Identity ещё нет — генерируем,
+  // но НЕ сохраняем окончательно, пока пользователь не подтвердит seed-фразу.
   useEffect(() => {
-    if (authView === 'main' && !identity) {
+    if (authView === 'main' && !identity && !pendingIdentity) {
       generateIdentity().then(newIdentity => {
-        setIdentity(newIdentity);
+        // НЕ сохраняем в основной стейт сразу — показываем модалку с seed-фразой
+        setPendingIdentity(newIdentity);
+        setShowSeedModal(true);
       }).catch(err => {
         console.error('Failed to generate identity:', err);
       });
     }
-  }, [authView, identity, setIdentity]);
+  }, [authView, identity, pendingIdentity, setIdentity]);
+
+  // Phase 7.6.5: обработчики для SeedPhraseModal
+  const handleSeedConfirmed = () => {
+    if (pendingIdentity) {
+      // Пользователь подтвердил, что сохранил seed-фразу → окончательно сохраняем Identity
+      setIdentity(pendingIdentity);
+      setPendingIdentity(null);
+      setShowSeedModal(false);
+    }
+  };
+
+  const handleSeedSkip = () => {
+    // Пользователь пропустил (на свой страх и риск) → всё равно сохраняем Identity
+    // (иначе приложение неработоспособно). Можно усилить: блокировать вход.
+    if (pendingIdentity) {
+      setIdentity(pendingIdentity);
+      setPendingIdentity(null);
+      setShowSeedModal(false);
+    }
+  };
 
   // === Phase 7.6.2: WebSocket подписка на входящие сообщения ===
   // Подписываемся только если есть identity и приватный ключ для расшифровки
@@ -424,6 +451,16 @@ const App: React.FC = () => {
           onUpdateProfile={handleUpdateProfile}
           theme={theme ?? 'dark'}
           setTheme={setTheme}
+        />
+      )}
+
+      {/* Phase 7.6.5: Seed phrase modal */}
+      {showSeedModal && pendingIdentity?.seedPhrase && (
+        <SeedPhraseModal
+          seedPhrase={pendingIdentity.seedPhrase}
+          username={pendingIdentity.username}
+          onConfirm={handleSeedConfirmed}
+          onSkip={handleSeedSkip}
         />
       )}
     </div>

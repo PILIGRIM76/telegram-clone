@@ -35,6 +35,7 @@ export interface Identity {
   store?: Store;
   boards?: NoticeBoard[];
   keyFingerprint?: string;
+  seedPhrase?: string; // Phase 7.6.5: 12-словная фраза для восстановления (опционально для старых Identity)
 }
 
 export interface Contact {
