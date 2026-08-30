@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import type { Store, NoticeBoard, Product } from '../types';
 import { apiService } from '../services/apiService';
@@ -9,7 +9,7 @@ import AnnouncementPaymentModal from './AnnouncementPaymentModal';
 
 interface AddContactModalProps {
   onClose: () => void;
-  onAddContact: (name: string, uid: string) => void;
+  onAddContact: (name: string, uid: string, publicKey?: string) => void;
 }
 
 const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact }) => {
@@ -21,10 +21,12 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
       boards?: NoticeBoard[];
   } | null>(null);
   const [contactName, setContactName] = useState('');
+  const [publicKeyInput, setPublicKeyInput] = useState(''); // Phase 7.6.4: РѕРїС†РёРѕРЅР°Р»СЊРЅС‹Р№ РІРІРѕРґ JWK
+  const [showAdvanced, setShowAdvanced] = useState(false); // Phase 7.6.4: РїРѕРєР°Р·Р°С‚СЊ/СЃРєСЂС‹С‚СЊ СЂР°СЃС€РёСЂРµРЅРЅС‹Рµ РїРѕР»СЏ
   const [error, setError] = useState('');
   const [activeBoard, setActiveBoard] = useState<NoticeBoard | null>(null);
 
-  // Состояния для покупок/публикаций
+  // РЎРѕСЃС‚РѕСЏРЅРёСЏ РґР»СЏ РїРѕРєСѓРїРѕРє/РїСѓР±Р»РёРєР°С†РёР№
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isAdPaymentModalOpen, setIsAdPaymentModalOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
@@ -50,15 +52,18 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
 
   const addToContacts = () => {
       if (!result || !contactName) return;
-      onAddContact(contactName, result.uid);
+      // Phase 7.6.4: РёСЃРїРѕР»СЊР·СѓРµРј РІРІРµРґС‘РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј publicKey, РёРЅР°С‡Рµ РёР· result (РµСЃР»Рё СЃРµСЂРІРµСЂ РІРµСЂРЅСѓР»)
+      const finalPublicKey = publicKeyInput.trim() || result.publicKey || undefined;
+      onAddContact(contactName, result.uid, finalPublicKey);
       onClose();
   };
 
   const orderProduct = (txid: string) => {
       if (!selectedProduct || !result) return;
-      // В реальном приложении здесь нужен callback в App.tsx для отправки заказа
-      onAddContact(`Store ${result.store?.name || 'Seller'}`, result.uid);
-      
+      // Р’ СЂРµР°Р»СЊРЅРѕРј РїСЂРёР»РѕР¶РµРЅРёРё Р·РґРµСЃСЊ РЅСѓР¶РµРЅ callback РІ App.tsx РґР»СЏ РѕС‚РїСЂР°РІРєРё Р·Р°РєР°Р·Р°
+      const finalPublicKey = publicKeyInput.trim() || result.publicKey || undefined;
+      onAddContact(`Store ${result.store?.name || 'Seller'}`, result.uid, finalPublicKey);
+
       alert('Contact added. Please send TXID to the seller in chat to confirm order.');
       onClose();
   };
@@ -93,7 +98,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                {result ? (
                    <div className="space-y-6">
-                       {/* Профиль / Добавление */}
+                       {/* РџСЂРѕС„РёР»СЊ / Р”РѕР±Р°РІР»РµРЅРёРµ */}
                        <div className="bg-slate-700 p-4 rounded flex justify-between items-center">
                            <div>
                                <p className="text-xs text-slate-400">UID found</p>
@@ -107,10 +112,46 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
                                     className="bg-slate-800 p-1 px-2 rounded text-white text-sm"
                                />
                                <button onClick={addToContacts} className="bg-green-600 px-3 py-1 rounded text-white text-sm">Add</button>
-                           </div>
-                       </div>
+                            </div>
+                        </div>
 
-                       {/* Магазин */}
+                        {/* Phase 7.6.4: РћРїС†РёРѕРЅР°Р»СЊРЅС‹Р№ РІРІРѕРґ РїСѓР±Р»РёС‡РЅРѕРіРѕ РєР»СЋС‡Р° (E2EE) */}
+                        <div className="bg-slate-700/40 p-3 rounded border border-slate-600/50">
+                            <button
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className="text-xs text-slate-400 hover:text-cyan-400 flex items-center w-full"
+                            >
+                                <span>{showAdvanced ? 'в–ј' : 'в–¶'}</span>
+                                <span className="ml-2">
+                                    Р Р°СЃС€РёСЂРµРЅРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё (E2EE РїСѓР±Р»РёС‡РЅС‹Р№ РєР»СЋС‡)
+                                </span>
+                            </button>
+                            {showAdvanced && (
+                                <div className="mt-2 space-y-2">
+                                    <label className="block text-xs text-slate-400">
+                                        РџСѓР±Р»РёС‡РЅС‹Р№ РєР»СЋС‡ (JWK, РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
+                                        {result.publicKey && (
+                                            <span className="ml-2 text-green-400">
+                                                вњ“ РїРѕР»СѓС‡РµРЅ СЃ СЃРµСЂРІРµСЂР°
+                                            </span>
+                                        )}
+                                    </label>
+                                    <textarea
+                                        value={publicKeyInput}
+                                        onChange={e => setPublicKeyInput(e.target.value)}
+                                        placeholder='{"kty":"RSA","n":"...","e":"AQAB"} (РѕСЃС‚Р°РІСЊС‚Рµ РїСѓСЃС‚С‹Рј, РµСЃР»Рё СЃРµСЂРІРµСЂ РІРµСЂРЅСѓР» РєР»СЋС‡)'
+                                        className="w-full bg-slate-800 p-2 rounded text-white text-xs font-mono resize-none"
+                                        rows={3}
+                                    />
+                                    <p className="text-[10px] text-slate-500">
+                                        рџ”’ Р•СЃР»Рё СѓРєР°Р·Р°РЅ вЂ” Р±СѓРґРµС‚ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊСЃСЏ РґР»СЏ E2EE С€РёС„СЂРѕРІР°РЅРёСЏ СЃРѕРѕР±С‰РµРЅРёР№ СЌС‚РѕРјСѓ РєРѕРЅС‚Р°РєС‚Сѓ.
+                                        РЎРµСЂРІРµСЂ СѓР¶Рµ РјРѕРі РІРµСЂРЅСѓС‚СЊ РєР»СЋС‡ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                       {/* РњР°РіР°Р·РёРЅ */}
                        {result.store && (
                            <div>
                                <h3 className="text-lg font-bold text-white mb-3 flex items-center">
@@ -136,7 +177,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
                            </div>
                        )}
 
-                       {/* Доски объявлений */}
+                       {/* Р”РѕСЃРєРё РѕР±СЉСЏРІР»РµРЅРёР№ */}
                        {result.boards && result.boards.length > 0 && (
                            <div className="mt-6 border-t border-slate-700 pt-4">
                                <div className="flex justify-between items-center mb-4">
