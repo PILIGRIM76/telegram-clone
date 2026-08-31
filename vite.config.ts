@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => {
       plugins: [react(), VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'CipherLink',
-        short_name: 'CipherLink',
-        description: 'Защищённый мессенджер с E2EE шифрованием',
+        name: 'PILIGRIM',
+        short_name: 'PILIGRIM',
+        description: 'Защищённый мессенджер PILIGRIM с E2EE шифрованием',
         theme_color: '#7c3aed',
         background_color: '#3b82f6',
         display: 'standalone',

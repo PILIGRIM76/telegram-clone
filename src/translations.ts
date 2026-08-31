@@ -4,8 +4,8 @@ export type Language = 'en' | 'ru';
 export const resources = {
   en: {
     // Auth / Setup
-    welcome_title: "Welcome to CipherLink",
-    welcome_desc: "CipherLink is a secure messenger that works without a phone number or email. Your identity is a unique cryptographic key stored only on your device.",
+    welcome_title: "Welcome to PILIGRIM",
+    welcome_desc: "PILIGRIM is a secure messenger that works without a phone number or email. Your identity is a unique cryptographic key stored only on your device.",
     backup_warning: "Important: You are responsible for backing up your identity. If you clear your browser data or lose access to this device, your identity and contacts will be lost forever.",
     create_identity_btn: "Create Secure Identity",
     
@@ -32,7 +32,7 @@ export const resources = {
     attach_file: "Attach file",
     
     // Placeholders
-    select_chat_title: "Welcome to CipherLink",
+    select_chat_title: "Welcome to PILIGRIM",
     select_chat_desc: "Your secure and anonymous messenger. Select a contact to start a conversation, or add a new one using their secure UID.",
     security_note: "Security Note: All messages are end-to-end encrypted. No one outside of this chat, not even CipherLink, can read them.",
     
@@ -51,8 +51,8 @@ export const resources = {
   },
   ru: {
     // Auth / Setup
-    welcome_title: "Добро пожаловать в ШифроСвязь",
-    welcome_desc: "ШифроСвязь — это безопасный мессенджер без номера телефона или email. Ваша личность — это уникальный криптографический ключ, хранящийся только на устройстве.",
+    welcome_title: "Добро пожаловать в PILIGRIM",
+    welcome_desc: "PILIGRIM — это безопасный мессенджер без номера телефона или email. Ваша личность — это уникальный криптографический ключ, хранящийся только на устройстве.",
     backup_warning: "Важно: Вы сами отвечаете за сохранность ключа. При очистке браузера или потере устройства данные восстановить невозможно.",
     create_identity_btn: "Создать Личность",
     

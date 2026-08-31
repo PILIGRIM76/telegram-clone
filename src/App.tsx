@@ -28,14 +28,14 @@ type AuthView = 'login' | 'register' | 'main';
 
 const App: React.FC = () => {
   const { language, t } = useTranslation();
-  const [identity, setIdentity] = useLocalStorage<Identity | null>('cipherlink-identity', null);
-  const [contacts, setContacts] = useLocalStorage<Contact[]>('cipherlink-contacts', []);
-  const [groups, setGroups] = useLocalStorage<Group[]>('cipherlink-groups', []);
-  const [chats, setChats] = useLocalStorage<Record<string, Chat>>('cipherlink-chats', {});
+  const [identity, setIdentity] = useLocalStorage<Identity | null>('piligrim-identity', null);
+  const [contacts, setContacts] = useLocalStorage<Contact[]>('piligrim-contacts', []);
+  const [groups, setGroups] = useLocalStorage<Group[]>('piligrim-groups', []);
+  const [chats, setChats] = useLocalStorage<Record<string, Chat>>('piligrim-chats', {});
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [globalMuteUntil, setGlobalMuteUntil] = useLocalStorage<number | 'forever' | null>('cipherlink-global-mute', null);
-  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('cipherlink-theme', 'dark');
+  const [globalMuteUntil, setGlobalMuteUntil] = useLocalStorage<number | 'forever' | null>('piligrim-global-mute', null);
+  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('piligrim-theme', 'dark');
   const [authView, setAuthView] = useState<AuthView>('login');
 
   // Phase 7.6.5: временное хранилище для сгенерированной Identity до подтверждения seed-фразы
@@ -53,16 +53,24 @@ const App: React.FC = () => {
 
   // Authentication handlers
   const handleLogin = (result: AuthResult) => {
+    console.log('[PILIGRIM] handleLogin called with:', result);
     if (result.success) {
+      console.log('[PILIGRIM] handleLogin SUCCESS, switching to main view');
       setAuthView('main');
-      localStorage.setItem('cipherlink-authenticated', 'true');
+      localStorage.setItem('piligrim-authenticated', 'true');
+    } else {
+      console.warn('[PILIGRIM] handleLogin FAILED:', result.error || result.message);
     }
   };
 
   const handleRegister = (result: AuthResult) => {
+    console.log('[PILIGRIM] handleRegister called with:', result);
     if (result.success) {
+      console.log('[PILIGRIM] handleRegister SUCCESS, switching to main view');
       setAuthView('main');
-      localStorage.setItem('cipherlink-authenticated', 'true');
+      localStorage.setItem('piligrim-authenticated', 'true');
+    } else {
+      console.warn('[PILIGRIM] handleRegister FAILED:', result.error || result.message);
     }
   };
 
@@ -78,19 +86,19 @@ const App: React.FC = () => {
   useEffect(() => {
     if (authView === 'main' && !identity && !pendingIdentity) {
       // Phase 9.5 debug: подробное логирование
-      console.log('[CipherLink] Попытка генерации Identity...');
-      console.log('[CipherLink] VITE_API_URL =', (typeof process !== 'undefined' && (process as any).env?.VITE_API_URL) || 'not inlined');
-      console.log('[CipherLink] authView =', authView, ', identity =', !!identity, ', pendingIdentity =', !!pendingIdentity);
+      console.log('[PILIGRIM] Попытка генерации Identity...');
+      console.log('[PILIGRIM] VITE_API_URL =', (typeof process !== 'undefined' && (process as any).env?.VITE_API_URL) || 'not inlined');
+      console.log('[PILIGRIM] authView =', authView, ', identity =', !!identity, ', pendingIdentity =', !!pendingIdentity);
       generateIdentity().then(newIdentity => {
-        console.log('[CipherLink] Identity сгенерирована успешно, uid =', newIdentity?.uid);
+        console.log('[PILIGRIM] Identity сгенерирована успешно, uid =', newIdentity?.uid);
         // НЕ сохраняем в основной стейт сразу — показываем модалку с seed-фразой
         setPendingIdentity(newIdentity);
         setShowSeedModal(true);
         // Phase 9.5: скрываем сплэш-скрин после успешной генерации Identity
         SplashScreen.hide().catch(e => console.warn('SplashScreen.hide failed:', e));
       }).catch(err => {
-        console.error('[CipherLink] Ошибка генерации Identity:', err);
-        console.error('[CipherLink] Stack trace:', err?.stack);
+        console.error('[PILIGRIM] Ошибка генерации Identity:', err);
+        console.error('[PILIGRIM] Stack trace:', err?.stack);
       });
     }
   }, [authView, identity, pendingIdentity, setIdentity]);
@@ -351,7 +359,7 @@ const App: React.FC = () => {
     setSelectedChatId(null);
     setIsProfileOpen(false);
     setAuthView('login');
-    localStorage.removeItem('cipherlink-identity'); // Очистка
+    localStorage.removeItem('piligrim-identity'); // Очистка
     // TODO: Phase 7.6 - Очистить сессию на сервере
   };
 
@@ -366,7 +374,7 @@ const App: React.FC = () => {
   const currentChat = selectedChatId ? safeChats[selectedChatId] : null;
 
   const handleLogout = () => {
-    localStorage.removeItem('cipherlink-authenticated');
+    localStorage.removeItem('piligrim-authenticated');
     setIdentity(null);
     setSelectedChatId(null);
     setAuthView('login');
@@ -442,7 +450,7 @@ const App: React.FC = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-500">
             <div className="text-center max-w-md px-4">
-              <h2 className="text-3xl font-bold text-slate-300 mb-2">CipherLink</h2>
+              <h2 className="text-3xl font-bold text-slate-300 mb-2">PILIGRIM</h2>
               <p className="text-slate-400">Выберите чат, чтобы начать общение</p>
               <p className="text-xs text-slate-600 mt-4 font-mono">{statusText}</p>
             </div>
@@ -478,3 +486,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+

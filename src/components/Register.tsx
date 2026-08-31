@@ -39,6 +39,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
   };
 
   const handleRegister = async () => {
+    console.log('[PILIGRIM] Register button clicked. show2FASetup=', show2FASetup, 'email=', email);
     if (show2FASetup) {
       handleVerify2FA();
     } else {
