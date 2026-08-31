@@ -8,7 +8,7 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "identifier": "com.cipherlink.app",
+      "identifier": "com.piligrim.app",
       "icons": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -19,7 +19,7 @@
     },
     "windows": [
       {
-        "title": "CipherLink",
+        "title": "PILIGRIM",
         "width": 1000,
         "height": 800,
         "resizable": true,
@@ -33,7 +33,7 @@
     }
   },
   "package": {
-    "productName": "CipherLink",
+    "productName": "PILIGRIM",
     "version": "1.1.0"
   }
 }

@@ -10,6 +10,8 @@ import { Login } from './components/Login';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import { generateIdentity, encrypt, decrypt } from './services/cryptoService';
+import { SplashScreen } from '@capacitor/splash-screen';
+// Phase 9.5 cache buster - 2026-08-30T21:00:00Z - force esbuild to re-process all files
 import { WelcomePlaceholder } from './components/WelcomePlaceholder';
 import { apiService } from './services/apiService';
 import ProfileDrawer from './components/ProfileDrawer';
@@ -75,12 +77,20 @@ const App: React.FC = () => {
   // но НЕ сохраняем окончательно, пока пользователь не подтвердит seed-фразу.
   useEffect(() => {
     if (authView === 'main' && !identity && !pendingIdentity) {
+      // Phase 9.5 debug: подробное логирование
+      console.log('[CipherLink] Попытка генерации Identity...');
+      console.log('[CipherLink] VITE_API_URL =', (typeof process !== 'undefined' && (process as any).env?.VITE_API_URL) || 'not inlined');
+      console.log('[CipherLink] authView =', authView, ', identity =', !!identity, ', pendingIdentity =', !!pendingIdentity);
       generateIdentity().then(newIdentity => {
+        console.log('[CipherLink] Identity сгенерирована успешно, uid =', newIdentity?.uid);
         // НЕ сохраняем в основной стейт сразу — показываем модалку с seed-фразой
         setPendingIdentity(newIdentity);
         setShowSeedModal(true);
+        // Phase 9.5: скрываем сплэш-скрин после успешной генерации Identity
+        SplashScreen.hide().catch(e => console.warn('SplashScreen.hide failed:', e));
       }).catch(err => {
-        console.error('Failed to generate identity:', err);
+        console.error('[CipherLink] Ошибка генерации Identity:', err);
+        console.error('[CipherLink] Stack trace:', err?.stack);
       });
     }
   }, [authView, identity, pendingIdentity, setIdentity]);

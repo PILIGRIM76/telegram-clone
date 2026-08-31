@@ -41,7 +41,8 @@ export default defineConfig(({ mode }) => {
     })],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        // Phase 9.5: critical — apiService использует хардкод (см. комментарий в apiService.ts)
       },
       resolve: {
         alias: {

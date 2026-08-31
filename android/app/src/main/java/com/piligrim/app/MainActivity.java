@@ -1,4 +1,4 @@
-package com.cipherlink.app;
+package com.piligrim.app;
 
 import com.getcapacitor.BridgeActivity;
 

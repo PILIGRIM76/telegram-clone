@@ -2,9 +2,16 @@ import type { Message, Store, Group, NoticeBoard } from '../types';
 import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
 
-const BASE_URL = process.env.VITE_API_URL || 'http://localhost:8080';
+// Phase 9.5 fix: hardcoded IP for RT9 deployment
+// (process.env в Vite-браузере не работает — используем прямое присваивание)
+const BASE_URL = 'http://192.168.100.4:4000';
 const API_URL = BASE_URL.replace(/\/+$/, '');
 const WS_URL = API_URL.replace(/^http/, 'ws');
+
+// DEBUG: console.log используется ТОЛЬКО для проверки билда, потом удалить
+if (typeof console !== 'undefined') {
+  console.log('[apiService] BASE_URL =', BASE_URL, 'API_URL =', API_URL);
+}
 
 class ApiService {
   private ws: WebSocket | null = null;
