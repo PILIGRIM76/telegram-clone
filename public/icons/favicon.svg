@@ -1,8 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Упрощённый favicon: только замок, без градиента фона -->
-  <rect x="22" y="28" width="20" height="22" rx="3" ry="3" fill="#0891b2"/>
-  <circle cx="32" cy="37" r="2.5" fill="#ffffff"/>
-  <rect x="31" y="37" width="2" height="6" fill="#ffffff"/>
-  <path d="M 26 28 L 26 21 Q 26 14, 32 14 Q 38 14, 38 21 L 38 28"
-        fill="none" stroke="#0891b2" stroke-width="3" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="fgGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#dbeafe" />
+    </linearGradient>
+  </defs>
+
+  <path d="M 12,32 A 20,20 0 0,1 24,18" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.3"/>
+  <path d="M 18,32 A 14,14 0 0,1 26,24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.6"/>
+  <path d="M 52,32 A 20,20 0 0,0 40,18" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.3"/>
+  <path d="M 46,32 A 14,14 0 0,0 38,24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.6"/>
+
+  <circle cx="32" cy="24" r="6" fill="none" stroke="url(#fgGrad)" stroke-width="4"/>
+  <rect x="29" y="29" width="6" height="16" rx="3" fill="url(#fgGrad)"/>
+  <rect x="29" y="40" width="9" height="4" rx="2" fill="url(#fgGrad)"/>
 </svg>

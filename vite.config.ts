@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => {
         name: 'CipherLink',
         short_name: 'CipherLink',
         description: 'Защищённый мессенджер с E2EE шифрованием',
-        theme_color: '#0891b2',
-        background_color: '#0e7490',
+        theme_color: '#7c3aed',
+        background_color: '#3b82f6',
         display: 'standalone',
         icons: [
           {

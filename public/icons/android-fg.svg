@@ -1,19 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
   <defs>
-    <linearGradient id="lockGradFG" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e0f2fe"/>
+    <linearGradient id="keyGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#e0e7ff" stop-opacity="1" />
     </linearGradient>
   </defs>
 
-  <!-- Замок (тело) — центрирован на холсте 108x108 -->
-  <g transform="translate(0, 10)">
-    <rect x="34" y="46" width="40" height="42" rx="4" ry="4" fill="url(#lockGradFG)"/>
-    <circle cx="54" cy="65" r="4" fill="#0891b2"/>
-    <rect x="52.5" y="65" width="3" height="10" fill="#0891b2"/>
-  </g>
+  <g transform="translate(54, 54)">
+    <path d="M -36,0 A 36,36 0 0,1 -24,-26" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.25"/>
+    <path d="M -30,0 A 30,30 0 0,1 -21,-21" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.4"/>
+    <path d="M -24,0 A 24,24 0 0,1 -17,-17" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.7"/>
+    <path d="M 36,0 A 36,36 0 0,0 24,-26" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.25"/>
+    <path d="M 30,0 A 30,30 0 0,0 21,-21" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.4"/>
+    <path d="M 24,0 A 24,24 0 0,0 17,-17" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.7"/>
 
-  <!-- Дуга замка -->
-  <path d="M 42 56 L 42 42 Q 42 28, 54 28 Q 66 28, 66 42 L 66 56"
-        fill="none" stroke="url(#lockGradFG)" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="0" cy="-10" r="8.5" fill="none" stroke="url(#keyGradient)" stroke-width="4.5"/>
+    <rect x="-2.5" y="-1.5" width="5" height="30" rx="2.5" fill="url(#keyGradient)"/>
+    <rect x="-2.5" y="18" width="7.5" height="3.5" rx="1.5" fill="url(#keyGradient)"/>
+    <rect x="-2.5" y="24" width="5.5" height="3.5" rx="1.5" fill="url(#keyGradient)"/>
+  </g>
 </svg>
