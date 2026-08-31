@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useCallTimer } from '../hooks/useCallTimer';
+import { webrtcService } from '../services/webrtcService'; // Phase 8.3: геттеры screenStream/localStream
 import { playRingtone, stopRingtone, playConnectSound, playEndCallSound } from '../utils/callSounds';
 
 interface CallModalProps {
@@ -40,6 +41,25 @@ export const CallModal: React.FC<CallModalProps> = ({
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
+
+  // Phase 8.3: переключаем локальное превью на экран при screen sharing
+  useEffect(() => {
+    if (!localVideoRef.current) return;
+    if (isScreenSharing) {
+      const screenStream = webrtcService.getScreenStream();
+      if (screenStream) {
+        localVideoRef.current.srcObject = screenStream;
+        console.log('Local preview switched to screen');
+      }
+    } else {
+      // Возвращаем камеру
+      const camStream = webrtcService.getLocalStream();
+      if (camStream) {
+        localVideoRef.current.srcObject = camStream;
+        console.log('Local preview switched back to camera');
+      }
+    }
+  }, [isScreenSharing, localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -209,6 +229,69 @@ export const CallModal: React.FC<CallModalProps> = ({
               objectFit: 'cover'
             }}
           />
+
+          {/* Phase 8.3: UX-бейдж "Демонстрация экрана" */}
+          {isScreenSharing && (
+            <>
+              {/* Бейдж над local-видео (показывает, что сейчас экран) */}
+              <div style={{
+                position: 'absolute',
+                bottom: '310px',
+                right: '20px',
+                background: '#ef4444',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
+                animation: 'pulse 2s infinite',
+                zIndex: 20
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  background: 'white',
+                  borderRadius: '50%'
+                }}></span>
+                ВЫ ДЕМОНСТРИРУЕТЕ ЭКРАН
+              </div>
+
+              {/* Главный бейдж по центру (на весь экран) */}
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(239, 68, 68, 0.95)',
+                color: 'white',
+                padding: '10px 20px',
+                borderRadius: '24px',
+                fontSize: '14px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.6)',
+                animation: 'pulse 2s infinite',
+                zIndex: 20
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '10px',
+                  height: '10px',
+                  background: 'white',
+                  borderRadius: '50%',
+                  boxShadow: '0 0 8px white'
+                }}></span>
+                🖥️ Демонстрация экрана активна
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{

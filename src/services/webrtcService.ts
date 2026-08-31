@@ -290,6 +290,17 @@ class WebRTCService {
     return this.isScreenSharing;
   }
 
+  // Phase 8.3: геттеры для UI-компонентов (превью в CallModal)
+  /** Возвращает локальный MediaStream (камера/микрофон), или null */
+  getLocalStream(): MediaStream | null {
+    return this.localStream;
+  }
+
+  /** Возвращает screen MediaStream (демонстрация экрана), или null */
+  getScreenStream(): MediaStream | null {
+    return this.screenStream;
+  }
+
   setCallType(type: 'video' | 'audio'): void {
     this.callType = type;
   }
