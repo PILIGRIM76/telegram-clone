@@ -22,12 +22,14 @@ export const CallModal: React.FC<CallModalProps> = ({
     incomingCall,
     localStream,
     remoteStream,
+    isScreenSharing,    // Phase 8.2
     startCall,
     answerCall,
     rejectCall,
     endCall,
     toggleAudio,
-    toggleVideo
+    toggleVideo,
+    toggleScreenShare   // Phase 8.2
   } = useWebRTC(currentUserId);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -245,6 +247,26 @@ export const CallModal: React.FC<CallModalProps> = ({
             }}
           >
             📹
+          </button>
+          {/* Phase 8.2: Кнопка демонстрации экрана */}
+          <button
+            onClick={toggleScreenShare}
+            title={isScreenSharing ? 'Остановить демонстрацию' : 'Поделиться экраном'}
+            style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: isScreenSharing ? '#f97316' : '#6b7280', // orange when active, gray when inactive
+              color: 'white',
+              border: isScreenSharing ? '2px solid #fbbf24' : 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: isScreenSharing ? '0 0 12px rgba(251, 191, 36, 0.6)' : 'none'
+            }}
+            aria-label={isScreenSharing ? 'Stop screen sharing' : 'Start screen sharing'}
+          >
+            {isScreenSharing ? '🛑' : '🖥️'}
           </button>
           <button
             onClick={() => {

@@ -13,6 +13,8 @@ export function useWebRTC(currentUserId: string) {
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  // Phase 8.2: state для демонстрации экрана
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   useEffect(() => {
     // Подписка на входящие звонки
@@ -122,17 +124,48 @@ export function useWebRTC(currentUserId: string) {
     return webrtcService.toggleVideo();
   }, []);
 
+  // Phase 8.2: переключатель демонстрации экрана
+  const toggleScreenShare = useCallback(async () => {
+    if (isScreenSharing) {
+      webrtcService.stopScreenShare();
+      // state обновится через событие onScreenShareStopped ниже
+    } else {
+      const success = await webrtcService.startScreenShare();
+      if (!success) {
+        // Пользователь отменил диалог или ошибка — ничего не делаем
+        console.log('Screen share not started (cancelled or error)');
+      }
+    }
+  }, [isScreenSharing]);
+
+  // Phase 8.2: подписка на события от webrtcService для синхронизации state
+  useEffect(() => {
+    const handleScreenStarted = () => setIsScreenSharing(true);
+    const handleScreenStopped = () => setIsScreenSharing(false);
+
+    // webrtcService.emitCallEvent используется для всех событий, но
+    // для screen sharing мы используем простую проверку через сервис
+    const interval = setInterval(() => {
+      const serviceActive = webrtcService.isScreenShareActive();
+      setIsScreenSharing(prev => prev !== serviceActive ? serviceActive : prev);
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return {
     isInCall,
     isCalling,
     incomingCall,
     localStream,
     remoteStream,
+    isScreenSharing,        // Phase 8.2
     startCall,
     answerCall,
     rejectCall,
     endCall,
     toggleAudio,
-    toggleVideo
+    toggleVideo,
+    toggleScreenShare      // Phase 8.2
   };
 }
