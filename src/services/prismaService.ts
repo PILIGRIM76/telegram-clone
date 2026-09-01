@@ -1,19 +1,17 @@
 ﻿// Prisma Service - PostgreSQL + Redis integration
-// Для тестирования используется fallback на SQLite
+// Phase 9.5 fix: для browser bundle мы не используем PrismaClient напрямую
+// (это Node.js only). В браузере/Capacitor возвращаем пустые массивы/объекты.
+// Реальная серверная часть (Prisma + Redis) работает в Node.js процессе.
 
 import { sqliteStorage } from './sqliteStorage';
-import Redis from 'ioredis';
 import type { Message } from '../types';
-import { PrismaClient } from '../generated/prisma';
-
-const prisma = new PrismaClient();
-
-const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 
 export const prismaService = {
   async saveMessage(chatId: string, sender: string, content: string, timestamp: number, isEncrypted: boolean = false) {
     const message = {
-      id: crypto.randomUUID(),
+      id: (typeof crypto !== 'undefined' && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2),
       senderId: sender,
       text: content,
       timestamp: timestamp.toString(),
@@ -33,70 +31,35 @@ export const prismaService = {
     return await sqliteStorage.loadMessages(chatId, limit, offset);
   },
 
-  async publishMessage(chatId: string, message: any) {
-    if (redis) {
-      await redis.publish('messages:' + chatId, JSON.stringify(message));
-    }
+  async publishMessage(_chatId: string, _message: any) {
+    // Redis pub/sub недоступен в браузере
   },
 
   async disconnect() {
-    if (redis) {
-      await redis.quit();
-    }
+    // no-op в браузере
   },
 
-  async saveCall(data: {
+  async saveCall(_data: {
     callerId: string;
     receiverId: string;
     callType: string;
     status: string;
     duration: number;
   }) {
-    return await prisma.call.create({
-      data: {
-        callerId: data.callerId,
-        receiverId: data.receiverId,
-        callType: data.callType,
-        status: data.status,
-        duration: data.duration
-      }
-    });
+    // Phase 9.5: PrismaClient недоступен в browser bundle
+    return { id: 'browser-stub' } as any;
   },
 
-  async getCallHistory(userId: string, limit: number = 50, offset: number = 0) {
-    return await prisma.call.findMany({
-      where: {
-        OR: [
-          { callerId: userId },
-          { receiverId: userId }
-        ]
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset
-    });
+  async getCallHistory(_userId: string, _limit: number = 50, _offset: number = 0) {
+    return [] as any[];
   },
 
-  async getMissedCalls(userId: string) {
-    return await prisma.call.findMany({
-      where: {
-        receiverId: userId,
-        status: 'missed'
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  async getMissedCalls(_userId: string) {
+    return [] as any[];
   },
 
-  async getCallsWithUser(userId: string, partnerId: string) {
-    return await prisma.call.findMany({
-      where: {
-        OR: [
-          { callerId: userId, receiverId: partnerId },
-          { callerId: partnerId, receiverId: userId }
-        ]
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  async getCallsWithUser(_userId: string, _partnerId: string) {
+    return [] as any[];
   }
 };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { apiService } from '../services/apiService';
 
 type WebSocketStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
@@ -7,9 +7,9 @@ export function useWebSocketStatus() {
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
 
   useEffect(() => {
-    const handleOpen = useCallback(() => setStatus('connected'), []);
-    const handleClose = useCallback(() => setStatus('disconnected'), []);
-    const handleError = useCallback(() => setStatus('error'), []);
+    const handleOpen = () => setStatus('connected');
+    const handleClose = () => setStatus('disconnected');
+    const handleError = () => setStatus('error');
 
     apiService.onOpen(handleOpen);
     apiService.onClose(handleClose);
@@ -21,10 +21,10 @@ export function useWebSocketStatus() {
   }, []);
 
   const statusText = {
-    connected: '🟢 Подключено',
-    connecting: '🔵 Подключаюсь...',
-    disconnected: '⚪ Отключено',
-    error: '🔴 Ошибка'
+    connected: 'Подключено',
+    connecting: 'Подключаюсь...',
+    disconnected: 'Отключено',
+    error: 'Ошибка'
   }[status];
 
   return { status, statusText };

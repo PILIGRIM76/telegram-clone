@@ -1,4 +1,4 @@
-
+﻿
 import CallModal from './CallModal';
 import CallHistory from './CallHistory';
 import React, { useRef, useEffect, useState } from 'react';
@@ -50,14 +50,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-    // Отправляем сигнал "прочитано" если это личный чат
+    // РћС‚РїСЂР°РІР»СЏРµРј СЃРёРіРЅР°Р» "РїСЂРѕС‡РёС‚Р°РЅРѕ" РµСЃР»Рё СЌС‚Рѕ Р»РёС‡РЅС‹Р№ С‡Р°С‚
     if (!('name' in partner)) {
        apiService.sendMessage((partner as Contact).uid, '', '', { type: 'read' });
     }
   }, [chat.messages, partner]);
   
   useEffect(() => {
-    // Сбрасываем состояние при смене партнёра
+    // РЎР±СЂР°СЃС‹РІР°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ РїСЂРё СЃРјРµРЅРµ РїР°СЂС‚РЅС‘СЂР°
   }, [partner.id]);
 
   const isGroup = 'name' in partner;
@@ -155,20 +155,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <button 
                 onClick={async () => {
                   try {
-                    const path = await obsidianSync.exportChatToMarkdown({
+                    const path = await obsidianSync.exportChat({
                       chatId: chatId,
                       participant: partnerName
                     });
-                    alert(`Экспортировано в: ${path}`);
+                    alert(`Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРѕ РІ: ${path}`);
                   } catch (err) {
                     console.error('Export failed:', err);
-                    alert('Ошибка экспорта');
+                    alert('РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р°');
                   }
                 }}
                 style={{ padding: '6px 12px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                title="Экспорт в Obsidian"
+                title="Р­РєСЃРїРѕСЂС‚ РІ Obsidian"
             >
-                🧠 Экспорт в Obsidian
+                рџ§  Р­РєСЃРїРѕСЂС‚ РІ Obsidian
               </button>
               
               {!isGroup && (
@@ -183,9 +183,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     cursor: 'pointer',
                     fontSize: '14px'
                   }}
-                  title="История звонков"
+                  title="РСЃС‚РѕСЂРёСЏ Р·РІРѕРЅРєРѕРІ"
                 >
-                  📋 История
+                  рџ“‹ РСЃС‚РѕСЂРёСЏ
                 </button>
               )}
         </div>
@@ -251,7 +251,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 zIndex: 10
               }}
             >
-              ✕
+              вњ•
             </button>
             <CallHistory currentUserId="current-user" />
           </div>

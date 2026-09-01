@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface SeedPhraseModalProps {
   seedPhrase: string;
@@ -13,6 +13,16 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
   onSkip,
   username
 }) => {
+  console.log('🎭 [PILIGRIM] SeedPhraseModal рендерится, props:', {
+    seedPhraseLength: seedPhrase?.length,
+    wordCount: seedPhrase?.trim().split(/\s+/).length,
+  });
+
+  useEffect(() => {
+    console.log('🎭 [PILIGRIM] SeedPhraseModal mounted');
+    return () => console.log('🎭 [PILIGRIM] SeedPhraseModal unmounted');
+  }, []);
+
   const [hasSaved, setHasSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 

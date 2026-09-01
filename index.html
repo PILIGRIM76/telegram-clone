@@ -11,7 +11,6 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PILIGRIM</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* Простая стилизация полосы прокрутки для более современного вида */
       ::-webkit-scrollbar {
@@ -35,6 +34,35 @@
       }
     </style>
     <script>
+      // Phase 9.5 fix: simple-peer и некоторые Node.js полифиллы ожидают `require` и `global`.
+      // В браузере/Capacitor WebView их нет. Определяем no-op shim ДО загрузки bundle.
+      window.global = window.global || window;
+      if (typeof window.require !== 'function') {
+        window.require = function (name) {
+          console.warn('[PILIGRIM] require("' + name + '") called in browser — returning empty stub');
+          return {};
+        };
+      }
+    </script>
+    <script>
+      // Phase 9.5 fix: глобальные обработчики ошибок и диагностика ДО загрузки bundle
+      window.__PILIGRIM_BOOT__ = { start: Date.now() };
+      window.addEventListener('error', function(event) {
+        console.error('[PILIGRIM] GLOBAL ERROR:', (event.error && event.error.message) || event.message);
+        console.error('[PILIGRIM] GLOBAL ERROR stack:', event.error && event.error.stack);
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('[PILIGRIM] UNHANDLED PROMISE:', event.reason);
+      });
+      console.log('[PILIGRIM] PRE-BOOT: HTML inline script executed');
+      console.log('[PILIGRIM] PRE-BOOT: typeof setTimeout =', typeof setTimeout);
+      console.log('[PILIGRIM] PRE-BOOT: typeof Promise =', typeof Promise);
+      console.log('[PILIGRIM] PRE-BOOT: typeof fetch =', typeof fetch);
+      console.log('[PILIGRIM] PRE-BOOT: typeof console =', typeof console);
+      console.log('[PILIGRIM] PRE-BOOT: typeof globalThis =', typeof globalThis);
+      console.log('[PILIGRIM] PRE-BOOT: typeof window =', typeof window);
+    </script>
+    <script>
       // Phase 9.5 fix: очищаем Service Worker кэш при каждой загрузке
       // (PWA был отключён в vite.config.ts, но старый SW может остаться)
       if ('serviceWorker' in navigator) {
@@ -47,21 +75,9 @@
         });
       }
     </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "vite": "https://aistudiocdn.com/vite@^7.2.6",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-slate-900 text-slate-200">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/index.tsx"></script>
 </body>
 </html>

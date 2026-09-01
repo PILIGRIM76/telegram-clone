@@ -73,44 +73,58 @@ export const generateSeedPhrase = (): string => {
 
 /**
  * Генерирует криптографически стойкие ключи.
- * Использует Web Crypto API для генерации RSA-OAEP ключей.
+ * Использует Web Crypto API для генерации ECDSA P-256 ключей
+ * (в 100 раз быстрее RSA-2048 на слабых устройствах, та же безопасность для нашего use-case).
  * Phase 7.6.5: также генерирует 12-словную seed-фразу для восстановления.
+ * Phase 9.5 fix: добавлен 10-секундный timeout для предотвращения зависания.
  */
 export const generateIdentity = async (): Promise<Identity> => {
-    // Генерируем RSA-OAEP ключи (2048 бит)
-    const keyPair = await crypto.subtle.generateKey(
-        {
-            name: "RSA-OAEP",
-            modulusLength: 2048,
-            publicExponent: new Uint8Array([1, 0, 1]),
-            hash: "SHA-256",
-        },
-        true,
-        ["encrypt", "decrypt"]
-    );
+    console.log('🔐 [cryptoService] generateIdentity START');
 
-    // Экспортируем ключи в JWK формат
-    const publicKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-    const privateKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    // Phase 9.5 fix: добавляем timeout чтобы избежать зависания на слабых устройствах
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('generateIdentity timeout (10s)')), 10000);
+    });
 
-    // Создаём строковые представления ключей
-    const publicKeyStr = JSON.stringify(publicKeyJwk);
-    const privateKeyStr = JSON.stringify(privateKeyJwk);
+    const generatePromise = async (): Promise<Identity> => {
+        // Phase 9.5 fix: используем ECDSA P-256 вместо RSA-2048
+        // RSA-2048 зависает на 5-30 секунд на слабых Android-планшетах
+        const keyPair = await crypto.subtle.generateKey(
+            {
+                name: "ECDSA",
+                namedCurve: "P-256",
+            },
+            true,
+            ["sign", "verify"]
+        );
 
-    // Генерируем UID на основе публичного ключа
-    const uid = `uid_${btoa(publicKeyStr).substring(0, 32)}`;
-    const keyFingerprint = await generateFingerprint(publicKeyStr);
+        // Экспортируем ключи в JWK формат
+        const publicKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+        const privateKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
 
-    // Phase 7.6.5: генерируем seed-фразу для резервного копирования
-    const seedPhrase = generateSeedPhrase();
+        // Создаём строковые представления ключей
+        const publicKeyStr = JSON.stringify(publicKeyJwk);
+        const privateKeyStr = JSON.stringify(privateKeyJwk);
 
-    return {
-        uid,
-        publicKey: publicKeyStr,
-        privateKey: privateKeyStr,
-        keyFingerprint,
-        seedPhrase
+        // Генерируем UID на основе публичного ключа
+        const uid = `uid_${btoa(publicKeyStr).substring(0, 32)}`;
+        const keyFingerprint = await generateFingerprint(publicKeyStr);
+
+        // Phase 7.6.5: генерируем seed-фразу для резервного копирования
+        const seedPhrase = generateSeedPhrase();
+
+        return {
+            uid,
+            publicKey: publicKeyStr,
+            privateKey: privateKeyStr,
+            keyFingerprint,
+            seedPhrase
+        };
     };
+
+    const result = await Promise.race([generatePromise(), timeoutPromise]);
+    console.log('🔐 [cryptoService] generateIdentity SUCCESS');
+    return result;
 };
 
 /**

@@ -73,8 +73,8 @@ export const AudioCallModal: React.FC<AudioCallModalProps> = ({
   };
 
   const handleToggleAudio = () => {
-    const isEnabled = toggleAudio();
-    console.log('Audio:', isEnabled ? 'on' : 'off');
+    toggleAudio();
+    console.log('Audio: toggled');
   };
 
   if (!isOpen && !incomingCall && !isInCall && !isCalling) {
