@@ -1,4 +1,7 @@
 
+// Полифилл для crypto.randomUUID() ДОЛЖЕН быть первой строкой (до React/любых компонентов)
+import './src/polyfills/crypto';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
