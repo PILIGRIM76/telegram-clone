@@ -74,34 +74,39 @@ const App: React.FC = () => {
     }
   };
 
+  // Phase 9.5 fix: Локальная генерация Identity, БЕЗ зависимости от бэкенда.
+  // Бэкенд-вызов делается fire-and-forget для опциональной синхронизации.
+  const handleCreateIdentity = async () => {
+    console.log('🚀 [PILIGRIM] handleCreateIdentity START v9.5-2026-09-01');
+    try {
+      const newIdentity = await generateIdentity();
+      console.log('[PILIGRIM] Identity сгенерирована успешно, uid =', newIdentity?.uid);
+      setPendingIdentity(newIdentity);
+      setShowSeedModal(true);
+      SplashScreen.hide().catch(e => console.warn('SplashScreen.hide failed:', e));
+
+      // Оповещаем бэкенд ОПЦИОНАЛЬНО (fire-and-forget) — не блокируем UI
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (apiService as any).register?.(newIdentity.uid, newIdentity.publicKey);
+        console.log('[PILIGRIM] Бэкенд оповещён:', result);
+      } catch (apiError: any) {
+        console.warn('[PILIGRIM] Бэкенд недоступен, работаем offline:', apiError?.message || apiError);
+      }
+    } catch (error) {
+      console.error('❌ [PILIGRIM] Ошибка генерации Identity:', error);
+    }
+  };
+
   // === Phase 7.5.3: Safe wrappers (для useLocalStorage T | null) ===
   // Должны быть определены ДО useEffect и handlers, т.к. они их используют.
   const safeContacts = contacts ?? [];
   const safeGroups = groups ?? [];
   const safeChats = chats ?? {};
 
-  // === Phase 7.5.1: Identity Guard (Phase 7.6.5: требует подтверждения seed-фразы) ===
-  // Если пользователь залогинился, но Identity ещё нет — генерируем,
-  // но НЕ сохраняем окончательно, пока пользователь не подтвердит seed-фразу.
-  useEffect(() => {
-    if (authView === 'main' && !identity && !pendingIdentity) {
-      // Phase 9.5 debug: подробное логирование
-      console.log('[PILIGRIM] Попытка генерации Identity...');
-      console.log('[PILIGRIM] VITE_API_URL =', (typeof process !== 'undefined' && (process as any).env?.VITE_API_URL) || 'not inlined');
-      console.log('[PILIGRIM] authView =', authView, ', identity =', !!identity, ', pendingIdentity =', !!pendingIdentity);
-      generateIdentity().then(newIdentity => {
-        console.log('[PILIGRIM] Identity сгенерирована успешно, uid =', newIdentity?.uid);
-        // НЕ сохраняем в основной стейт сразу — показываем модалку с seed-фразой
-        setPendingIdentity(newIdentity);
-        setShowSeedModal(true);
-        // Phase 9.5: скрываем сплэш-скрин после успешной генерации Identity
-        SplashScreen.hide().catch(e => console.warn('SplashScreen.hide failed:', e));
-      }).catch(err => {
-        console.error('[PILIGRIM] Ошибка генерации Identity:', err);
-        console.error('[PILIGRIM] Stack trace:', err?.stack);
-      });
-    }
-  }, [authView, identity, pendingIdentity, setIdentity]);
+  // Phase 9.5 fix: Генерация Identity теперь вызывается ЯВНО через handleCreateIdentity.
+  // Автоматический useEffect убран, чтобы не зависеть от порядка рендера и не блокировать UI
+  // при отсутствии/недоступности бэкенда.
 
   // Phase 7.6.5: обработчики для SeedPhraseModal
   const handleSeedConfirmed = () => {
@@ -377,7 +382,10 @@ const App: React.FC = () => {
     localStorage.removeItem('piligrim-authenticated');
     setIdentity(null);
     setSelectedChatId(null);
+    // Phase 9.5 fix: при logout сразу показываем CreateIdentity (без перехода на login)
     setAuthView('login');
+    setPendingIdentity(null);
+    setShowSeedModal(false);
   };
 
   // WebSocket status
@@ -400,15 +408,10 @@ const App: React.FC = () => {
     );
   }
 
-  // === Phase 7.5.4: Guard — если нет Identity, показываем загрузку ===
-  if (authView === 'main' && !identity) {
+  // === Phase 9.5 fix: если нет Identity, показываем экран создания ===
+  if (!identity && !pendingIdentity) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-900 text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p className="text-slate-400">Генерация Identity...</p>
-        </div>
-      </div>
+      <CreateIdentity onCreateIdentity={handleCreateIdentity} />
     );
   }
 

@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react(), VitePWA({
+      disable: true, // Phase 9.5 fix: отключаем PWA в dev-режиме, чтобы Service Worker не блокировал обновления
       registerType: 'autoUpdate',
       manifest: {
         name: 'PILIGRIM',
