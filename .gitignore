@@ -1,4 +1,4 @@
-# Logs
+﻿# Logs
 logs
 *.log
 npm-debug.log*
@@ -43,3 +43,10 @@ debug/
 /android/app/src/main/assets/capacitor.plugins.json
 /android/app/capacitor.build.gradle
 /android/capacitor.settings.gradle
+
+
+# TLS certificates and private keys (security)
+certs/*.key
+certs/*.csr
+certs/*.srl
+# certs/*.crt КОММИТИМ (для Docker volumes), но НЕ приватные ключи

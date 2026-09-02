@@ -55,6 +55,28 @@ services:
     networks:
       - cipherlink-network
 
+  # v2.0 Stage 2: Nginx TLS reverse proxy (TLS терминация для WSS)
+  nginx-tls:
+    image: nginx:1.27-alpine
+    container_name: piligrim-nginx-tls
+    restart: unless-stopped
+    ports:
+      - "4443:4443"  # HTTPS + WSS endpoint
+    volumes:
+      # Конфигурация Nginx (read-only)
+      - ./nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      # TLS-сертификаты (read-only, из Шага 1)
+      - ./certs/piligrim-server.crt:/etc/nginx/certs/piligrim-server.crt:ro
+      - ./certs/piligrim-server.key:/etc/nginx/certs/piligrim-server.key:ro
+    extra_hosts:
+      # Позволяет Docker-контейнеру видеть хост через host.docker.internal
+      # (доступно в Docker Desktop на Windows/Mac)
+      - "host.docker.internal:host-gateway"
+    networks:
+      - cipherlink-network
+    depends_on:
+      - backend
+
   # (Опционально) MinIO для хранения файлов
   # minio:
   #   image: minio/minio
