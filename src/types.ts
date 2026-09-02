@@ -98,6 +98,10 @@ export interface Chat {
   contactId: string; // Может быть ID контакта или ID группы
   messages: Message[];
   disappearTimer?: number; // Текущая настройка таймера для этого чата
+  /** v1.6 Batch 4: timestamp до которого уведомления чата заглушены (Number.MAX_SAFE_INTEGER = forever) */
+  mutedUntil?: number;
+  /** v1.6 Batch 4: чат в архиве (скрыт из основного списка) */
+  archived?: boolean;
 }
 
 // --- E-Commerce и Доски ---

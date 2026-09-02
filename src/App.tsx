@@ -159,8 +159,25 @@ const App: React.FC = () => {
   const handleCreateGroup = (_name: string, _type: 'public' | 'private') => {
     console.log('[PILIGRIM] handleCreateGroup stub');
   };
-  const handleMuteChat = (_contactId: string, _duration: number | 'forever' | null) => {
-    console.log('[PILIGRIM] handleMuteChat stub');
+  // v1.6 Batch 4: handleMuteChat — заглушить уведомления чата на заданное время
+  // duration: number (мс до конца) | 'forever' | null (null = снять заглушение)
+  const handleMuteChat = (chatId: string, duration: number | 'forever' | null) => {
+    const now = Date.now();
+    let mutedUntil: number | undefined;
+    if (duration === 'forever') {
+      mutedUntil = Number.MAX_SAFE_INTEGER;
+    } else if (typeof duration === 'number') {
+      mutedUntil = now + duration;
+    } else {
+      mutedUntil = undefined;
+    }
+    setChats((prev) => {
+      const updated = { ...prev };
+      const existing = updated[chatId] || { contactId: chatId, messages: [] };
+      updated[chatId] = { ...existing, mutedUntil };
+      return updated;
+    });
+    console.log(`🔇 [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
   };
   const handleArchiveChat = (_contactId: string, _archive: boolean) => {
     console.log('[PILIGRIM] handleArchiveChat stub');
@@ -412,6 +429,7 @@ const App: React.FC = () => {
                   ? 'incoming'
                 : 'idle'
             }
+            mutedUntil={chats[selectedChatId]?.mutedUntil}
           />
         ) : (
           <div style={{

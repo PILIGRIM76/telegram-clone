@@ -19,6 +19,8 @@ interface ChatWindowProps {
   onStartCall?: () => void;
   /** Stage 6: текущий статус звонка для UI-индикации. */
   callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
+  /** Batch 4: timestamp до которого уведомления заглушены (для 🔇 индикатора) */
+  mutedUntil?: number;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -29,7 +31,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUserUid,
   onBack,
   onStartCall,
-  callState = 'idle'
+  callState = 'idle',
+  mutedUntil
 }) => {
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -130,6 +133,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             }}
           >
             {partnerName}
+            {mutedUntil !== undefined && mutedUntil > Date.now() && (
+              <span
+                title={
+                  mutedUntil === Number.MAX_SAFE_INTEGER
+                    ? 'Уведомления заглушены навсегда'
+                    : `Уведомления заглушены до ${new Date(mutedUntil).toLocaleTimeString()}`
+                }
+                data-testid="muted-indicator"
+                style={{ marginLeft: '6px', fontSize: '14px' }}
+              >
+                🔇
+              </span>
+            )}
           </div>
           <div style={{ color: '#64748b', fontSize: '12px' }}>
             {messages.length} {messages.length === 1 ? 'сообщение' : 'сообщений'}
