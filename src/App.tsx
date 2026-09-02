@@ -1,5 +1,5 @@
-// v1.5.2 Stage 4: E2EE шифрование сообщений через RSA-OAEP
-// Цель: сообщения шифруются публичным ключом контакта перед сохранением в localStorage
+// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
+// Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
 import React, { useState, useEffect } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
@@ -7,6 +7,7 @@ import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
+import { useWebSocket } from './hooks/useWebSocket';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -26,6 +27,8 @@ const App: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [chats, setChats] = useState<Record<string, Chat>>({});
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  // v1.5.2 Stage 5: статус WebSocket для UI-индикатора (Online/Offline/Reconnecting)
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error' | 'unsupported'>('closed');
 
   // v1.5.2 Stage 2: загрузка контактов, групп и чатов из localStorage после монтирования
   useEffect(() => {
@@ -164,6 +167,42 @@ const App: React.FC = () => {
   const handleOpenProfile = () => console.log('[PILIGRIM] handleOpenProfile stub');
   const handleOpenStore = () => console.log('[PILIGRIM] handleOpenStore stub');
   const handleOpenBoards = () => console.log('[PILIGRIM] handleOpenBoards stub');
+
+  // v1.5.2 Stage 5: WebSocket real-time для входящих сообщений.
+  // Использует apiService (NaCl box для транспорта) + graceful degradation
+  // при недоступности бэкенда (только localStorage).
+  const ws = useWebSocket({
+    myUid: identity?.uid || '',
+    enabled: !!identity,
+    onMessage: (incomingMessage) => {
+      // incomingMessage приходит от apiService уже с расшифрованным текстом
+      // (если NaCl box ключи были настроены), иначе с raw text
+      console.log(`📩 [PILIGRIM] WS: incoming message from ${incomingMessage.senderId}, chatId=${incomingMessage.groupId ?? 'dm'}`);
+      const chatId = incomingMessage.groupId || incomingMessage.senderId;
+      setChats((prev) => {
+        const updated = { ...prev };
+        if (!updated[chatId]) {
+          updated[chatId] = { contactId: chatId, messages: [] };
+        }
+        // Защита от дубликатов (на случай re-connect)
+        const exists = (updated[chatId].messages || []).some((m) => m.id === incomingMessage.id);
+        if (exists) {
+          console.log(`[PILIGRIM] WS: duplicate message ${incomingMessage.id}, skipped`);
+          return prev;
+        }
+        updated[chatId] = {
+          ...updated[chatId],
+          messages: [...(updated[chatId].messages || []), incomingMessage]
+        };
+        return updated;
+      });
+    },
+    onStatusChange: (status) => {
+      console.log(`[PILIGRIM] WS status: ${status}`);
+      setWsStatus(status);
+    }
+  });
+
   const handleSelectChat = (id: string) => {
     console.log('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
@@ -222,6 +261,20 @@ const App: React.FC = () => {
       };
       return updated;
     });
+
+    // Stage 5: если WebSocket подключён — отправляем сообщение получателю через сервер.
+    // apiService использует NaCl box (X25519+XSalsa20) для транспортного шифрования.
+    // Если WS недоступен — сообщение остаётся только локально (offline-first).
+    if (ws.isConnected) {
+      try {
+        ws.send(contact?.uid || chatId, trimmed, contact?.publicKey);
+        console.log(`📡 [PILIGRIM] WS: message dispatched to ${contact?.name || chatId}`);
+      } catch (e) {
+        console.error('[PILIGRIM] WS: send failed', e);
+      }
+    } else {
+      console.log(`[PILIGRIM] WS offline, message saved locally only`);
+    }
   };
   const handleLogout = () => {
     localStorage.removeItem('piligrim-identity');
@@ -264,6 +317,45 @@ const App: React.FC = () => {
   // v1.5.2 Stage 1: двухколоночный layout — ContactList слева, заглушка чата справа
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%', background: '#0f172a', color: '#e2e8f0', position: 'relative' }}>
+      {/* Stage 5: индикатор статуса WebSocket (правый верхний угол) */}
+      <div
+        data-testid="ws-status"
+        title={`WebSocket: ${wsStatus}`}
+        style={{
+          position: 'absolute',
+          top: '8px',
+          right: '12px',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 10px',
+          backgroundColor: wsStatus === 'open' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+          border: `1px solid ${wsStatus === 'open' ? '#22c55e' : '#ef4444'}`,
+          borderRadius: '12px',
+          color: wsStatus === 'open' ? '#22c55e' : '#ef4444',
+          fontSize: '11px',
+          fontWeight: 600
+        }}
+      >
+        <span
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: wsStatus === 'open' ? '#22c55e' : '#ef4444',
+            animation: wsStatus === 'connecting' ? 'pulse 1.5s ease-in-out infinite' : undefined
+          }}
+        />
+        <span>
+          {wsStatus === 'open' && '🟢 Online'}
+          {wsStatus === 'connecting' && '🟡 Подключение…'}
+          {wsStatus === 'closed' && '⚪ Offline'}
+          {wsStatus === 'error' && '🔴 Ошибка'}
+          {wsStatus === 'unsupported' && '⚪ Не поддерживается'}
+        </span>
+      </div>
+
       {/* Левая колонка: ContactList */}
       <div style={{ width: '320px', minWidth: '320px', borderRight: '1px solid #334155' }}>
         <ContactList
