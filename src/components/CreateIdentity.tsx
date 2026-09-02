@@ -29,6 +29,20 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity }) => 
         >
           {t('create_identity_btn')}
         </button>
+
+        {/* v1.5.2 Stage 1: hybrid "Login" button — offline-friendly stub.
+            Серверной аутентификации в текущей архитектуре нет (offline-first),
+            поэтому показываем информационное сообщение. */}
+        <button
+          onClick={() => {
+            alert(
+              'Вход по паролю в разработке. В текущей версии используйте "Создать безопасную личность" — ваша идентичность хранится только на этом устройстве.'
+            );
+          }}
+          className="w-full py-3 bg-slate-700/30 text-slate-400 font-medium rounded-xl hover:bg-slate-700/50 transition-all text-sm border border-slate-600/30"
+        >
+          Войти с существующим аккаунтом
+        </button>
       </div>
     </div>
   );
