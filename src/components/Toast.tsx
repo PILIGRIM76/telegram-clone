@@ -33,6 +33,7 @@ const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void 
       role="status"
       aria-live="polite"
       data-testid="toast"
+      className="piligrim-slide-in"
       style={{
         padding: '10px 14px',
         backgroundColor: style.bg,

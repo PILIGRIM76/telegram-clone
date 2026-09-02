@@ -1,5 +1,6 @@
 ﻿// v1.6 Batch 4: Verify Modal — защита от MITM через визуальное сравнение fingerprint.
 import React from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface VerifyModalProps {
   partnerName: string;
@@ -33,6 +34,8 @@ export default function VerifyModal({
   onClose
 }: VerifyModalProps) {
   const myCode = myFingerprint || fingerprintFromKey(myPublicKey);
+  // Batch 4 UX: закрытие по Escape
+  useEscapeKey(onClose);
   const partnerCode = partnerFingerprint || fingerprintFromKey(partnerPublicKey);
 
   return (
