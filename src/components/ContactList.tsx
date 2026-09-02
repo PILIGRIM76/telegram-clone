@@ -18,7 +18,7 @@ interface ContactListProps {
   identity: Identity;
   contacts: Contact[];
   groups: Group[];
-  onAddContact: (name: string, uid: string) => void;
+  onAddContact: (name: string, uid: string, publicKey?: string) => void;
   selectedChatId: string | null;
   onSelectChat: (id: string) => void;
   chats: Record<string, Chat>;
@@ -51,7 +51,12 @@ const ContactList: React.FC<ContactListProps> = ({
   const [copied, setCopied] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, contact: Contact } | null>(null);
   const [showArchive, setShowArchive] = useState(false);
-  
+
+  // v1.5.2 Stage 2: логирование state для дебага
+  useEffect(() => {
+    console.log('🔔 [ContactList] isContactModalOpen changed:', isContactModalOpen);
+  }, [isContactModalOpen]);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -101,26 +106,98 @@ const ContactList: React.FC<ContactListProps> = ({
 
   return (
     <>
-      <aside className="flex flex-col h-full bg-slate-900 border-r border-slate-700 w-full md:w-80 lg:w-96 flex-shrink-0">
+      <aside
+  style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0f172a', borderRight: '1px solid #334155', flexShrink: 0, position: 'relative', zIndex: 10 }}
+  onClick={(e) => {
+    // Event delegation: перехватываем клики в области header buttons
+    const target = e.target as HTMLElement;
+    const button = target.closest('button[data-action]');
+    if (button) {
+      const action = button.getAttribute('data-action');
+      console.log('🎯 [ContactList] Delegated click:', action);
+      if (action === 'add-contact') {
+        console.log('🎯 [ContactList] Setting isContactModalOpen = true');
+        setIsContactModalOpen(true);
+        console.log('🎯 [ContactList] After setState, isContactModalOpen is now:', true);
+      }
+      else if (action === 'create-group') setIsGroupModalOpen(true);
+      else if (action === 'open-profile') onOpenProfile();
+    }
+  }}
+>
         {/* Заголовок */}
-        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
-          <div className="flex items-center space-x-2">
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', flexShrink: 0, minHeight: '56px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {showArchive && (
-                <button onClick={() => setShowArchive(false)} className="mr-2 text-slate-400 hover:text-white">
+                <button onClick={() => setShowArchive(false)} style={{ marginRight: '8px', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>
                     ←
                 </button>
             )}
-            <h2 className="text-xl font-bold text-white">{showArchive ? t('archive_title') : t('chats_title')}</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap' }}>{showArchive ? t('archive_title') : t('chats_title')}</h2>
           </div>
-          <div className="flex items-center space-x-1">
-            <button onClick={() => setIsGroupModalOpen(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" title={t('create_group')}>
-                <UsersIcon className="w-5 h-5 text-slate-400" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative', zIndex: 100 }}>
+            <button
+              data-action="add-contact"
+              onClick={() => setIsContactModalOpen(true)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                background: '#0891b2',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'white',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                minWidth: '60px',
+                minHeight: '36px',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+              title={t('add_contact')}
+            >
+              <UserPlusIcon className="w-5 h-5" />
+              <span>+</span>
             </button>
-            <button onClick={() => setIsContactModalOpen(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" title={t('add_contact')}>
-              <UserPlusIcon className="w-5 h-5 text-slate-400" />
+            <button
+              data-action="create-group"
+              onClick={() => setIsGroupModalOpen(true)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                minWidth: '36px',
+                minHeight: '36px',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+              title={t('create_group')}
+            >
+              <UsersIcon className="w-5 h-5" />
             </button>
-            <button onClick={onOpenProfile} className="p-2 rounded-full hover:bg-slate-700 transition-colors" title="Settings">
-                <SettingsIcon className="w-5 h-5 text-slate-400" />
+            <button
+              data-action="open-profile"
+              onClick={onOpenProfile}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                minWidth: '36px',
+                minHeight: '36px',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+              title="Settings"
+            >
+              <SettingsIcon className="w-5 h-5" />
             </button>
           </div>
         </div>

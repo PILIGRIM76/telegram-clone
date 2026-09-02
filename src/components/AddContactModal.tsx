@@ -79,12 +79,12 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }} onClick={onClose}>
        <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
            <div className="p-4 border-b border-slate-700">
                <h2 className="text-xl font-bold text-white mb-2">Search People, Stores, Boards</h2>
                <div className="flex space-x-2">
-                   <input 
+                   <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Enter UID or invite link"

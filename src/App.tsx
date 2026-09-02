@@ -26,14 +26,49 @@ const App: React.FC = () => {
   const [chats, setChats] = useState<Record<string, Chat>>({});
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
-  // Загрузка контактов из localStorage после монтирования (offline-first)
+  // v1.5.2 Stage 2: загрузка контактов, групп и чатов из localStorage после монтирования
   useEffect(() => {
-    console.log('[PILIGRIM] App mounted (v1.5.2 Stage 1 — ContactList integration)');
+    console.log('[PILIGRIM] App mounted (v1.5.2 Stage 2 — AddContact enabled)');
     try {
       const savedContacts = localStorage.getItem('piligrim-contacts');
       if (savedContacts) setContacts(JSON.parse(savedContacts));
     } catch {}
+    try {
+      const savedGroups = localStorage.getItem('piligrim-groups');
+      if (savedGroups) setGroups(JSON.parse(savedGroups));
+    } catch {}
+    try {
+      const savedChats = localStorage.getItem('piligrim-chats');
+      if (savedChats) setChats(JSON.parse(savedChats));
+    } catch {}
   }, []);
+
+  // v1.5.2 Stage 2: автосохранение contacts в localStorage при каждом изменении
+  useEffect(() => {
+    try {
+      localStorage.setItem('piligrim-contacts', JSON.stringify(contacts));
+    } catch (e) {
+      console.error('[PILIGRIM] Ошибка сохранения contacts:', e);
+    }
+  }, [contacts]);
+
+  // v1.5.2 Stage 2: автосохранение groups в localStorage при каждом изменении
+  useEffect(() => {
+    try {
+      localStorage.setItem('piligrim-groups', JSON.stringify(groups));
+    } catch (e) {
+      console.error('[PILIGRIM] Ошибка сохранения groups:', e);
+    }
+  }, [groups]);
+
+  // v1.5.2 Stage 2: автосохранение chats в localStorage при каждом изменении
+  useEffect(() => {
+    try {
+      localStorage.setItem('piligrim-chats', JSON.stringify(chats));
+    } catch (e) {
+      console.error('[PILIGRIM] Ошибка сохранения chats:', e);
+    }
+  }, [chats]);
 
   const handleCreateIdentity = async () => {
     console.log('🚀 [PILIGRIM] START: handleCreateIdentity вызван');
@@ -81,9 +116,40 @@ const App: React.FC = () => {
     }
   };
 
-  // v1.5.2 Stage 1: stub-обработчики (Этап 2 добавит реальный функционал)
-  const handleAddContact = (_name: string, _uid: string) => {
-    console.log('[PILIGRIM] handleAddContact stub');
+  // v1.5.2 Stage 2: реальный обработчик добавления контакта (offline-first)
+  const handleAddContact = (name: string, uid: string, publicKey?: string) => {
+    console.log('➕ [PILIGRIM] handleAddContact:', name, uid, publicKey ? '(with pubKey)' : '(no pubKey)');
+
+    // Защита от дубликатов: если контакт с таким uid уже есть, не добавляем
+    if (contacts.some(c => c.uid === uid)) {
+      console.warn('⚠️ [PILIGRIM] Контакт с uid', uid, 'уже существует');
+      alert(`Контакт "${name}" уже добавлен в ваш список.`);
+      return;
+    }
+
+    const newContact: Contact = {
+      id: uid, // используем uid как локальный id
+      uid,
+      name,
+      verified: false,
+      publicKey,
+      archived: false,
+      // mutedUntil не устанавливаем — чат не замьючен по умолчанию
+    };
+
+    setContacts(prev => [...prev, newContact]);
+
+    // Создаём пустой чат для нового контакта
+    setChats(prev => ({
+      ...prev,
+      [uid]: {
+        contactId: uid,
+        messages: [],
+        disappearTimer: undefined,
+      },
+    }));
+
+    console.log('✅ [PILIGRIM] Контакт добавлен:', newContact);
   };
   const handleCreateGroup = (_name: string, _type: 'public' | 'private') => {
     console.log('[PILIGRIM] handleCreateGroup stub');
@@ -141,9 +207,9 @@ const App: React.FC = () => {
 
   // v1.5.2 Stage 1: двухколоночный layout — ContactList слева, заглушка чата справа
   return (
-    <div className="flex h-screen bg-slate-900 text-white">
+    <div style={{ display: 'flex', height: '100%', width: '100%', background: '#0f172a', color: '#e2e8f0', position: 'relative' }}>
       {/* Левая колонка: ContactList */}
-      <div className="w-80 border-r border-slate-700 flex-shrink-0">
+      <div style={{ width: '320px', minWidth: '320px', borderRight: '1px solid #334155' }}>
         <ContactList
           identity={identity}
           contacts={contacts}
@@ -162,11 +228,11 @@ const App: React.FC = () => {
       </div>
 
       {/* Правая колонка: заглушка чата (Этап 2 — ChatWindow) */}
-      <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-        <p className="text-lg">Выберите контакт для начала общения</p>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+        <p style={{ fontSize: '1.125rem' }}>Выберите контакт для начала общения</p>
         <button
           onClick={handleLogout}
-          className="mt-6 px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white rounded text-sm"
+          style={{ marginTop: '1.5rem', padding: '0.5rem 1rem', background: 'rgba(220, 38, 38, 0.8)', color: 'white', borderRadius: '0.375rem', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
         >
           Выйти из аккаунта
         </button>
