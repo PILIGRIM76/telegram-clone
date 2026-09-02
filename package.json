@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/copy-dist-to-public.js",
+    "build:android": "npm run build && cap sync android && cd android && gradlew.bat assembleDebug",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
