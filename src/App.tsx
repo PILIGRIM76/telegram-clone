@@ -8,6 +8,7 @@ import ChatWindow from './components/ChatWindow';
 import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useWebRTC } from './hooks/useWebRTC';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -203,6 +204,9 @@ const App: React.FC = () => {
     }
   });
 
+  // v1.5.2 Stage 6: WebRTC hook — для звонков и демонстрации экрана.
+  const webrtcHook = useWebRTC(identity?.uid || '');
+
   const handleSelectChat = (id: string) => {
     console.log('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
@@ -390,6 +394,24 @@ const App: React.FC = () => {
               return undefined;
             })()}
             currentUserUid={identity?.uid}
+            onStartCall={() => {
+              const target = contacts.find((c) => c.id === selectedChatId);
+              if (target && target.uid) {
+                console.log(`📞 [PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
+                webrtcHook.startCall(target.uid);
+              } else {
+                alert('Контакт не найден или не имеет UID');
+              }
+            }}
+            callState={
+              webrtcHook.isInCall
+                ? 'in-call'
+                : webrtcHook.isCalling
+                  ? 'calling'
+                : webrtcHook.incomingCall
+                  ? 'incoming'
+                : 'idle'
+            }
           />
         ) : (
           <div style={{

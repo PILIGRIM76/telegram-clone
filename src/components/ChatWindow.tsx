@@ -15,6 +15,10 @@ interface ChatWindowProps {
   currentUserUid?: string;
   /** Опционально: кнопка "Назад" (для мобильного layout) */
   onBack?: () => void;
+  /** Stage 6: начать звонок (WebRTC). */
+  onStartCall?: () => void;
+  /** Stage 6: текущий статус звонка для UI-индикации. */
+  callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -23,7 +27,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onSendMessage,
   partner,
   currentUserUid,
-  onBack
+  onBack,
+  onStartCall,
+  callState = 'idle'
 }) => {
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -129,6 +135,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             {messages.length} {messages.length === 1 ? 'сообщение' : 'сообщений'}
           </div>
         </div>
+        {onStartCall && (
+          <button
+            type="button"
+            onClick={onStartCall}
+            disabled={callState !== 'idle'}
+            data-testid="call-button"
+            title={callState === 'idle' ? 'Позвонить' : `Звонок: ${callState}`}
+            aria-label="Позвонить"
+            style={{
+              padding: '8px 12px',
+              backgroundColor: callState === 'in-call' ? '#22c55e' : '#3b82f6',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: callState === 'idle' ? 'pointer' : 'not-allowed',
+              opacity: callState === 'idle' ? 1 : 0.6,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {callState === 'in-call' ? '📞 В звонке' : callState === 'calling' ? '📞 Вызов…' : '📞'}
+          </button>
+        )}
       </header>
 
       {/* Messages list (scrollable) */}
