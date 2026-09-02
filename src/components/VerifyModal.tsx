@@ -45,6 +45,7 @@ export default function VerifyModal({
       aria-labelledby='verify-title'
       aria-modal='true'
       onClick={onClose}
+      className='piligrim-fade-in'
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
@@ -58,6 +59,7 @@ export default function VerifyModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className='piligrim-scale-in'
         style={{
           background: '#1e293b',
           borderRadius: '12px',
@@ -109,7 +111,7 @@ export default function VerifyModal({
         }}>⚠️ Если коды НЕ совпадают — возможна MITM-атака. Не отправляйте секреты.</div>
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button type='button' onClick={onClose} aria-label='Закрыть' style={{
-            padding: '8px 16px', background: 'transparent', color: '#94a3b8',
+      padding: '8px 16px', background: 'transparent', color: '#94a3b8',
             border: '1px solid #475569', borderRadius: '6px', cursor: 'pointer', fontSize: '14px'
           }}>Закрыть</button>
           <button type='button' onClick={onConfirm} disabled={isVerified}
