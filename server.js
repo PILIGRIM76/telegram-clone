@@ -332,13 +332,56 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
 
 // --- WEBSOCKET ЛОГИКА ---
 
-серверВебсокетов.on('connection', (ws, req) => {
-  const uid = new URL(req.url, `http://${req.headers.host}`).searchParams.get('uid');
-  if (!uid || !пользователи.has(uid)) { ws.close(); return; }
-  
-  const юзер = пользователи.get(uid);
+серверВебсокетов.on('connection', async (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const uid = url.searchParams.get('uid');
+  const pkBase64url = url.searchParams.get('pk');
+  const protocolVersion = url.searchParams.get('v') || '1.0';
+  const clientType = url.searchParams.get('client') || 'unknown';
+
+  // v2.0 Stage 5.1: Trust-on-first-use — если пользователь НЕ зарегистрирован,
+  // но передал валидный pk — создаём user record на лету.
+  // Это устраняет необходимость в предварительном POST /register.
+  if (!uid) {
+    console.warn('[WS] connection rejected: missing uid');
+    ws.close(4001, 'Missing uid');
+    return;
+  }
+
+  // base64url decode → JWK string
+  let publicKey = null;
+  if (pkBase64url) {
+    try {
+      const padded = pkBase64url.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+      publicKey = Buffer.from(padded + padding, 'base64').toString('utf-8');
+    } catch (e) {
+      console.warn(`[WS] invalid pk encoding for ${uid}:`, e.message);
+    }
+  }
+
+  let юзер = пользователи.get(uid);
+
+  // Trust-on-first-use: создаём user record если его нет
+  if (!юзер) {
+    if (!publicKey) {
+      console.warn(`[WS] connection rejected: uid=${uid} not registered and no pk provided`);
+      ws.close(4002, 'Unknown uid and no publicKey for trust-on-first-use');
+      return;
+    }
+    юзер = { публичныйКлюч: publicKey, ws: null, доски: [], зарегистрированВ: new Date().toISOString(), clientType, protocolVersion };
+    пользователи.set(uid, юзер);
+    console.log(`[WS] trust-on-first-use: auto-registered ${uid} (client=${clientType}, v=${protocolVersion})`);
+  } else if (publicKey && юзер.публичныйКлюч !== publicKey) {
+    // PublicKey mismatch — потенциальная MITM-атака или key rotation
+    console.warn(`[WS] publicKey mismatch for ${uid}: stored vs new`);
+    // В production тут можно закрывать соединение. Для dev — пропускаем warning.
+  }
+
   юзер.ws = ws;
+  юзер.последнийПодключенВ = new Date().toISOString();
   ws.uid = uid;
+  console.log(`[WS] client connected: uid=${uid} (client=${clientType})`);
 
   // 1. Отправка офлайн сообщений
   if (офлайнСообщения.has(uid)) {
@@ -371,6 +414,56 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
   ws.on('message', (данные) => {
     try {
       const msg = JSON.parse(данные);
+
+      // v2.0 Stage 5.4: Read receipt — клиент сообщает, что прочитал сообщение.
+      // Сервер пересылает это оригинальному отправителю.
+      // Формат: {type: 'read', messageId: '...', from: '<sender_uid>'}
+      if (msg.type === 'read' && msg.messageId) {
+          // Broadcast всем users, которые могут быть отправителями.
+          // В нашей модели — всем users (простая версия).
+          // TODO: хранить mapping messageId → sender для точной маршрутизации.
+          for (const [otherUid, otherUser] of пользователи) {
+              if (otherUid === uid) continue;
+              if (otherUser.ws && otherUser.ws.readyState === WebSocket.OPEN) {
+                  otherUser.ws.send(JSON.stringify({
+                      type: 'receipt',
+                      receipt: 'read',
+                      messageId: msg.messageId,
+                      from: uid,
+                      timestamp: new Date().toISOString()
+                  }));
+              }
+          }
+          return;
+      }
+
+      // v2.0 Stage 5.5: Typing indicator — клиент сообщает, что печатает.
+      // Сервер пересылает это получателю. Не персистируется.
+      if (msg.type === 'typing' && (msg.to || msg.idГруппы)) {
+          if (msg.to) {
+              отправить(msg.to, {
+                  type: 'typing',
+                  from: uid,
+                  chatId: msg.to,
+                  timestamp: new Date().toISOString()
+              });
+          } else if (msg.idГруппы) {
+              const группа = группы.get(msg.idГруппы);
+              if (группа) {
+                  группа.участники.forEach(участникUid => {
+                      if (участникUid === uid) return;
+                      отправить(участникUid, {
+                          type: 'typing',
+                          from: uid,
+                          chatId: msg.idГруппы,
+                          timestamp: new Date().toISOString()
+                      });
+                  });
+              }
+          }
+          return;
+      }
+
       const { кому, содержимое, idГруппы, тип, payload, времяИсчезновения, таймерУстановленВ } = msg;
 
       const исходящее = {
@@ -396,6 +489,23 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
       } else {
           // Личное сообщение
           отправить(кому, исходящее);
+      }
+
+      // v2.0 Stage 5.3: Delivery receipt — подтверждаем отправителю,
+      // что сообщение доставлено адресату (или поставлено в очередь offline).
+      if (msg.id) {
+          // Если получатель онлайн и мы только что отправили — receipt "delivered".
+          // Если онлайн → отправляется мгновенно, если нет — ставится в очередь.
+          const получательЮзер = пользователи.get(кому);
+          const доставленоСразу = получательЮзер && получательЮзер.ws && получательЮзер.ws.readyState === WebSocket.OPEN;
+          отправить(uid, {
+              type: 'receipt',
+              receipt: 'delivered',
+              messageId: msg.id,
+              to: кому,
+              timestamp: new Date().toISOString(),
+              queued: !доставленоСразу
+          });
       }
 
     } catch (e) { console.error(e); }
