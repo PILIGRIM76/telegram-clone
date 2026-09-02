@@ -21,6 +21,8 @@ interface ChatWindowProps {
   callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
   /** Batch 4: timestamp до которого уведомления заглушены (для 🔇 индикатора) */
   mutedUntil?: number;
+  /** Batch 4: показать модалку верификации контакта */
+  onVerifyContact?: () => void;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -32,7 +34,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onBack,
   onStartCall,
   callState = 'idle',
-  mutedUntil
+  mutedUntil,
+  onVerifyContact
 }) => {
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -175,6 +178,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             }}
           >
             {callState === 'in-call' ? '📞 В звонке' : callState === 'calling' ? '📞 Вызов…' : '📞'}
+          </button>
+        )}
+        {onVerifyContact && (
+          <button
+            type="button"
+            onClick={onVerifyContact}
+            data-testid="verify-button"
+            title="Верифицировать контакт"
+            aria-label="Верифицировать контакт"
+            style={{
+              padding: '8px 12px',
+              backgroundColor: 'transparent',
+              color: '#94a3b8',
+              border: '1px solid #475569',
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+          >
+            🔐
           </button>
         )}
       </header>

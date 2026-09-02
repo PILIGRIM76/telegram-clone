@@ -5,6 +5,7 @@ import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
+import VerifyModal from './components/VerifyModal';
 import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -30,6 +31,8 @@ const App: React.FC = () => {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   // v1.5.2 Stage 5: статус WebSocket для UI-индикатора (Online/Offline/Reconnecting)
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error' | 'unsupported'>('closed');
+  // v1.6 Batch 4: показывать модалку верификации контакта
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // v1.5.2 Stage 2: загрузка контактов, групп и чатов из localStorage после монтирования
   useEffect(() => {
@@ -192,6 +195,20 @@ const App: React.FC = () => {
   const handleOpenProfile = () => console.log('[PILIGRIM] handleOpenProfile stub');
   const handleOpenStore = () => console.log('[PILIGRIM] handleOpenStore stub');
   const handleOpenBoards = () => console.log('[PILIGRIM] handleOpenBoards stub');
+
+  // v1.6 Batch 4: handleVerifyContact — пометить контакт как verified
+  const handleVerifyContact = (chatId: string) => {
+    setContacts((prev) =>
+      prev.map((c) => {
+        if (c.id === chatId || c.uid === chatId) {
+          return { ...c, verified: true, verifiedAt: new Date().toISOString() };
+        }
+        return c;
+      })
+    );
+    setShowVerifyModal(false);
+    console.log(`✅ [PILIGRIM] handleVerifyContact: chatId=${chatId} marked as verified`);
+  };
 
   // v1.5.2 Stage 5: WebSocket real-time для входящих сообщений.
   // Использует apiService (NaCl box для транспорта) + graceful degradation
@@ -437,6 +454,7 @@ const App: React.FC = () => {
                 : 'idle'
             }
             mutedUntil={chats[selectedChatId]?.mutedUntil}
+            onVerifyContact={() => setShowVerifyModal(true)}
           />
         ) : (
           <div style={{
@@ -467,6 +485,23 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Batch 4: модалка верификации контакта */}
+      {showVerifyModal && selectedChatId && (() => {
+        const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+        return (
+          <VerifyModal
+            partnerName={partner?.name || 'Контакт'}
+            partnerPublicKey={partner?.publicKey}
+            myPublicKey={identity?.publicKey}
+            partnerFingerprint={partner?.keyFingerprint}
+            myFingerprint={identity?.keyFingerprint}
+            isVerified={!!partner?.verified}
+            onConfirm={() => handleVerifyContact(selectedChatId)}
+            onClose={() => setShowVerifyModal(false)}
+          />
+        );
+      })()}
     </div>
   );
 };
