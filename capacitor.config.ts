@@ -11,7 +11,15 @@ const config: CapacitorConfig = {
     // Phase 9.5 fix: androidScheme='https' по умолчанию в Capacitor 3+ создаёт
     // виртуальный хост https://localhost, который блокирует загрузку bundle
     // на Android WebView (белый экран на RT9). Используем 'http' для совместимости.
-    androidScheme: 'http'
+    androidScheme: 'http',
+    // v1.5.2 Stage 7: Разрешаем WebSocket подключения к LAN backend (192.168.100.4:4000)
+    // Mixed Content policy по умолчанию блокирует ws:// с https://localhost страницы.
+    // 'cleartext': true разрешает HTTP/WS к указанным доменам.
+    cleartext: true
+  },
+  server: {
+    // Разрешаем навигацию к backend (для WebSocket и REST)
+    allowNavigation: ['192.168.100.4', 'localhost', '127.0.0.1']
   },
   plugins: {
     SplashScreen: {
