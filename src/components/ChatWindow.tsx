@@ -1,262 +1,257 @@
-﻿
-import CallModal from './CallModal';
-import CallHistory from './CallHistory';
-import React, { useRef, useEffect, useState } from 'react';
-import type { Identity, Contact, Chat, Group } from '../types';
-import MessageInput from './MessageInput';
-import MessageItem from './MessageItem';
-import MessageTimerSelection from './MessageTimerSelection';
-import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
-import { ShareIcon } from './icons/ShareIcon';
-import { ClockIcon } from './icons/ClockIcon';
-import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
-import { QrCodeIcon } from './icons/QrCodeIcon';
-import { apiService } from '../services/apiService';
-import { useTypingIndicator } from '../hooks/useTypingIndicator';
-import { useMessageHistory } from '../hooks/useMessageHistory';
-import { obsidianSync } from '../services/obsidianSync';
+// v1.5.2 Stage 3: упрощённый ChatWindow (offline-first, inline styles, без backend)
+// Цель: отображать сообщения, отправлять текст, автоскролл к последнему сообщению.
+// Полная версия с WebRTC/Timer/Export будет восстановлена в следующих этапах.
+
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import type { Message, Contact } from '../types';
 
 interface ChatWindowProps {
-  partner: Contact | Group;
-  chat: Chat;
-  onSendMessage: (text: string, media?: string, mediaType?: 'image' | 'video', payload?: any) => void;
-  currentUserIdentity: Identity;
-  onBack: () => void;
-  onSetTimer: (seconds: number | undefined) => void;
-  onDeleteMessage: (id: string) => void;
-  onVerify: () => void;
+  chatId: string;
+  messages: Message[];
+  onSendMessage: (text: string) => void;
+  /** Опционально: контакт/имя партнёра для отображения в header */
+  partner?: Contact | { name: string };
+  /** Опционально: текущий пользователь (для разделения своих/чужих) */
+  currentUserUid?: string;
+  /** Опционально: кнопка "Назад" (для мобильного layout) */
+  onBack?: () => void;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
-  partner,
-  chat,
+  chatId,
+  messages,
   onSendMessage,
-  currentUserIdentity,
-  onBack,
-  onSetTimer,
-  onDeleteMessage,
-  onVerify
+  partner,
+  currentUserUid,
+  onBack
 }) => {
+  const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isTimerSelectionOpen, setIsTimerSelectionOpen] = useState(false);
-  const [showCallHistory, setShowCallHistory] = useState(false);
-  const { isTyping, sendTyping } = useTypingIndicator(partner.id);
-  const chatId = 'name' in partner ? (partner as Group).id : (partner as Contact).id;
-  const { messages, hasMore, loading, loadMore } = useMessageHistory(chatId);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const scrollToBottom = () => {
+  // Stage 3: автоскролл к последнему сообщению при изменении списка
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [messages]);
 
-  useEffect(() => {
-    scrollToBottom();
-    // РћС‚РїСЂР°РІР»СЏРµРј СЃРёРіРЅР°Р» "РїСЂРѕС‡РёС‚Р°РЅРѕ" РµСЃР»Рё СЌС‚Рѕ Р»РёС‡РЅС‹Р№ С‡Р°С‚
-    if (!('name' in partner)) {
-       apiService.sendMessage((partner as Contact).uid, '', '', { type: 'read' });
+  const handleSubmit = useCallback((e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    console.log(`[PILIGRIM] ChatWindow: send message to chatId=${chatId}, len=${trimmed.length}`);
+    onSendMessage(trimmed);
+    setDraft('');
+    inputRef.current?.focus();
+  }, [draft, chatId, onSendMessage]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
     }
-  }, [chat.messages, partner]);
-  
-  useEffect(() => {
-    // РЎР±СЂР°СЃС‹РІР°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ РїСЂРё СЃРјРµРЅРµ РїР°СЂС‚РЅС‘СЂР°
-  }, [partner.id]);
+  }, [handleSubmit]);
 
-  const isGroup = 'name' in partner;
-  const partnerName = isGroup ? (partner as Group).name : (partner as Contact).name;
-  const verified = !isGroup && (partner as Contact).verified;
-
-  const copyInvite = () => {
-      if (isGroup && (partner as Group).inviteToken) {
-          const link = `${window.location.origin}/invite/${(partner as Group).inviteToken}`;
-          navigator.clipboard.writeText(link);
-          alert('Invite link copied!');
-      }
-  };
+  const partnerName = partner?.name ?? 'Чат';
+  const initial = partnerName.charAt(0).toUpperCase();
 
   return (
-    <div className="flex flex-col h-full bg-slate-800 relative">
-      <header className="flex items-center p-4 bg-slate-900 border-b border-slate-700 flex-shrink-0 z-10">
-        <button onClick={onBack} className="mr-4 md:hidden text-slate-400 hover:text-white transition-colors">
-            <ArrowLeftIcon className="w-6 h-6" />
-        </button>
-        
-        <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center font-bold text-cyan-400 mr-4 relative">
-          {partnerName.charAt(0).toUpperCase()}
-          {verified && (
-              <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5">
-                  <ShieldCheckIcon className="w-3 h-3 text-green-500" />
-              </div>
-          )}
-        </div>
-        
-        <div className="flex-1 min-w-0">
-            <div className="flex items-center">
-                <h3 className="font-bold text-lg text-white truncate">{partnerName}</h3>
-                {verified && <ShieldCheckIcon className="w-4 h-4 text-green-500 ml-2" />}
-            </div>
-            
-            {!isGroup && (
-              <CallModal 
-                currentUserId="current-user" 
-                partnerId={(partner as Contact).id} 
-                partnerName={partnerName}
-                onStartCall={() => console.log('Call started')}
-              />
-            )}
-            
-            {isTyping ? (
-              <p className="text-xs text-cyan-400 animate-pulse">... typing ...</p>
-            ) : (
-              <div className="flex items-center text-xs text-slate-400">
-                  {isGroup ? (
-                      <span>{ (partner as Group).members.length } members</span>
-                  ) : (
-                      <span className={verified ? "text-green-400" : "text-slate-500"}>
-                          {verified ? 'Identity verified' : 'Identity not verified'}
-                      </span>
-                  )}
-              </div>
-            )}
-        </div>
-
-        <div className="flex items-center space-x-3">
-            <div className="relative">
-                <button 
-                    onClick={() => setIsTimerSelectionOpen(!isTimerSelectionOpen)}
-                    className={`p-2 rounded-full hover:bg-slate-700 ${chat.disappearTimer ? 'text-cyan-400' : 'text-slate-400'}`}
-                    title="Disappearing messages"
-                >
-                    <ClockIcon className="w-5 h-5" />
-                </button>
-                {isTimerSelectionOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-20">
-                        <MessageTimerSelection 
-                            currentValue={chat.disappearTimer}
-                            onSelect={(sec) => {
-                                onSetTimer(sec);
-                                setIsTimerSelectionOpen(false);
-                            }}
-                        />
-                    </div>
-                )}
-            </div>
-
-            {!isGroup && !verified && (
-                <button onClick={onVerify} className="p-2 text-slate-400 hover:text-white" title="Verify">
-                    <QrCodeIcon className="w-5 h-5" />
-                </button>
-            )}
-
-            {isGroup && (partner as Group).type === 'private' && (
-                 <button onClick={copyInvite} className="p-2 text-slate-400 hover:text-white" title="Invite link">
-                     <ShareIcon className="w-5 h-5" />
-                 </button>
-            )}
-
-            <button 
-                onClick={async () => {
-                  try {
-                    const path = await obsidianSync.exportChat({
-                      chatId: chatId,
-                      participant: partnerName
-                    });
-                    alert(`Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРѕ РІ: ${path}`);
-                  } catch (err) {
-                    console.error('Export failed:', err);
-                    alert('РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р°');
-                  }
-                }}
-                style={{ padding: '6px 12px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                title="Р­РєСЃРїРѕСЂС‚ РІ Obsidian"
-            >
-                рџ§  Р­РєСЃРїРѕСЂС‚ РІ Obsidian
-              </button>
-              
-              {!isGroup && (
-                <button
-                  onClick={() => setShowCallHistory(true)}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  title="РСЃС‚РѕСЂРёСЏ Р·РІРѕРЅРєРѕРІ"
-                >
-                  рџ“‹ РСЃС‚РѕСЂРёСЏ
-                </button>
-              )}
-        </div>
-      </header>
-      
-      <div className="flex-1 p-4 overflow-y-auto bg-slate-800 custom-scrollbar relative">
-         <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-         
-        <div className="space-y-2 relative z-0">
-          {chat.messages.map(msg => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                currentIdentity={currentUserIdentity}
-                onDelete={onDeleteMessage}
-                disappearTimer={chat.disappearTimer}
-              />
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-      
-      <MessageInput 
-        onSendMessage={onSendMessage}
-        onTyping={sendTyping}
-      />
-      
-      {showCallHistory && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+    <div
+      data-testid="chat-window"
+      data-chat-id={chatId}
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        backgroundColor: '#1e293b',
+        minWidth: 0
+      }}
+    >
+      {/* Header */}
+      <header
+        style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9998
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflow: 'hidden',
-            position: 'relative'
-          }}>
-            <button
-              onClick={() => setShowCallHistory(false)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: '#f3f4f6',
-                border: 'none',
-                fontSize: '18px',
-                cursor: 'pointer',
-                zIndex: 10
-              }}
-            >
-              вњ•
-            </button>
-            <CallHistory currentUserId="current-user" />
+          padding: '12px 16px',
+          backgroundColor: '#0f172a',
+          borderBottom: '1px solid #334155',
+          flexShrink: 0,
+          gap: '12px'
+        }}
+      >
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Назад"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '4px 8px'
+            }}
+          >
+            ‹
+          </button>
+        )}
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: '#334155',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold',
+            color: '#22d3ee',
+            fontSize: '18px',
+            flexShrink: 0
+          }}
+        >
+          {initial}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              color: '#f1f5f9',
+              fontSize: '16px',
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {partnerName}
+          </div>
+          <div style={{ color: '#64748b', fontSize: '12px' }}>
+            {messages.length} {messages.length === 1 ? 'сообщение' : 'сообщений'}
           </div>
         </div>
-      )}
+      </header>
+
+      {/* Messages list (scrollable) */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          backgroundColor: '#1e293b',
+          minHeight: 0
+        }}
+      >
+        {messages.length === 0 ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748b',
+              fontSize: '14px',
+              textAlign: 'center'
+            }}
+          >
+            Нет сообщений. Напишите первое!
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isOwn = currentUserUid
+              ? msg.senderId === currentUserUid
+              : msg.senderId === 'local';
+            return (
+              <div
+                key={msg.id}
+                data-testid="message"
+                data-sender={msg.senderId}
+                style={{
+                  alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                  backgroundColor: isOwn ? '#3b82f6' : '#475569',
+                  color: '#ffffff',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  maxWidth: '70%',
+                  wordBreak: 'break-word',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                <div style={{ fontSize: '14px', lineHeight: 1.4 }}>{msg.text}</div>
+                <div
+                  style={{
+                    fontSize: '10px',
+                    opacity: 0.7,
+                    marginTop: '4px',
+                    textAlign: 'right'
+                  }}
+                >
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '12px 16px',
+          backgroundColor: '#0f172a',
+          borderTop: '1px solid #334155',
+          flexShrink: 0
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Введите сообщение..."
+          aria-label="Поле ввода сообщения"
+          data-testid="message-input"
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            backgroundColor: '#334155',
+            color: '#f1f5f9',
+            border: '1px solid #475569',
+            borderRadius: '20px',
+            fontSize: '14px',
+            outline: 'none',
+            minWidth: 0
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!draft.trim()}
+          data-testid="send-button"
+          style={{
+            padding: '0 20px',
+            backgroundColor: draft.trim() ? '#3b82f6' : '#1e293b',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '20px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: draft.trim() ? 'pointer' : 'not-allowed',
+            flexShrink: 0
+          }}
+        >
+          Send
+        </button>
+      </form>
     </div>
   );
 };

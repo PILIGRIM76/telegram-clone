@@ -1,12 +1,13 @@
-// v1.5.2 Stage 1: CreateIdentity + SeedPhraseModal + ContactList (пустой)
-// Цель: подключить ContactList со всеми обязательными props (offline-first, без backend)
+// v1.5.2 Stage 3: ChatWindow + handleSendMessage (offline-first)
+// Цель: двухколоночный layout с реальной отправкой сообщений в localStorage
 import React, { useState, useEffect } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
 import ContactList from './components/ContactList';
+import ChatWindow from './components/ChatWindow';
 import { generateIdentity } from './services/cryptoService';
 import { apiService } from './services/apiService';
-import type { Contact, Group, Chat, Identity } from './types';
+import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
   const [identity, setIdentity] = useState<Identity | null>(() => {
@@ -167,6 +168,36 @@ const App: React.FC = () => {
     console.log('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
   };
+  // v1.5.2 Stage 3: handleSendMessage — добавляет сообщение в чат и сохраняет в localStorage
+  const handleSendMessage = (chatId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (!identity) {
+      console.warn('[PILIGRIM] handleSendMessage: identity отсутствует, сообщение не отправлено');
+      return;
+    }
+    const newMessage: Message = {
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      text: trimmed,
+      senderId: identity.uid,
+      timestamp: new Date().toISOString(),
+      status: 'sent'
+    };
+    console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}`);
+    setChats((prev) => {
+      const updated = { ...prev };
+      if (!updated[chatId]) {
+        updated[chatId] = { contactId: chatId, messages: [] };
+      }
+      updated[chatId] = {
+        ...updated[chatId],
+        messages: [...(updated[chatId].messages || []), newMessage]
+      };
+      return updated;
+    });
+  };
   const handleLogout = () => {
     localStorage.removeItem('piligrim-identity');
     setIdentity(null);
@@ -227,15 +258,50 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Правая колонка: заглушка чата (Этап 2 — ChatWindow) */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-        <p style={{ fontSize: '1.125rem' }}>Выберите контакт для начала общения</p>
-        <button
-          onClick={handleLogout}
-          style={{ marginTop: '1.5rem', padding: '0.5rem 1rem', background: 'rgba(220, 38, 38, 0.8)', color: 'white', borderRadius: '0.375rem', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
-        >
-          Выйти из аккаунта
-        </button>
+      {/* Правая колонка: ChatWindow или placeholder */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {selectedChatId ? (
+          <ChatWindow
+            chatId={selectedChatId}
+            messages={chats[selectedChatId]?.messages || []}
+            onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
+            partner={(() => {
+              const c = contacts.find((c) => c.id === selectedChatId);
+              if (c) return c;
+              const g = groups.find((g) => g.id === selectedChatId);
+              if (g) return { name: g.name };
+              return undefined;
+            })()}
+            currentUserUid={identity?.uid}
+          />
+        ) : (
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#64748b',
+            padding: '24px'
+          }}>
+            <p style={{ fontSize: '1.125rem' }}>Выберите контакт для начала общения</p>
+            <button
+              onClick={handleLogout}
+              style={{
+                marginTop: '1.5rem',
+                padding: '0.5rem 1rem',
+                background: 'rgba(220, 38, 38, 0.8)',
+                color: 'white',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Выйти из аккаунта
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
