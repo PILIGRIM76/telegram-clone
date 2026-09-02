@@ -179,8 +179,15 @@ const App: React.FC = () => {
     });
     console.log(`🔇 [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
   };
-  const handleArchiveChat = (_contactId: string, _archive: boolean) => {
-    console.log('[PILIGRIM] handleArchiveChat stub');
+  // v1.6 Batch 4: handleArchiveChat — архивировать/разархивировать чат
+  const handleArchiveChat = (chatId: string, archive: boolean) => {
+    setChats((prev) => {
+      const updated = { ...prev };
+      const existing = updated[chatId] || { contactId: chatId, messages: [] };
+      updated[chatId] = { ...existing, archived: archive };
+      return updated;
+    });
+    console.log(`📁 [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
   };
   const handleOpenProfile = () => console.log('[PILIGRIM] handleOpenProfile stub');
   const handleOpenStore = () => console.log('[PILIGRIM] handleOpenStore stub');
