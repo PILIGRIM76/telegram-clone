@@ -1,6 +1,6 @@
-// v1.5.2 Stage 3: упрощённый ChatWindow (offline-first, inline styles, без backend)
-// Цель: отображать сообщения, отправлять текст, автоскролл к последнему сообщению.
-// Полная версия с WebRTC/Timer/Export будет восстановлена в следующих этапах.
+﻿// v1.5.2 Stage 3: СѓРїСЂРѕС‰С‘РЅРЅС‹Р№ ChatWindow (offline-first, inline styles, Р±РµР· backend)
+// Р¦РµР»СЊ: РѕС‚РѕР±СЂР°Р¶Р°С‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ, РѕС‚РїСЂР°РІР»СЏС‚СЊ С‚РµРєСЃС‚, Р°РІС‚РѕСЃРєСЂРѕР»Р» Рє РїРѕСЃР»РµРґРЅРµРјСѓ СЃРѕРѕР±С‰РµРЅРёСЋ.
+// РџРѕР»РЅР°СЏ РІРµСЂСЃРёСЏ СЃ WebRTC/Timer/Export Р±СѓРґРµС‚ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР° РІ СЃР»РµРґСѓСЋС‰РёС… СЌС‚Р°РїР°С….
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Message, Contact } from '../types';
@@ -9,19 +9,19 @@ interface ChatWindowProps {
   chatId: string;
   messages: Message[];
   onSendMessage: (text: string) => void;
-  /** Опционально: контакт/имя партнёра для отображения в header */
+  /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РєРѕРЅС‚Р°РєС‚/РёРјСЏ РїР°СЂС‚РЅС‘СЂР° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ header */
   partner?: Contact | { name: string };
-  /** Опционально: текущий пользователь (для разделения своих/чужих) */
+  /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: С‚РµРєСѓС‰РёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ (РґР»СЏ СЂР°Р·РґРµР»РµРЅРёСЏ СЃРІРѕРёС…/С‡СѓР¶РёС…) */
   currentUserUid?: string;
-  /** Опционально: кнопка "Назад" (для мобильного layout) */
+  /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РєРЅРѕРїРєР° "РќР°Р·Р°Рґ" (РґР»СЏ РјРѕР±РёР»СЊРЅРѕРіРѕ layout) */
   onBack?: () => void;
-  /** Stage 6: начать звонок (WebRTC). */
+  /** Stage 6: РЅР°С‡Р°С‚СЊ Р·РІРѕРЅРѕРє (WebRTC). */
   onStartCall?: () => void;
-  /** Stage 6: текущий статус звонка для UI-индикации. */
+  /** Stage 6: С‚РµРєСѓС‰РёР№ СЃС‚Р°С‚СѓСЃ Р·РІРѕРЅРєР° РґР»СЏ UI-РёРЅРґРёРєР°С†РёРё. */
   callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
-  /** Batch 4: timestamp до которого уведомления заглушены (для 🔇 индикатора) */
+  /** Batch 4: timestamp РґРѕ РєРѕС‚РѕСЂРѕРіРѕ СѓРІРµРґРѕРјР»РµРЅРёСЏ Р·Р°РіР»СѓС€РµРЅС‹ (РґР»СЏ рџ”‡ РёРЅРґРёРєР°С‚РѕСЂР°) */
   mutedUntil?: number;
-  /** Batch 4: показать модалку верификации контакта */
+  /** Batch 4: РїРѕРєР°Р·Р°С‚СЊ РјРѕРґР°Р»РєСѓ РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */
   onVerifyContact?: () => void;
 }
 
@@ -41,7 +41,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Stage 3: автоскролл к последнему сообщению при изменении списка
+  // Stage 3: Р°РІС‚РѕСЃРєСЂРѕР»Р» Рє РїРѕСЃР»РµРґРЅРµРјСѓ СЃРѕРѕР±С‰РµРЅРёСЋ РїСЂРё РёР·РјРµРЅРµРЅРёРё СЃРїРёСЃРєР°
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -63,7 +63,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [handleSubmit]);
 
-  const partnerName = partner?.name ?? 'Чат';
+  const partnerName = partner?.name ?? 'Р§Р°С‚';
   const initial = partnerName.charAt(0).toUpperCase();
 
   return (
@@ -94,7 +94,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         {onBack && (
           <button
             onClick={onBack}
-            aria-label="Назад"
+            aria-label="РќР°Р·Р°Рґ"
             style={{
               background: 'transparent',
               border: 'none',
@@ -104,7 +104,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               padding: '4px 8px'
             }}
           >
-            ‹
+            вЂ№
           </button>
         )}
         <div
@@ -140,18 +140,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               <span
                 title={
                   mutedUntil === Number.MAX_SAFE_INTEGER
-                    ? 'Уведомления заглушены навсегда'
-                    : `Уведомления заглушены до ${new Date(mutedUntil).toLocaleTimeString()}`
+                    ? 'РЈРІРµРґРѕРјР»РµРЅРёСЏ Р·Р°РіР»СѓС€РµРЅС‹ РЅР°РІСЃРµРіРґР°'
+                    : `РЈРІРµРґРѕРјР»РµРЅРёСЏ Р·Р°РіР»СѓС€РµРЅС‹ РґРѕ ${new Date(mutedUntil).toLocaleTimeString()}`
                 }
                 data-testid="muted-indicator"
                 style={{ marginLeft: '6px', fontSize: '14px' }}
               >
-                🔇
+                рџ”‡
               </span>
             )}
           </div>
           <div style={{ color: '#64748b', fontSize: '12px' }}>
-            {messages.length} {messages.length === 1 ? 'сообщение' : 'сообщений'}
+            {messages.length} {messages.length === 1 ? 'СЃРѕРѕР±С‰РµРЅРёРµ' : 'СЃРѕРѕР±С‰РµРЅРёР№'}
           </div>
         </div>
         {onStartCall && (
@@ -160,8 +160,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             onClick={onStartCall}
             disabled={callState !== 'idle'}
             data-testid="call-button"
-            title={callState === 'idle' ? 'Позвонить' : `Звонок: ${callState}`}
-            aria-label="Позвонить"
+            title={callState === 'idle' ? 'РџРѕР·РІРѕРЅРёС‚СЊ' : `Р—РІРѕРЅРѕРє: ${callState}`}
+            aria-label="РџРѕР·РІРѕРЅРёС‚СЊ"
             style={{
               padding: '8px 12px',
               backgroundColor: callState === 'in-call' ? '#22c55e' : '#3b82f6',
@@ -177,7 +177,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               gap: '4px'
             }}
           >
-            {callState === 'in-call' ? '📞 В звонке' : callState === 'calling' ? '📞 Вызов…' : '📞'}
+            {callState === 'in-call' ? 'рџ“ћ Р’ Р·РІРѕРЅРєРµ' : callState === 'calling' ? 'рџ“ћ Р’С‹Р·РѕРІвЂ¦' : 'рџ“ћ'}
           </button>
         )}
         {onVerifyContact && (
@@ -185,8 +185,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             type="button"
             onClick={onVerifyContact}
             data-testid="verify-button"
-            title="Верифицировать контакт"
-            aria-label="Верифицировать контакт"
+            title="Р’РµСЂРёС„РёС†РёСЂРѕРІР°С‚СЊ РєРѕРЅС‚Р°РєС‚"
+            aria-label="Р’РµСЂРёС„РёС†РёСЂРѕРІР°С‚СЊ РєРѕРЅС‚Р°РєС‚"
             style={{
               padding: '8px 12px',
               backgroundColor: 'transparent',
@@ -198,7 +198,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               flexShrink: 0
             }}
           >
-            🔐
+            рџ”ђ
           </button>
         )}
       </header>
@@ -228,7 +228,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               textAlign: 'center'
             }}
           >
-            Нет сообщений. Напишите первое!
+            РќРµС‚ СЃРѕРѕР±С‰РµРЅРёР№. РќР°РїРёС€РёС‚Рµ РїРµСЂРІРѕРµ!
           </div>
         ) : (
           messages.map((msg) => {
@@ -239,6 +239,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               <div
                 key={msg.id}
                 data-testid="message"
+                className='piligrim-message-in'
                 data-sender={msg.senderId}
                 style={{
                   alignSelf: isOwn ? 'flex-end' : 'flex-start',
@@ -266,11 +267,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 >
                   {msg.isEncrypted && (
                     <span
-                      title="Зашифровано (E2EE)"
-                      aria-label="Зашифровано"
+                      title="Р—Р°С€РёС„СЂРѕРІР°РЅРѕ (E2EE)"
+                      aria-label="Р—Р°С€РёС„СЂРѕРІР°РЅРѕ"
                       style={{ fontSize: '10px' }}
                     >
-                      🔒
+                      рџ”’
                     </span>
                   )}
                   <span>
@@ -305,8 +306,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Введите сообщение..."
-          aria-label="Поле ввода сообщения"
+          placeholder="Р’РІРµРґРёС‚Рµ СЃРѕРѕР±С‰РµРЅРёРµ..."
+          aria-label="РџРѕР»Рµ РІРІРѕРґР° СЃРѕРѕР±С‰РµРЅРёСЏ"
           data-testid="message-input"
           style={{
             flex: 1,
