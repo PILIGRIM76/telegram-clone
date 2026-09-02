@@ -6,6 +6,8 @@ import SeedPhraseModal from './components/SeedPhraseModal';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import VerifyModal from './components/VerifyModal';
+import Toasts from './components/Toast';
+import { useToasts } from './hooks/useToasts';
 import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -33,6 +35,8 @@ const App: React.FC = () => {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error' | 'unsupported'>('closed');
   // v1.6 Batch 4: показывать модалку верификации контакта
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  // v1.6 Batch 4: toast-уведомления (объявлены раньше handlers, чтобы их можно было вызывать)
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   // v1.5.2 Stage 2: загрузка контактов, групп и чатов из localStorage после монтирования
   useEffect(() => {
@@ -180,6 +184,14 @@ const App: React.FC = () => {
       updated[chatId] = { ...existing, mutedUntil };
       return updated;
     });
+    if (duration === 'forever') {
+      pushToast('Чат заглушён навсегда', 'info');
+    } else if (duration === null) {
+      pushToast('Заглушение снято', 'success');
+    } else {
+      const hours = Math.round(duration / 3600000);
+      pushToast(`Чат заглушён на ${hours} ч`, 'info');
+    }
     console.log(`🔇 [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
   };
   // v1.6 Batch 4: handleArchiveChat — архивировать/разархивировать чат
@@ -190,6 +202,7 @@ const App: React.FC = () => {
       updated[chatId] = { ...existing, archived: archive };
       return updated;
     });
+    pushToast(archive ? 'Чат архивирован' : 'Чат восстановлен', 'success');
     console.log(`📁 [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
   };
   const handleOpenProfile = () => console.log('[PILIGRIM] handleOpenProfile stub');
@@ -207,6 +220,7 @@ const App: React.FC = () => {
       })
     );
     setShowVerifyModal(false);
+    pushToast('Контакт подтверждён ✅', 'success');
     console.log(`✅ [PILIGRIM] handleVerifyContact: chatId=${chatId} marked as verified`);
   };
 
@@ -466,11 +480,17 @@ const App: React.FC = () => {
             color: '#64748b',
             padding: '24px'
           }}>
-            <p style={{ fontSize: '1.125rem' }}>Выберите контакт для начала общения</p>
+            <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Пустой чат">
+              👋 Добро пожаловать в PILIGRIM
+            </p>
+            <p style={{ fontSize: '0.875rem', color: '#475569', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
+              Выберите контакт слева или добавьте нового, нажав <strong style={{ color: '#94a3b8' }}>+</strong>
+            </p>
             <button
               onClick={handleLogout}
+              aria-label="Выйти из аккаунта"
               style={{
-                marginTop: '1.5rem',
+                marginTop: '1rem',
                 padding: '0.5rem 1rem',
                 background: 'rgba(220, 38, 38, 0.8)',
                 color: 'white',
@@ -502,6 +522,9 @@ const App: React.FC = () => {
           />
         );
       })()}
+
+      {/* Batch 4: Toast notifications */}
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 };
