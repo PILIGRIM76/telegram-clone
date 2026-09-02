@@ -7,6 +7,12 @@ describe('WebSocket API Service', () => {
   let mockWebSocket;
 
   beforeEach(() => {
+    // v2.0 Stage 4: apiService читает identity из localStorage для buildWsAuthUrl.
+    // Устанавливаем тестовую identity перед require().
+    localStorage.setItem('piligrim-identity', JSON.stringify({
+      uid: 'test-uid-123',
+      publicKey: '{"kty":"RSA","n":"abc123","e":"AQAB"}'
+    }));
     mockWebSocket = {
       onopen: null,
       onmessage: null,

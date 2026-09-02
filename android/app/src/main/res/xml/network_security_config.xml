@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2.0 Stage 3: Android Network Security Config
+  Доверяем нашему self-signed CA (piligrim-ca.crt) для wss://192.168.100.4:4443
+  Разрешаем cleartext только для dev-сервера (fallback)
+-->
+<network-security-config>
+    <!--
+        base-config: по умолчанию доверяем только system CA.
+        Дополнительно — наш self-signed CA из res/raw/piligrim_ca.crt
+        (DER, 1375 байт, подписан через openssl x509).
+    -->
+    <base-config>
+        <trust-anchors>
+            <certificates src="@raw/piligrim_ca"/>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <!--
+        Для нашего LAN dev-сервера (192.168.100.4) разрешаем cleartext
+        — fallback если TLS-канал недоступен.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.100.4</domain>
+    </domain-config>
+</network-security-config>

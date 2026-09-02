@@ -1,12 +1,16 @@
 import type { Message, Store, Group, NoticeBoard } from '../types';
 import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
+import { buildWsAuthUrl, redactWsUrl } from '../utils/websocketAuth';
 
+// v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
+// REST API остаётся на прямом HTTP (4000) для локального доступа.
 // Phase 9.5 fix: hardcoded IP for RT9 deployment
 // (process.env в Vite-браузере не работает — используем прямое присваивание)
 const BASE_URL = 'http://192.168.100.4:4000';
 const API_URL = BASE_URL.replace(/\/+$/, '');
-const WS_URL = API_URL.replace(/^http/, 'ws');
+// WS через Nginx TLS reverse proxy: wss://192.168.100.4:4443/?uid=...
+const WS_URL = 'wss://192.168.100.4:4443';
 
 // DEBUG: console.log используется ТОЛЬКО для проверки билда, потом удалить
 if (typeof console !== 'undefined') {
@@ -109,7 +113,12 @@ class ApiService {
 
   connect(uid: string) {
     if (this.ws) this.disconnect();
-    this.ws = new WebSocket(WS_URL + '?uid=' + uid);
+    // v2.0 Stage 4: используем buildWsAuthUrl для передачи publicKey в handshake
+    const identityStr = localStorage.getItem('piligrim-identity');
+    const identity = identityStr ? JSON.parse(identityStr) : null;
+    const authUrl = buildWsAuthUrl(WS_URL, identity);
+    console.log(`[PILIGRIM apiService] Connecting to: ${redactWsUrl(authUrl)}`);
+    this.ws = new WebSocket(authUrl);
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
