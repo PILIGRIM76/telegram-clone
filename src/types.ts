@@ -75,7 +75,7 @@ export interface Message {
   status?: MessageStatus;
   groupId?: string; // Если сообщение в группе
   type?: 'user' | 'system' | 'read';
-  
+
   // Медиа файлы
   media?: string; // Base64 строка
   mediaType?: 'image' | 'video';
@@ -86,6 +86,12 @@ export interface Message {
 
   // Для сложных данных (заказы, обновления, подарки)
   payload?: any;
+
+  // Phase 7.6 / Stage 4: E2EE (RSA-OAEP)
+  /** Зашифрованный текст (base64). Если есть — UI показывает иконку 🔒. */
+  encryptedPayload?: string;
+  /** Флаг: true если сообщение было зашифровано при отправке. */
+  isEncrypted?: boolean;
 }
 
 export interface Chat {

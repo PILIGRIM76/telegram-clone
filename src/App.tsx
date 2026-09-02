@@ -1,11 +1,11 @@
-// v1.5.2 Stage 3: ChatWindow + handleSendMessage (offline-first)
-// Цель: двухколоночный layout с реальной отправкой сообщений в localStorage
+// v1.5.2 Stage 4: E2EE шифрование сообщений через RSA-OAEP
+// Цель: сообщения шифруются публичным ключом контакта перед сохранением в localStorage
 import React, { useState, useEffect } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
-import { generateIdentity } from './services/cryptoService';
+import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
@@ -168,24 +168,49 @@ const App: React.FC = () => {
     console.log('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
   };
-  // v1.5.2 Stage 3: handleSendMessage — добавляет сообщение в чат и сохраняет в localStorage
-  const handleSendMessage = (chatId: string, text: string) => {
+  // v1.5.2 Stage 4: handleSendMessage — шифрует сообщение публичным ключом контакта
+  // (RSA-OAEP) перед сохранением в localStorage. Если publicKey отсутствует —
+  // отправляем в plaintext с предупреждением (graceful fallback для UX).
+  const handleSendMessage = async (chatId: string, text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
       console.warn('[PILIGRIM] handleSendMessage: identity отсутствует, сообщение не отправлено');
       return;
     }
+
+    // 1. Ищем контакт, чтобы получить его publicKey
+    const contact = contacts.find((c) => c.id === chatId || c.uid === chatId);
+
+    // 2. Шифруем, если есть publicKey
+    let encryptedPayload: string | undefined;
+    let isEncrypted = false;
+    if (contact?.publicKey) {
+      try {
+        encryptedPayload = await encrypt(trimmed, contact.publicKey);
+        isEncrypted = true;
+        console.log(`🔒 [PILIGRIM] E2EE: зашифровано для ${contact.name} (chatId=${chatId}, ciphertext_len=${encryptedPayload.length})`);
+      } catch (error) {
+        console.error(`❌ [PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
+        // Fallback: сохраняем в plaintext, но НЕ теряем сообщение
+      }
+    } else {
+      console.warn(`⚠️ [PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, сообщение будет сохранено в plaintext`);
+    }
+
+    // 3. Создаём Message (text — для локального UI, encryptedPayload — для хранения/передачи)
     const newMessage: Message = {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID()
         : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       text: trimmed,
+      encryptedPayload,
+      isEncrypted,
       senderId: identity.uid,
       timestamp: new Date().toISOString(),
       status: 'sent'
     };
-    console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}`);
+    console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
     setChats((prev) => {
       const updated = { ...prev };
       if (!updated[chatId]) {

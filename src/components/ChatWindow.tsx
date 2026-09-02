@@ -185,13 +185,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     fontSize: '10px',
                     opacity: 0.7,
                     marginTop: '4px',
-                    textAlign: 'right'
+                    textAlign: 'right',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '4px'
                   }}
                 >
-                  {new Date(msg.timestamp).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  {msg.isEncrypted && (
+                    <span
+                      title="Зашифровано (E2EE)"
+                      aria-label="Зашифровано"
+                      style={{ fontSize: '10px' }}
+                    >
+                      🔒
+                    </span>
+                  )}
+                  <span>
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
                 </div>
               </div>
             );
