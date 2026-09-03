@@ -7,17 +7,17 @@ const config: CapacitorConfig = {
   // server Р±Р»РѕРє СѓРґР°Р»С‘РЅ вЂ” РїСЂРёР»РѕР¶РµРЅРёРµ СЂР°Р±РѕС‚Р°РµС‚ РІ offline-СЂРµР¶РёРјРµ
   // РёР· Р»РѕРєР°Р»СЊРЅРѕРіРѕ Р±Р°РЅРґР»Р° (Р±РµР· Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ dev-СЃРµСЂРІРµСЂР°)
   android: {
-    allowMixedContent: true,
-    // Phase 9.5 fix: androidScheme='https' по умолчанию в Capacitor 3+ создаёт
-    // виртуальный хост https://localhost, который блокирует загрузку bundle
-    // на Android WebView (белый экран на RT9). Используем 'http' для совместимости.
-    androidScheme: 'http',
-    // v1.5.2 Stage 7: Разрешаем WebSocket подключения к LAN backend (192.168.100.4:4000)
-    // Mixed Content policy по умолчанию блокирует ws:// с https://localhost страницы.
-    // 'cleartext': true разрешает HTTP/WS к указанным доменам.
-    cleartext: true
+    allowMixedContent: true
+    // Примечание: cleartext для Capacitor v8+ теперь в network_security_config.xml
+    // (android/app/src/main/res/xml/network_security_config.xml),
+    // а НЕ в capacitor.config.ts.
   },
   server: {
+    // v2.0 Stage 7: Phase 9.5 fix — androidScheme перенесён из android{} в server{}
+    // для совместимости с Capacitor v8. Capacitor 3-7 принимал androidScheme
+    // в android{}, но v8+ переместил его сюда. Dual-write для обратной совместимости:
+    // Capacitor автоматически игнорирует androidScheme, если не знает о нём.
+    androidScheme: 'http',
     // Разрешаем навигацию к backend (для WebSocket и REST)
     allowNavigation: ['192.168.100.4', 'localhost', '127.0.0.1']
   },

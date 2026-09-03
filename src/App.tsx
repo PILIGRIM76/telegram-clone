@@ -1,5 +1,5 @@
-﻿// v1.5.2 Stage 5: WebSocket real-time РґР»СЏ Р·Р°С€РёС„СЂРѕРІР°РЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№
-// Р¦РµР»СЊ: РґРѕСЃС‚Р°РІРєР° РІС…РѕРґСЏС‰РёС… СЃРѕРѕР±С‰РµРЅРёР№ РѕС‚ РґСЂСѓРіРёС… РєР»РёРµРЅС‚РѕРІ + РёРЅРґРёРєР°С‚РѕСЂ СЃС‚Р°С‚СѓСЃР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ
+﻿// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
+// Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
 import React, { useState, useEffect } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
@@ -29,12 +29,12 @@ const App: React.FC = () => {
   const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
 
-  // v1.5.2 Stage 1: Р»РѕРєР°Р»СЊРЅС‹Рµ СЃРїРёСЃРєРё (Р±РµР· useLocalStorage, С‡С‚РѕР±С‹ РЅРµ РЅР°СЂСѓС€Р°С‚СЊ РїСЂР°РІРёР»Р° С…СѓРєРѕРІ)
+  // v1.5.2 Stage 1: локальные списки (без useLocalStorage, чтобы не нарушать правила хуков)
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [chats, setChats] = useState<Record<string, Chat>>({});
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  // v1.5.2 Stage 5: СЃС‚Р°С‚СѓСЃ WebSocket РґР»СЏ UI-РёРЅРґРёРєР°С‚РѕСЂР° (Online/Offline/Reconnecting)
+  // v1.5.2 Stage 5: статус WebSocket для UI-индикатора (Online/Offline/Reconnecting)
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error' | 'unsupported'>('closed');
   // v1.6 Batch 4: РїРѕРєР°Р·С‹РІР°С‚СЊ РјРѕРґР°Р»РєСѓ РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р°
   const [showVerifyModal, setShowVerifyModal] = useState(false);
