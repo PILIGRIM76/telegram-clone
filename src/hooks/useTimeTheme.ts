@@ -6,10 +6,10 @@ import { useState, useEffect } from 'react';
 export type TimeTheme = 'morning' | 'day' | 'evening' | 'night';
 
 function getThemeForHour(hour: number): TimeTheme {
-  if (hour >= 5 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 18) return 'day';
-  if (hour >= 18 && hour < 22) return 'evening';
-  return 'night';
+  if (hour >= 6 && hour < 12) return 'morning';   // мандарин
+  if (hour >= 12 && hour < 18) return 'day';      // терракот
+  if (hour >= 18 && hour < 23) return 'evening';  // фиолет
+  return 'night';                                  // лавандовый
 }
 
 /**

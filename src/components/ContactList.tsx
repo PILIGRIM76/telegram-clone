@@ -13,6 +13,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { StoreIcon } from './icons/StoreIcon';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
 import { useTranslation } from '../contexts/LanguageContext';
+import { AnimatedAvatar } from './AnimatedAvatar';
 
 interface ContactListProps {
   identity: Identity;
@@ -284,8 +285,8 @@ const ContactList: React.FC<ContactListProps> = ({
                             selected ? 'bg-cyan-900/50' : ''
                             }`}
                         >
-                            <div className="w-12 h-12 bg-slate-700 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-cyan-400 relative">
-                                {contact.name.charAt(0).toUpperCase()}
+                            <div className="relative flex-shrink-0">
+                                <AnimatedAvatar name={contact.name} size={48} />
                                 {contact.verified && (
                                     <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5">
                                         <CheckCircleIcon className="w-4 h-4 text-green-500" />
