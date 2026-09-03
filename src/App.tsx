@@ -463,11 +463,11 @@ const App: React.FC = () => {
           }}
         />
         <span>
-          {wsStatus === 'open' && 'рџџў Online'}
-          {wsStatus === 'connecting' && 'рџџЎ РџРѕРґРєР»СЋС‡РµРЅРёРµвЂ¦'}
-          {wsStatus === 'closed' && 'вљЄ Offline'}
-          {wsStatus === 'error' && 'рџ”ґ РћС€РёР±РєР°'}
-          {wsStatus === 'unsupported' && 'вљЄ РќРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ'}
+          {wsStatus === 'open' && '🟢 Online'}
+          {wsStatus === 'connecting' && '🟡 Подключение…'}
+          {wsStatus === 'closed' && '⚪ Offline'}
+          {wsStatus === 'error' && '🔴 Ошибка'}
+          {wsStatus === 'unsupported' && '⚪ Не поддерживается'}
         </span>
       </div>
 
@@ -536,15 +536,15 @@ const App: React.FC = () => {
             color: '#64748b',
             padding: '24px'
           }}>
-            <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="РџСѓСЃС‚РѕР№ С‡Р°С‚">
-              рџ‘‹ Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РІ PILIGRIM
+            <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Пустой чат">
+              👋 Добро пожаловать в PILIGRIM
             </p>
             <p style={{ fontSize: '0.875rem', color: '#475569', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
-              Р’С‹Р±РµСЂРёС‚Рµ РєРѕРЅС‚Р°РєС‚ СЃР»РµРІР° РёР»Рё РґРѕР±Р°РІСЊС‚Рµ РЅРѕРІРѕРіРѕ, РЅР°Р¶Р°РІ <strong style={{ color: '#94a3b8' }}>+</strong>
+              Выберите контакт слева или добавьте нового, нажав <strong style={{ color: '#94a3b8' }}>+</strong>
             </p>
             <button
               onClick={handleLogout}
-              aria-label="Р’С‹Р№С‚Рё РёР· Р°РєРєР°СѓРЅС‚Р°"
+              aria-label="Выйти из аккаунта"
               style={{
                 marginTop: '1rem',
                 padding: '0.5rem 1rem',
@@ -556,7 +556,7 @@ const App: React.FC = () => {
                 cursor: 'pointer'
               }}
             >
-              Р’С‹Р№С‚Рё РёР· Р°РєРєР°СѓРЅС‚Р°
+              Выйти из аккаунта
             </button>
 
             {showFeatures && (

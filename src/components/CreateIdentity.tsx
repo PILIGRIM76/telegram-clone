@@ -2,47 +2,120 @@
 import React from 'react';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 import { useTranslation } from '../contexts/LanguageContext';
+import FeaturesList from './FeaturesList';
 
 interface CreateIdentityProps {
   onCreateIdentity: () => void;
 }
 
 const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity }) => {
-  const { t } = useTranslation();
+  const { language, t } = useTranslation();
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-900">
-      <div className="max-w-md w-full p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg text-center">
-        <div className="flex justify-center">
+    <div
+      data-testid="create-identity-screen"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#0f172a',
+        padding: '20px',
+        overflowY: 'auto'
+      }}
+    >
+      {/* Логотип + заголовок */}
+      <div style={{ textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
           <ShieldCheckIcon className="w-16 h-16 text-cyan-400" />
         </div>
-        <h1 className="text-3xl font-bold text-white">{t('welcome_title')}</h1>
-        <p className="text-slate-400">
+        <h1 style={{ color: '#e2e8f0', fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>
+          {t('welcome_title')}
+        </h1>
+        <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '480px', margin: '0 auto' }}>
           {t('welcome_desc')}
         </p>
-        <div className="p-4 bg-yellow-900/50 border border-yellow-600 rounded-md text-yellow-200">
-            {t('backup_warning')}
+      </div>
+
+      {/* Карточка с кнопками */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '480px',
+          padding: '24px',
+          background: '#1e293b',
+          borderRadius: '12px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          border: '1px solid #334155',
+          marginBottom: '20px'
+        }}
+      >
+        <div
+          style={{
+            padding: '12px',
+            background: 'rgba(234, 179, 8, 0.15)',
+            border: '1px solid #eab308',
+            borderRadius: '8px',
+            color: '#fde047',
+            fontSize: '13px',
+            lineHeight: 1.5,
+            marginBottom: '16px'
+          }}
+        >
+          {t('backup_warning')}
         </div>
+
         <button
+          type="button"
           onClick={onCreateIdentity}
-          className="w-full px-4 py-3 font-semibold text-white bg-cyan-600 rounded-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-cyan-500 transition-colors duration-200"
+          data-testid="create-identity-btn"
+          aria-label={t('create_identity_btn')}
+          style={{
+            width: '100%',
+            padding: '14px 20px',
+            background: '#06b6d4',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 600,
+            marginBottom: '12px',
+            cursor: 'pointer'
+          }}
         >
           {t('create_identity_btn')}
         </button>
 
-        {/* v1.5.2 Stage 1: hybrid "Login" button — offline-friendly stub.
-            Серверной аутентификации в текущей архитектуре нет (offline-first),
-            поэтому показываем информационное сообщение. */}
+        {/* Login stub — offline-first, серверной auth нет */}
         <button
+          type="button"
           onClick={() => {
             alert(
-              'Вход по паролю в разработке. В текущей версии используйте "Создать безопасную личность" — ваша идентичность хранится только на этом устройстве.'
+              language === 'ru'
+                ? 'Вход по паролю в разработке. В текущей версии используйте "Создать безопасную личность" — ваша идентичность хранится только на этом устройстве.'
+                : 'Password login is in development. Use "Create Secure Identity" — your identity is stored only on this device.'
             );
           }}
-          className="w-full py-3 bg-slate-700/30 text-slate-400 font-medium rounded-xl hover:bg-slate-700/50 transition-all text-sm border border-slate-600/30"
+          data-testid="login-stub-btn"
+          aria-label="Login stub"
+          style={{
+            width: '100%',
+            padding: '12px 20px',
+            background: 'transparent',
+            color: '#94a3b8',
+            border: '1px solid #475569',
+            borderRadius: '8px',
+            fontSize: '14px',
+            cursor: 'pointer'
+          }}
         >
-          Войти с существующим аккаунтом
+          {language === 'ru' ? 'Войти с существующим аккаунтом' : 'Login with existing account'}
         </button>
+      </div>
+
+      {/* FeaturesList — МАКСИМАЛЬНО ВИДИМЫЙ на CreateIdentity */}
+      <div style={{ width: '100%', maxWidth: '720px', marginBottom: '40px' }}>
+        <FeaturesList lang={language} />
       </div>
     </div>
   );
