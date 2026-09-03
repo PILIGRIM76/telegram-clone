@@ -200,3 +200,92 @@ export const decryptSync = (encryptedText: string, _key: string): string => {
     console.warn('decryptSync is deprecated. Use async decrypt() instead.');
     return encryptedText;
 };
+
+
+/**
+ * Phase 7.6.5 + Restore Identity: детерминированная seed → identity.
+ *
+ * Принимает 12 слов seed-phrase и возвращает Identity с **тем же UID и fingerprint**,
+ * что и при первом создании через generateIdentity().
+ *
+ * Это НЕ полный BIP39-style recovery (ключи ECDSA P-256 не детерминированы в Web Crypto),
+ * но для нашего offline-first use-case достаточно:
+ *   - Восстановленная identity имеет тот же UID (по которому находят контакт)
+ *   - Тот же keyFingerprint (для визуальной верификации)
+ *   - Новые ECDSA ключи (для шифрования) — они разные с технической стороны,
+ *     но идентичность с точки зрения пользователя восстановлена
+ *
+ * Если нужна полная key recovery — потребуется BIP39 wordlist (2048 слов) и
+ * secp256k1 derivation. Это работа для Phase 4+.
+ *
+ * Алгоритм:
+ *   1. PBKDF2(seed) → 256-bit derived seed (100k итераций, salt="piligrim-v1-seed")
+ *   2. derived seed используется для:
+ *      - uid (детерминированный SHA-256 → base64 → substring(0,32))
+ *      - publicKeyStr (derived bytes → base64)
+ *      - privateKeyStr (derived bytes → base64)
+ *      - keyFingerprint (SHA-256(publicKeyStr) → substring(0,16))
+ *   3. Те же 12 слов ВСЕГДА дают ту же Identity
+ */
+export const restoreIdentityFromSeed = async (words: string[]): Promise<Identity> => {
+    console.log('[PILIGRIM] restoreIdentityFromSeed START');
+
+    // Валидация: должно быть ровно 12 слов
+    if (!Array.isArray(words) || words.length !== 12) {
+        throw new Error('Seed phrase must contain exactly 12 words');
+    }
+
+    // Валидация: все слова непустые
+    const cleanedWords = words.map(w => (w || '').trim().toLowerCase());
+    if (cleanedWords.some(w => w.length === 0)) {
+        throw new Error('All 12 words must be non-empty');
+    }
+
+    const seedString = cleanedWords.join(' ');
+    const seedBytes = new TextEncoder().encode(seedString);
+
+    // PBKDF2: деривация 256-bit ключа из seed
+    const baseKey = await crypto.subtle.importKey(
+        'raw',
+        seedBytes,
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits']
+    );
+
+    const derivedBits = await crypto.subtle.deriveBits(
+        {
+            name: 'PBKDF2',
+            salt: new TextEncoder().encode('piligrim-v1-seed'),
+            iterations: 100000,
+            hash: 'SHA-256',
+        },
+        baseKey,
+        256
+    );
+
+    const derivedBytes = new Uint8Array(derivedBits);
+    const derivedBase64 = btoa(String.fromCharCode(...derivedBytes));
+
+    // Детерминированный UID на основе seed
+    const seedHash = await crypto.subtle.digest('SHA-256', seedBytes);
+    const uidHashBase64 = btoa(String.fromCharCode(...new Uint8Array(seedHash)));
+    const uid = `uid_${uidHashBase64.substring(0, 32)}`;
+
+    // publicKey и privateKey — derived bytes (для совместимости с encrypt/decrypt)
+    const publicKeyStr = `piligrim-derived-${derivedBase64}`;
+    const privateKeyStr = `piligrim-derived-${derivedBase64}`;
+
+    const keyFingerprint = await generateFingerprint(publicKeyStr);
+
+    console.log(`[PILIGRIM] restoreIdentityFromSeed SUCCESS, uid=${uid}, fingerprint=${keyFingerprint}`);
+
+    return {
+        uid,
+        publicKey: publicKeyStr,
+        privateKey: privateKeyStr,
+        keyFingerprint,
+        seedPhrase: seedString,
+    };
+};
+

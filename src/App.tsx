@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
+import { RestoreIdentity } from './components/RestoreIdentity';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import VerifyModal from './components/VerifyModal';
@@ -31,6 +32,8 @@ const App: React.FC = () => {
   });
   const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
+  // v3.0 Restore Identity: переключатель между Create и Restore screens
+  const [authView, setAuthView] = useState<'create' | 'restore'>('create');
 
   // v1.5.2 Stage 1: локальные списки (без useLocalStorage, чтобы не нарушать правила хуков)
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -380,7 +383,30 @@ const App: React.FC = () => {
   }
 
   if (!identity) {
-    return <CreateIdentity onCreateIdentity={handleCreateIdentity} />;
+    // v3.0 Restore Identity: выбор между созданием новой личности и восстановлением
+    if (authView === 'restore') {
+      return (
+        <RestoreIdentity
+          onRestore={(restoredIdentity: Identity) => {
+            console.log('[PILIGRIM] Identity restored from seed phrase, uid=', restoredIdentity.uid);
+            try {
+              localStorage.setItem('piligrim-identity', JSON.stringify(restoredIdentity));
+            } catch (e) {
+              console.error('[PILIGRIM] Failed to save restored identity to localStorage:', e);
+            }
+            setIdentity(restoredIdentity);
+            setAuthView('create');
+          }}
+          onBack={() => setAuthView('create')}
+        />
+      );
+    }
+    return (
+      <CreateIdentity
+        onCreateIdentity={handleCreateIdentity}
+        onRestore={() => setAuthView('restore')}
+      />
+    );
   }
 
   // v3.0 Phase 2B-1: Responsive Layout Shell

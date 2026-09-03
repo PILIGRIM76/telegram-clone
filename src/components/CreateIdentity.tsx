@@ -6,9 +6,10 @@ import FeaturesList from './FeaturesList';
 
 interface CreateIdentityProps {
   onCreateIdentity: () => void;
+  onRestore?: () => void;
 }
 
-const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity }) => {
+const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRestore }) => {
   const { language, t } = useTranslation();
 
   return (
@@ -86,18 +87,22 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity }) => 
           {t('create_identity_btn')}
         </button>
 
-        {/* Login stub — offline-first, серверной auth нет */}
+        {/* v3.0 Restore Identity: открыть экран восстановления через 12 seed-слов */}
         <button
           type="button"
           onClick={() => {
-            alert(
-              language === 'ru'
-                ? 'Вход по паролю в разработке. В текущей версии используйте "Создать безопасную личность" — ваша идентичность хранится только на этом устройстве.'
-                : 'Password login is in development. Use "Create Secure Identity" — your identity is stored only on this device.'
-            );
+            if (onRestore) {
+              onRestore();
+            } else {
+              alert(
+                language === 'ru'
+                  ? 'Вход по паролю в разработке. Используйте "Создать безопасную личность" — ваша идентичность хранится только на этом устройстве.'
+                  : 'Password login is in development. Use "Create Secure Identity" — your identity is stored only on this device.'
+              );
+            }
           }}
-          data-testid="login-stub-btn"
-          aria-label="Login stub"
+          data-testid="restore-identity-btn"
+          aria-label="Restore identity from seed phrase"
           style={{
             width: '100%',
             padding: '12px 20px',
