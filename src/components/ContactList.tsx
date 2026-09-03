@@ -58,6 +58,16 @@ const ContactList: React.FC<ContactListProps> = ({
     console.log('🔔 [ContactList] isContactModalOpen changed:', isContactModalOpen);
   }, [isContactModalOpen]);
 
+  // v3.0 Phase 2C: слушаем кастомное событие от FAB для открытия AddContactModal
+  useEffect(() => {
+    const handler = () => {
+      console.log('[PILIGRIM] ContactList: received FAB event, opening AddContactModal');
+      setIsContactModalOpen(true);
+    };
+    window.addEventListener('piligrim:open-add-contact', handler);
+    return () => window.removeEventListener('piligrim:open-add-contact', handler);
+  }, []);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

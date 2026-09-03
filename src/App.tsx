@@ -23,6 +23,8 @@ import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { FloatingActionButton } from './components/FloatingActionButton';
 import { useLogout } from './hooks/useLogout';
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
+import { CallsHistoryView } from './components/CallsHistoryView';
+import { FavoritesView } from './components/FavoritesView';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -516,6 +518,7 @@ const App: React.FC = () => {
       </div>
 
       {/* v3.0 Phase 2B-1: ResponsiveShell - 3 breakpoints (mobile/tablet/desktop) */}
+      {activeTab === 'chats' && (
       <ResponsiveShell
         leftPanel={
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -660,10 +663,62 @@ const App: React.FC = () => {
         }
         fab={
           <FloatingActionButton
-            onClick={() => console.log('[PILIGRIM] New message (Phase 2C)')}
+            onClick={() => {
+              // v3.0 Phase 2C: FAB открывает AddContactModal через кастомное событие,
+              // которое слушает ContactList (он владеет модалкой внутри себя)
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              console.log('[PILIGRIM] FAB clicked: requested AddContactModal open');
+            }}
           />
         }
       />
+      )}
+
+      {/* v3.0 Phase 2C: вкладка Контакты — полноэкранный ContactList */}
+      {activeTab === 'contacts' && (
+        <div data-testid="contacts-tab-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--color-bg-primary)' } as React.CSSProperties}>
+          <LeftAppBar
+            title="Контакты"
+            onMenuClick={() => console.log('[PILIGRIM] Drawer (Phase 2D)')}
+            onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')}
+          />
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
+            <ContactList
+              identity={identity}
+              contacts={contacts}
+              groups={groups}
+              chats={chats}
+              selectedChatId={selectedChatId}
+              onSelectChat={(id) => { setActiveTab('chats'); handleSelectChat(id); }}
+              onAddContact={handleAddContact}
+              onCreateGroup={handleCreateGroup}
+              onMuteChat={handleMuteChat}
+              onArchiveChat={handleArchiveChat}
+              onOpenProfile={handleOpenProfile}
+              onOpenStore={handleOpenStore}
+              onOpenBoards={handleOpenBoards}
+            />
+          </div>
+          <TabletTabBar activeView={activeTab} onViewChange={setActiveTab} />
+        </div>
+      )}
+
+      {/* v3.0 Phase 2C: вкладка Звонки — CallsHistoryView с demo данными */}
+      {activeTab === 'calls' && (
+        <CallsHistoryView onViewChange={setActiveTab} />
+      )}
+
+      {/* v3.0 Phase 2C: вкладка Избранное — только verified контакты */}
+      {activeTab === 'favorites' && (
+        <FavoritesView
+          contacts={contacts}
+          onSelectContact={(uid) => {
+            setActiveTab('chats');
+            handleSelectChat(uid);
+          }}
+          onViewChange={setActiveTab}
+        />
+      )}
 
       {/* Batch 4: РјРѕРґР°Р»РєР° РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */}
       {showVerifyModal && selectedChatId && (() => {
