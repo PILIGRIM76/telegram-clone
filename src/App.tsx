@@ -16,6 +16,8 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTimeTheme } from './hooks/useTimeTheme';
 import { ResponsiveShell } from './components/ResponsiveShell';
+import { LeftAppBar } from './components/LeftAppBar';
+import { RightAppBar } from './components/RightAppBar';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -480,95 +482,136 @@ const App: React.FC = () => {
       {/* v3.0 Phase 2B-1: ResponsiveShell - 3 breakpoints (mobile/tablet/desktop) */}
       <ResponsiveShell
         leftPanel={
-          <ContactList
-            identity={identity}
-            contacts={contacts}
-            groups={groups}
-            chats={chats}
-            selectedChatId={selectedChatId}
-            onSelectChat={handleSelectChat}
-            onAddContact={handleAddContact}
-            onCreateGroup={handleCreateGroup}
-            onMuteChat={handleMuteChat}
-            onArchiveChat={handleArchiveChat}
-            onOpenProfile={handleOpenProfile}
-            onOpenStore={handleOpenStore}
-            onOpenBoards={handleOpenBoards}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            {/* Phase 2B-2: LeftAppBar — burger + "Чаты" + search */}
+            <LeftAppBar
+              onMenuClick={() => console.log('[PILIGRIM] Drawer open (Phase 2D)')}
+              onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')}
+            />
+            {/* Scrollable ContactList area */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <ContactList
+                identity={identity}
+                contacts={contacts}
+                groups={groups}
+                chats={chats}
+                selectedChatId={selectedChatId}
+                onSelectChat={handleSelectChat}
+                onAddContact={handleAddContact}
+                onCreateGroup={handleCreateGroup}
+                onMuteChat={handleMuteChat}
+                onArchiveChat={handleArchiveChat}
+                onOpenProfile={handleOpenProfile}
+                onOpenStore={handleOpenStore}
+                onOpenBoards={handleOpenBoards}
+              />
+            </div>
+          </div>
         }
         rightPanel={
-          selectedChatId ? (
-            <ChatWindow
-              chatId={selectedChatId}
-              messages={chats[selectedChatId]?.messages || []}
-              onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
-              partner={(() => {
-                const c = contacts.find((c) => c.id === selectedChatId);
-                if (c) return c;
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            {/* Phase 2B-2: RightAppBar — avatar + name + status + 3 icons */}
+            <RightAppBar
+              contactName={(() => {
+                if (!selectedChatId) return undefined;
+                const c = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+                if (c) return c.name;
                 const g = groups.find((g) => g.id === selectedChatId);
-                if (g) return { name: g.name };
+                if (g) return g.name;
                 return undefined;
               })()}
-              currentUserUid={identity?.uid}
-              onStartCall={() => {
-                const target = contacts.find((c) => c.id === selectedChatId);
+              contactUid={selectedChatId || undefined}
+              isOnline={wsStatus === 'open'}
+              showBack={!!selectedChatId}
+              onBackClick={() => setSelectedChatId(null)}
+              onCallClick={() => {
+                const target = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
                 if (target && target.uid) {
-                  console.log(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
+                  console.log(`[PILIGRIM] Stage 6: audio call to ${target.name} (${target.uid})`);
                   webrtcHook.startCall(target.uid);
                 } else {
                   alert('Contact not found or has no UID');
                 }
               }}
-              callState={
-                webrtcHook.isInCall
-                  ? 'in-call'
-                  : webrtcHook.isCalling
-                    ? 'calling'
-                  : webrtcHook.incomingCall
-                    ? 'incoming'
-                  : 'idle'
-              }
-              mutedUntil={chats[selectedChatId]?.mutedUntil}
-              onVerifyContact={() => setShowVerifyModal(true)}
+              onVideoClick={() => console.log('[PILIGRIM] Video call (Phase 2F)')}
+              onMenuClick={() => console.log('[PILIGRIM] Chat menu (Phase 2C)')}
             />
-          ) : (
+            {/* Scrollable content area */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {selectedChatId && chats[selectedChatId] ? (
+                <ChatWindow
+                  chatId={selectedChatId}
+                  messages={chats[selectedChatId]?.messages || []}
+                  onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
+                  partner={(() => {
+                    const c = contacts.find((c) => c.id === selectedChatId);
+                    if (c) return c;
+                    const g = groups.find((g) => g.id === selectedChatId);
+                    if (g) return { name: g.name };
+                    return undefined;
+                  })()}
+                  currentUserUid={identity?.uid}
+                  onStartCall={() => {
+                    const target = contacts.find((c) => c.id === selectedChatId);
+                    if (target && target.uid) {
+                      console.log(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
+                      webrtcHook.startCall(target.uid);
+                    } else {
+                      alert('Contact not found or has no UID');
+                    }
+                  }}
+                  callState={
+                    webrtcHook.isInCall
+                      ? 'in-call'
+                      : webrtcHook.isCalling
+                        ? 'calling'
+                      : webrtcHook.incomingCall
+                        ? 'incoming'
+                      : 'idle'
+                  }
+                  mutedUntil={chats[selectedChatId]?.mutedUntil}
+                  onVerifyContact={() => setShowVerifyModal(true)}
+                />
+              ) : (
             <div style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-secondary)',
-              padding: '24px'
-            }}>
-              <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
-                Welcome to PILIGRIM
-              </p>
-              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
-                Select a contact on the left or add a new one with <strong>+</strong>
-              </p>
-              <button
-                onClick={handleLogout}
-                aria-label="Logout"
-                style={{
-                  marginTop: '1rem',
-                  padding: '0.5rem 1rem',
-                  background: 'rgba(220, 38, 38, 0.8)',
-                  color: 'white',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                Logout
-              </button>
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-text-secondary)',
+                  padding: '24px'
+                }}>
+                  <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
+                    Welcome to PILIGRIM
+                  </p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
+                    Select a contact on the left or add a new one with <strong>+</strong>
+                  </p>
+                  <button
+                    onClick={handleLogout}
+                    aria-label="Logout"
+                    style={{
+                      marginTop: '1rem',
+                      padding: '0.5rem 1rem',
+                      background: 'rgba(220, 38, 38, 0.8)',
+                      color: 'white',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Logout
+                  </button>
 
-              {showFeatures && (
-                <FeaturesList lang={language} />
+                  {showFeatures && (
+                    <FeaturesList lang={language} />
+                  )}
+                </div>
               )}
             </div>
-          )
+          </div>
         }
       />
 
