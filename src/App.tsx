@@ -21,6 +21,8 @@ import { LeftAppBar } from './components/LeftAppBar';
 import { RightAppBar } from './components/RightAppBar';
 import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { FloatingActionButton } from './components/FloatingActionButton';
+import { useLogout } from './hooks/useLogout';
+import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -38,6 +40,10 @@ const App: React.FC = () => {
   const [authView, setAuthView] = useState<'create' | 'restore'>('create');
   // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
   const [activeTab, setActiveTab] = useState<TabView>('chats');
+  // v3.0 Logout: модалка подтверждения выхода из аккаунта
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  // v3.0 Logout: hook для очистки identity + WebSocket + reload
+  const logout = useLogout({ clearData: false });
 
   // v1.5.2 Stage 1: локальные списки (без useLocalStorage, чтобы не нарушать правила хуков)
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -564,7 +570,7 @@ const App: React.FC = () => {
                 }
               }}
               onVideoClick={() => console.log('[PILIGRIM] Video call (Phase 2F)')}
-              onMenuClick={() => console.log('[PILIGRIM] Chat menu (Phase 2C)')}
+              onMenuClick={() => setShowLogoutModal(true)}
             />
             {/* Scrollable content area */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -678,6 +684,17 @@ const App: React.FC = () => {
 
       {/* Batch 4: Toast notifications */}
       <Toasts toasts={toasts} onDismiss={dismissToast} />
+
+      {/* v3.0 Logout: модалка подтверждения выхода (вызывается из RightAppBar ⋮) */}
+      <ConfirmLogoutModal
+        isOpen={showLogoutModal}
+        identityUid={identity?.uid}
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={() => {
+          setShowLogoutModal(false);
+          logout();
+        }}
+      />
 
       {/* v3.0 Phase 1: theme indicator (правый нижний угол) */}
       <div
