@@ -19,6 +19,8 @@ import { useTimeTheme } from './hooks/useTimeTheme';
 import { ResponsiveShell } from './components/ResponsiveShell';
 import { LeftAppBar } from './components/LeftAppBar';
 import { RightAppBar } from './components/RightAppBar';
+import { TabletTabBar, type TabView } from './components/TabletTabBar';
+import { FloatingActionButton } from './components/FloatingActionButton';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -34,6 +36,8 @@ const App: React.FC = () => {
   const [showSeedModal, setShowSeedModal] = useState(false);
   // v3.0 Restore Identity: переключатель между Create и Restore screens
   const [authView, setAuthView] = useState<'create' | 'restore'>('create');
+  // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
+  const [activeTab, setActiveTab] = useState<TabView>('chats');
 
   // v1.5.2 Stage 1: локальные списки (без useLocalStorage, чтобы не нарушать правила хуков)
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -638,6 +642,20 @@ const App: React.FC = () => {
               )}
             </div>
           </div>
+        }
+        tabBar={
+          <TabletTabBar
+            activeView={activeTab}
+            onViewChange={(view) => {
+              console.log('[PILIGRIM] Tab changed to:', view);
+              setActiveTab(view);
+            }}
+          />
+        }
+        fab={
+          <FloatingActionButton
+            onClick={() => console.log('[PILIGRIM] New message (Phase 2C)')}
+          />
         }
       />
 
