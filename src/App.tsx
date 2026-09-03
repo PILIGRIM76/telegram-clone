@@ -15,6 +15,7 @@ import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTimeTheme } from './hooks/useTimeTheme';
+import { ResponsiveShell } from './components/ResponsiveShell';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -380,10 +381,12 @@ const App: React.FC = () => {
     return <CreateIdentity onCreateIdentity={handleCreateIdentity} />;
   }
 
-  // v1.5.2 Stage 1: РґРІСѓС…РєРѕР»РѕРЅРѕС‡РЅС‹Р№ layout вЂ” ContactList СЃР»РµРІР°, Р·Р°РіР»СѓС€РєР° С‡Р°С‚Р° СЃРїСЂР°РІР°
+  // v3.0 Phase 2B-1: Responsive Layout Shell
+  // 3 breakpoints: mobile (<=640), tablet (641-1024), desktop (>1024).
+  // On RT9 (800x1280) -> tablet — two-column 30%/70% layout.
   return (
-    <div style={{ display: 'flex', height: '100%', width: '100%', background: '#0f172a', color: '#e2e8f0', position: 'relative' }}>
-{/* Batch 5: language switcher (левый верхний угол) */}
+    <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--color-bg-primary)', color: 'var(--color-text-primary)', position: 'relative' }}>
+{/* Batch 5: language switcher (left top corner) */}
       <div
         data-testid="language-switcher"
         style={{
@@ -474,100 +477,100 @@ const App: React.FC = () => {
         </span>
       </div>
 
-      {/* Р›РµРІР°СЏ РєРѕР»РѕРЅРєР°: ContactList */}
-      <div style={{ width: '320px', minWidth: '320px', borderRight: '1px solid #334155' }}>
-        <ContactList
-          identity={identity}
-          contacts={contacts}
-          groups={groups}
-          chats={chats}
-          selectedChatId={selectedChatId}
-          onSelectChat={handleSelectChat}
-          onAddContact={handleAddContact}
-          onCreateGroup={handleCreateGroup}
-          onMuteChat={handleMuteChat}
-          onArchiveChat={handleArchiveChat}
-          onOpenProfile={handleOpenProfile}
-          onOpenStore={handleOpenStore}
-          onOpenBoards={handleOpenBoards}
-        />
-      </div>
-
-      {/* РџСЂР°РІР°СЏ РєРѕР»РѕРЅРєР°: ChatWindow РёР»Рё placeholder */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {selectedChatId ? (
-          <ChatWindow
-            chatId={selectedChatId}
-            messages={chats[selectedChatId]?.messages || []}
-            onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
-            partner={(() => {
-              const c = contacts.find((c) => c.id === selectedChatId);
-              if (c) return c;
-              const g = groups.find((g) => g.id === selectedChatId);
-              if (g) return { name: g.name };
-              return undefined;
-            })()}
-            currentUserUid={identity?.uid}
-            onStartCall={() => {
-              const target = contacts.find((c) => c.id === selectedChatId);
-              if (target && target.uid) {
-                console.log(`рџ“ћ [PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
-                webrtcHook.startCall(target.uid);
-              } else {
-                alert('РљРѕРЅС‚Р°РєС‚ РЅРµ РЅР°Р№РґРµРЅ РёР»Рё РЅРµ РёРјРµРµС‚ UID');
-              }
-            }}
-            callState={
-              webrtcHook.isInCall
-                ? 'in-call'
-                : webrtcHook.isCalling
-                  ? 'calling'
-                : webrtcHook.incomingCall
-                  ? 'incoming'
-                : 'idle'
-            }
-            mutedUntil={chats[selectedChatId]?.mutedUntil}
-            onVerifyContact={() => setShowVerifyModal(true)}
+      {/* v3.0 Phase 2B-1: ResponsiveShell - 3 breakpoints (mobile/tablet/desktop) */}
+      <ResponsiveShell
+        leftPanel={
+          <ContactList
+            identity={identity}
+            contacts={contacts}
+            groups={groups}
+            chats={chats}
+            selectedChatId={selectedChatId}
+            onSelectChat={handleSelectChat}
+            onAddContact={handleAddContact}
+            onCreateGroup={handleCreateGroup}
+            onMuteChat={handleMuteChat}
+            onArchiveChat={handleArchiveChat}
+            onOpenProfile={handleOpenProfile}
+            onOpenStore={handleOpenStore}
+            onOpenBoards={handleOpenBoards}
           />
-        ) : (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#64748b',
-            padding: '24px'
-          }}>
-            <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Пустой чат">
-              👋 Добро пожаловать в PILIGRIM
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#475569', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
-              Выберите контакт слева или добавьте нового, нажав <strong style={{ color: '#94a3b8' }}>+</strong>
-            </p>
-            <button
-              onClick={handleLogout}
-              aria-label="Выйти из аккаунта"
-              style={{
-                marginTop: '1rem',
-                padding: '0.5rem 1rem',
-                background: 'rgba(220, 38, 38, 0.8)',
-                color: 'white',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                border: 'none',
-                cursor: 'pointer'
+        }
+        rightPanel={
+          selectedChatId ? (
+            <ChatWindow
+              chatId={selectedChatId}
+              messages={chats[selectedChatId]?.messages || []}
+              onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
+              partner={(() => {
+                const c = contacts.find((c) => c.id === selectedChatId);
+                if (c) return c;
+                const g = groups.find((g) => g.id === selectedChatId);
+                if (g) return { name: g.name };
+                return undefined;
+              })()}
+              currentUserUid={identity?.uid}
+              onStartCall={() => {
+                const target = contacts.find((c) => c.id === selectedChatId);
+                if (target && target.uid) {
+                  console.log(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
+                  webrtcHook.startCall(target.uid);
+                } else {
+                  alert('Contact not found or has no UID');
+                }
               }}
-            >
-              Выйти из аккаунта
-            </button>
+              callState={
+                webrtcHook.isInCall
+                  ? 'in-call'
+                  : webrtcHook.isCalling
+                    ? 'calling'
+                  : webrtcHook.incomingCall
+                    ? 'incoming'
+                  : 'idle'
+              }
+              mutedUntil={chats[selectedChatId]?.mutedUntil}
+              onVerifyContact={() => setShowVerifyModal(true)}
+            />
+          ) : (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text-secondary)',
+              padding: '24px'
+            }}>
+              <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
+                Welcome to PILIGRIM
+              </p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
+                Select a contact on the left or add a new one with <strong>+</strong>
+              </p>
+              <button
+                onClick={handleLogout}
+                aria-label="Logout"
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.5rem 1rem',
+                  background: 'rgba(220, 38, 38, 0.8)',
+                  color: 'white',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Logout
+              </button>
 
-            {showFeatures && (
-              <FeaturesList lang={language} />
-            )}
-          </div>
-        )}
-      </div>
+              {showFeatures && (
+                <FeaturesList lang={language} />
+              )}
+            </div>
+          )
+        }
+      />
 
       {/* Batch 4: РјРѕРґР°Р»РєР° РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */}
       {showVerifyModal && selectedChatId && (() => {
