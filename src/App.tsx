@@ -25,6 +25,7 @@ import { useLogout } from './hooks/useLogout';
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import { CallsHistoryView } from './components/CallsHistoryView';
 import { FavoritesView } from './components/FavoritesView';
+import { Drawer } from './components/Drawer';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -44,6 +45,16 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabView>('chats');
   // v3.0 Logout: модалка подтверждения выхода из аккаунта
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  // v3.0 Phase 2D: Drawer (боковая штора профиля)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
+  // для открытия Drawer через window event (loose coupling)
+  useEffect(() => {
+    const handler = () => setIsDrawerOpen(true);
+    window.addEventListener('piligrim:open-drawer', handler);
+    return () => window.removeEventListener('piligrim:open-drawer', handler);
+  }, []);
   // v3.0 Logout: hook для очистки identity + WebSocket + reload
   const logout = useLogout({ clearData: false });
 
@@ -524,7 +535,7 @@ const App: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
             {/* Phase 2B-2: LeftAppBar — burger + "Чаты" + search */}
             <LeftAppBar
-              onMenuClick={() => console.log('[PILIGRIM] Drawer open (Phase 2D)')}
+              onMenuClick={() => setIsDrawerOpen(true)}
               onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')}
             />
             {/* Scrollable ContactList area */}
@@ -739,6 +750,19 @@ const App: React.FC = () => {
 
       {/* Batch 4: Toast notifications */}
       <Toasts toasts={toasts} onDismiss={dismissToast} />
+
+      {/* v3.0 Phase 2D: Drawer (боковая штора профиля + QR-код) */}
+      <Drawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        identity={identity}
+        lang={language}
+        onToggleLang={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
+        onLogout={() => {
+          setIsDrawerOpen(false);
+          setShowLogoutModal(true);
+        }}
+      />
 
       {/* v3.0 Logout: модалка подтверждения выхода (вызывается из RightAppBar ⋮) */}
       <ConfirmLogoutModal

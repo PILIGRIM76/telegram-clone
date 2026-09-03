@@ -31,7 +31,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ contacts, onSelect
 
   return (
     <div data-testid="favorites-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-primary)' } as React.CSSProperties}>
-      <LeftAppBar title="РР·Р±СЂР°РЅРЅРѕРµ" onMenuClick={() => console.log('[PILIGRIM] Drawer (Phase 2D)')} onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')} />
+      <LeftAppBar title="РР·Р±СЂР°РЅРЅРѕРµ" onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))} onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')} />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
         {favorites.length === 0 ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', gap: 12, padding: 24, textAlign: 'center' } as React.CSSProperties}>

@@ -43,7 +43,7 @@ const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
 export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange }) => {
   return (
     <div data-testid="calls-history-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-primary)' } as React.CSSProperties}>
-      <LeftAppBar title="Р—РІРѕРЅРєРё" onMenuClick={() => console.log('[PILIGRIM] Drawer (Phase 2D)')} onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')} />
+      <LeftAppBar title="Р—РІРѕРЅРєРё" onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))} onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')} />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
         {DEMO_CALLS.length === 0 ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', gap: 12, padding: 24, textAlign: 'center' } as React.CSSProperties}>
