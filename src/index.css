@@ -100,11 +100,7 @@ body.theme-night {
   --shadow-modal: 0px 20px 60px rgba(0, 0, 0, 0.7);
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Базовая тёмная тема (как на эталонном скриншоте) */
+/* Базовая тёмная тема (Phase 9.5) */
 html, body, #root {
   height: 100%;
 }

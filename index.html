@@ -15,28 +15,8 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PILIGRIM</title>
-    <style>
-      /* Простая стилизация полосы прокрутки для более современного вида */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b; /* slate-800 */
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569; /* slate-600 */
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; /* slate-500 */
-      }
-      /* Phase 8.3: pulse animation for screen sharing badge */
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-      }
-    </style>
+    <!-- Phase 9.5 fix: inline <style> удалён — перенесён в src/index.css.
+         Vite html-proxy не работает с inline CSS при наличии vite-plugin-pwa. -->
     <script>
       // Phase 9.5 fix: simple-peer и некоторые Node.js полифиллы ожидают `require` и `global`.
       // В браузере/Capacitor WebView их нет. Определяем no-op shim ДО загрузки bundle.
