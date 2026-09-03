@@ -14,6 +14,7 @@ import { generateIdentity, encrypt } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
+import { useTimeTheme } from './hooks/useTimeTheme';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -265,6 +266,8 @@ const App: React.FC = () => {
 
   // v1.5.2 Stage 6: WebRTC hook вЂ” РґР»СЏ Р·РІРѕРЅРєРѕРІ Рё РґРµРјРѕРЅСЃС‚СЂР°С†РёРё СЌРєСЂР°РЅР°.
   const webrtcHook = useWebRTC(identity?.uid || '');
+  // v3.0 Phase 1: time-based theme (morning/day/evening/night)
+  const theme = useTimeTheme();
 
   const handleSelectChat = (id: string) => {
     console.log('[PILIGRIM] handleSelectChat:', id);
@@ -585,6 +588,32 @@ const App: React.FC = () => {
 
       {/* Batch 4: Toast notifications */}
       <Toasts toasts={toasts} onDismiss={dismissToast} />
+
+      {/* v3.0 Phase 1: theme indicator (правый нижний угол) */}
+      <div
+        data-testid="theme-indicator"
+        style={{
+          position: 'fixed',
+          bottom: '12px',
+          right: '12px',
+          padding: '4px 10px',
+          backgroundColor: 'var(--color-bg-elevated)',
+          color: 'var(--color-text)',
+          border: '1px solid var(--color-surface)',
+          borderRadius: '12px',
+          fontSize: '11px',
+          fontWeight: 600,
+          zIndex: 100,
+          boxShadow: 'var(--shadow-sm)'
+        }}
+        title="Адаптивная тема по времени суток"
+        aria-label="Текущая тема"
+      >
+        {theme === 'morning' && '🌅 Утро'}
+        {theme === 'day' && '☀️ День'}
+        {theme === 'evening' && '🌆 Вечер'}
+        {theme === 'night' && '🌙 Ночь'}
+      </div>
     </div>
   );
 };
