@@ -42,7 +42,10 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, identity, onLog
 
   useEffect(() => {
     if (identity && showQr && !qrDataUrl) {
-      const payload = JSON.stringify({ v: 'piligrim-identity-v1', uid: identity.uid });
+      const payloadObj: { v: string; uid: string; publicKey?: string } = { v: 'piligrim-contact-v2', uid: identity.uid };
+      const pk = (identity as { publicKey?: string }).publicKey;
+      if (pk) payloadObj.publicKey = pk;
+      const payload = JSON.stringify(payloadObj);
       QRCode.toDataURL(payload, { width: 200, margin: 2, color: { dark: '#1C1816', light: '#FCF9F7' } })
         .then(setQrDataUrl)
         .catch((err: unknown) => console.error('[PILIGRIM] QR generation failed:', err));

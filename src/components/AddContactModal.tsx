@@ -5,6 +5,7 @@ import { apiService } from '../services/apiService';
 import { ShoppingBagIcon } from './icons/ShoppingBagIcon';
 import PaymentModal from './PaymentModal';
 import AddAnnouncementModal from './AddAnnouncementModal';
+import { QRScannerModal, type ScannedIdentity } from './QRScannerModal';
 import AnnouncementPaymentModal from './AnnouncementPaymentModal';
 
 interface AddContactModalProps {
@@ -30,6 +31,8 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isAdPaymentModalOpen, setIsAdPaymentModalOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  // v3.0 Phase 4: QR scanner modal
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [adTxid, setAdTxid] = useState<string|undefined>(undefined);
 
   const performSearch = async () => {
@@ -91,6 +94,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAddContact
                         className="flex-1 bg-slate-700 p-2 rounded text-white"
                    />
                    <button onClick={performSearch} className="bg-cyan-600 px-4 rounded text-white">Search</button>
+                    <button onClick={() => setIsScannerOpen(true)} data-testid="addcontact-scan-qr" className="bg-slate-700 px-4 rounded text-white" title="Scan QR">Scan QR</button>
                </div>
                {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
            </div>
