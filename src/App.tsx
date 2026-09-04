@@ -23,6 +23,9 @@ import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { FloatingActionButton } from './components/FloatingActionButton';
 // v3.0 Phase 2G: mobile floating circle nav
 import { FloatingCircleNav } from './components/FloatingCircleNav';
+// v3.0 Phase 2H: desktop joystick + profile panel
+import { DesktopJoystick } from './components/DesktopJoystick';
+import { ProfilePanel } from './components/ProfilePanel';
 import { useLogout } from './hooks/useLogout';
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import { CallsHistoryView } from './components/CallsHistoryView';
@@ -52,6 +55,8 @@ const App: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   // v3.0 Phase 2E: Search modal (Ctrl+K command palette)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // v3.0 Phase 2H: Profile panel (3rd desktop panel)
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
   // для открытия Drawer через window event (loose coupling)
@@ -610,6 +615,8 @@ const App: React.FC = () => {
               }}
               onVideoClick={() => console.log('[PILIGRIM] Video call (Phase 2F)')}
               onMenuClick={() => setShowLogoutModal(true)}
+              // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel
+              onAvatarClick={() => setIsProfileOpen(true)}
             />
             {/* Scrollable content area */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -717,6 +724,36 @@ const App: React.FC = () => {
               console.log('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
             }}
           />
+        }
+        // v3.0 Phase 2H: desktop joystick (фиксированный слева)
+        desktopNav={
+          <DesktopJoystick
+            activeView={activeTab}
+            onViewChange={setActiveTab}
+            onCompose={() => {
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              console.log('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
+            }}
+          />
+        }
+        // v3.0 Phase 2H: 3rd panel on desktop — открывается по клику на аватар в RightAppBar
+        profilePanel={
+          (() => {
+            if (!isProfileOpen || !selectedChatId) return undefined;
+            const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+            if (!partner) return undefined;
+            return (
+              <ProfilePanel
+                contactName={partner.name}
+                contactUid={partner.uid}
+                isOnline={wsStatus === 'open'}
+                onCall={() => console.log('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
+                onVideo={() => console.log('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
+                onSearch={() => setIsSearchOpen(true)}
+                onClose={() => setIsProfileOpen(false)}
+              />
+            );
+          })()
         }
       />
       )}

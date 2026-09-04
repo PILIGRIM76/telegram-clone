@@ -15,6 +15,8 @@ interface RightAppBarProps {
   onMenuClick?: () => void;
   onBackClick?: () => void;
   showBack?: boolean;
+  // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel (desktop)
+  onAvatarClick?: () => void;
 }
 
 const iconButtonStyle: React.CSSProperties = {
@@ -48,6 +50,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
   onMenuClick,
   onBackClick,
   showBack = false,
+  onAvatarClick,
 }) => {
   const hasContact = !!contactUid;
 
@@ -81,11 +84,28 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
           </button>
         )}
 
-        {hasContact && <AnimatedAvatar name={contactName} size={36} />}
+        {hasContact && (
+          <button
+            onClick={onAvatarClick}
+            aria-label="Открыть профиль"
+            data-testid="right-app-bar-avatar-btn"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              borderRadius: '50%',
+              flexShrink: 0,
+            } as React.CSSProperties}
+          >
+            <AnimatedAvatar name={contactName} size={36} />
+          </button>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } as React.CSSProperties}>
           <div
             data-testid="right-app-bar-name"
+            onClick={onAvatarClick}
             style={{
               fontSize: 18,
               fontWeight: 600,
@@ -94,6 +114,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              cursor: onAvatarClick ? 'pointer' : 'default',
             } as React.CSSProperties}
           >
             {contactName}

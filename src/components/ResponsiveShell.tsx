@@ -79,7 +79,9 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         position: 'relative' as const,
       },
       left: {
+        // v3.0 Phase 2H: paddingLeft для joystick (48px + 8px left + 8px gap)
         width: 280,
+        paddingLeft: 64,
         background: 'var(--color-bg-primary)',
         borderRight: '1px solid rgba(0,0,0,0.05)',
         display: 'flex',
@@ -154,6 +156,21 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
       {/* v3.0 Phase 2G: mobile floating circle nav */}
       {mobileNav && bp === 'mobile' && (
         <div data-testid="mobile-nav">{mobileNav}</div>
+      )}
+
+      {/* v3.0 Phase 2H: desktop joystick */}
+      {desktopNav && bp === 'desktop' && (
+        <div data-testid="desktop-nav">{desktopNav}</div>
+      )}
+
+      {/* v3.0 Phase 2H: 3rd panel (profile) only on desktop */}
+      {profilePanel && bp === 'desktop' && (
+        <div
+          data-testid="profile-panel"
+          style={{ display: 'flex', flexShrink: 0 } as React.CSSProperties}
+        >
+          {profilePanel}
+        </div>
       )}
     </div>
   );
