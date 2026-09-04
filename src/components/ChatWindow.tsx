@@ -4,11 +4,13 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Message, Contact } from '../types';
+import { useImagePicker } from '../hooks/useImagePicker';
+import { AttachmentSheet } from './AttachmentSheet';
 
 interface ChatWindowProps {
   chatId: string;
   messages: Message[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[]) => void;
   /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РєРѕРЅС‚Р°РєС‚/РёРјСЏ РїР°СЂС‚РЅС‘СЂР° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ header */
   partner?: Contact | { name: string };
   /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: С‚РµРєСѓС‰РёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ (РґР»СЏ СЂР°Р·РґРµР»РµРЅРёСЏ СЃРІРѕРёС…/С‡СѓР¶РёС…) */
@@ -38,8 +40,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onVerifyContact
 }) => {
   const [draft, setDraft] = useState('');
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // v3.0 Phase 5: вложения фото
+  const { inputRef: fileInputRef, pendingImages, openPicker, handleFiles, removeImage, clearImages } = useImagePicker();
 
   // Stage 3: Р°РІС‚РѕСЃРєСЂРѕР»Р» Рє РїРѕСЃР»РµРґРЅРµРјСѓ СЃРѕРѕР±С‰РµРЅРёСЋ РїСЂРё РёР·РјРµРЅРµРЅРёРё СЃРїРёСЃРєР°
   useEffect(() => {
@@ -50,8 +55,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (e) e.preventDefault();
     const trimmed = draft.trim();
     if (!trimmed) return;
-    console.log(`[PILIGRIM] ChatWindow: send message to chatId=${chatId}, len=${trimmed.length}`);
-    onSendMessage(trimmed);
+    const atts = pendingImages.length > 0 ? pendingImages : undefined;
+    console.log(`[PILIGRIM] ChatWindow: send to chatId=${chatId}, len=${trimmed.length}, attachments=${pendingImages.length}`);
+    onSendMessage(trimmed, atts);
+    clearImages();
     setDraft('');
     inputRef.current?.focus();
   }, [draft, chatId, onSendMessage]);
@@ -253,6 +260,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 }}
               >
                 <div style={{ fontSize: '14px', lineHeight: 1.4 }}>{msg.text}</div>
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: msg.text ? 6 : 0 } as React.CSSProperties}>
+                    {msg.attachments.map((att) => (
+                      <img
+                        key={att.id}
+                        src={att.dataUrl}
+                        alt={att.name || 'attachment'}
+                        data-testid={'attachment-' + att.id}
+                        style={{ maxWidth: 180, maxHeight: 200, borderRadius: 8, display: 'block', objectFit: 'cover' } as React.CSSProperties}
+                      />
+                    ))}
+                  </div>
+                )}
                 <div
                   style={{
                     fontSize: '10px',
@@ -288,6 +308,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* v3.0 Phase 5: Media Carousel над input area */}
+      {pendingImages.length > 0 && (
+        <div data-testid="attachment-carousel" style={{ display: 'flex', gap: 8, padding: '8px 16px', borderTop: '1px solid rgba(0,0,0,0.04)', background: 'var(--color-surface)', overflowX: 'auto' } as React.CSSProperties}>
+          {pendingImages.map((img) => (
+            <div key={img.id} style={{ position: 'relative', flexShrink: 0 } as React.CSSProperties}>
+              <img src={img.dataUrl} alt={img.name} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover' } as React.CSSProperties} />
+              <button onClick={() => removeImage(img.id)} aria-label="Remove attachment" data-testid={'remove-attachment-' + img.id} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' } as React.CSSProperties}>
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AttachmentSheet isOpen={isSheetOpen} onClose={() => setIsSheetOpen(false)} onPick={openPicker} />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        data-testid="file-input"
+        onChange={(e) => handleFiles(e.target.files)}
+        style={{ display: 'none' } as React.CSSProperties}
+      />
+
       {/* Input */}
       <form
         onSubmit={handleSubmit}
@@ -300,6 +346,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           flexShrink: 0
         }}
       >
+        <button
+          type="button"
+          onClick={() => setIsSheetOpen(true)}
+          aria-label="Attach photo"
+          data-testid="attach-button"
+          title="Attach photo"
+          style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer', padding: '4px 8px', flexShrink: 0 } as React.CSSProperties}
+        >
+          📎
+        </button>
         <input
           ref={inputRef}
           type="text"

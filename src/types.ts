@@ -77,8 +77,11 @@ export interface Message {
   type?: 'user' | 'system' | 'read';
 
   // Медиа файлы
-  media?: string; // Base64 строка
+  media?: string; // Base64 строка (legacy single media)
   mediaType?: 'image' | 'video';
+
+  // v3.0 Phase 5: массив вложений (фото-галерея)
+  attachments?: { id: string; dataUrl: string; name: string }[];
 
   // Для исчезающих сообщений
   disappearIn?: number; // В секундах

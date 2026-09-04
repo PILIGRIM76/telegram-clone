@@ -327,7 +327,7 @@ const App: React.FC = () => {
   // v1.5.2 Stage 4: handleSendMessage вЂ” С€РёС„СЂСѓРµС‚ СЃРѕРѕР±С‰РµРЅРёРµ РїСѓР±Р»РёС‡РЅС‹Рј РєР»СЋС‡РѕРј РєРѕРЅС‚Р°РєС‚Р°
   // (RSA-OAEP) РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј РІ localStorage. Р•СЃР»Рё publicKey РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ вЂ”
   // РѕС‚РїСЂР°РІР»СЏРµРј РІ plaintext СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј (graceful fallback РґР»СЏ UX).
-  const handleSendMessage = async (chatId: string, text: string) => {
+  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
@@ -364,7 +364,8 @@ const App: React.FC = () => {
       isEncrypted,
       senderId: identity.uid,
       timestamp: new Date().toISOString(),
-      status: 'sent'
+      status: 'sent',
+      attachments: attachments && attachments.length > 0 ? attachments : undefined
     };
     console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
     setChats((prev) => {
@@ -614,7 +615,7 @@ const App: React.FC = () => {
                 <ChatWindow
                   chatId={selectedChatId}
                   messages={chats[selectedChatId]?.messages || []}
-                  onSendMessage={(text) => handleSendMessage(selectedChatId, text)}
+                  onSendMessage={(text, attachments) => handleSendMessage(selectedChatId, text, attachments)}
                   partner={(() => {
                     const c = contacts.find((c) => c.id === selectedChatId);
                     if (c) return c;
