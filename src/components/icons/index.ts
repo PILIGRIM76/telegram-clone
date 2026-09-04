@@ -26,4 +26,16 @@ export * from './ExclamationTriangleIcon';
 export * from './PaintBrushIcon';
 export * from './PaperClipIcon';
 export * from './ReplyIcon';
+export * from './ChatBubbleIcon';
+export * from './CallIcon';
+export * from './FavoriteIcon';
+export * from './LockIcon';
+export * from './SearchIcon';
+export * from './EyeIcon';
+export * from './EyeOffIcon';
+export * from './LogoutIcon';
+export * from './CheckIcon';
+export * from './DoubleCheckIcon';
+export * from './EmojiIcon';
+export * from './CameraIcon';
 
