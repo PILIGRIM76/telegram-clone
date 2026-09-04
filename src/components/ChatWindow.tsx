@@ -11,7 +11,7 @@ import { ContextMenu } from './ContextMenu';
 interface ChatWindowProps {
   chatId: string;
   messages: Message[];
-  onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[]) => void;
+  onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string) => void;
   /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РєРѕРЅС‚Р°РєС‚/РёРјСЏ РїР°СЂС‚РЅС‘СЂР° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ header */
   partner?: Contact | { name: string };
   /** РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: С‚РµРєСѓС‰РёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ (РґР»СЏ СЂР°Р·РґРµР»РµРЅРёСЏ СЃРІРѕРёС…/С‡СѓР¶РёС…) */
@@ -26,6 +26,10 @@ interface ChatWindowProps {
   mutedUntil?: number;
   /** Batch 4: РїРѕРєР°Р·Р°С‚СЊ РјРѕРґР°Р»РєСѓ РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */
   onVerifyContact?: () => void;
+  /** v3.0 Phase 3: удаление сообщения */
+  onDeleteMessage?: (messageId: string) => void;
+  /** v3.0 Phase 3: редактирование сообщения */
+  onEditMessage?: (messageId: string, newText: string) => void;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -38,9 +42,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onStartCall,
   callState = 'idle',
   mutedUntil,
-  onVerifyContact
+    onVerifyContact,
+  onDeleteMessage,
+  onEditMessage
 }) => {
   const [draft, setDraft] = useState('');
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   // v3.0 Phase 2F: context menu (right-click / long-press)
   const [ctx, setCtx] = useState<{ x: number; y: number; messageId: string } | null>(null);
@@ -59,12 +67,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     const trimmed = draft.trim();
     if (!trimmed) return;
     const atts = pendingImages.length > 0 ? pendingImages : undefined;
-    console.log(`[PILIGRIM] ChatWindow: send to chatId=${chatId}, len=${trimmed.length}, attachments=${pendingImages.length}`);
-    onSendMessage(trimmed, atts);
+    console.log(`[PILIGRIM] ChatWindow: send to chatId=${chatId}, len=${trimmed.length}, attachments=${pendingImages.length}, replyTo=${replyTo?.id || 'none'}`);
+    // v3.0 Phase 3: если редактируем сообщение — вызываем onEditMessage
+    if (editingId && onEditMessage) {
+      onEditMessage(editingId, trimmed);
+      setEditingId(null);
+    } else {
+      onSendMessage(trimmed, atts, replyTo?.id);
+    }
     clearImages();
     setDraft('');
+    setReplyTo(null);
     inputRef.current?.focus();
-  }, [draft, chatId, onSendMessage]);
+  }, [draft, chatId, onSendMessage, onEditMessage, editingId, replyTo, pendingImages]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -355,6 +370,55 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         style={{ display: 'none' } as React.CSSProperties}
       />
 
+      {/* v3.0 Phase 3: индикатор ответа на сообщение */}
+      {replyTo && (
+        <div
+          data-testid="reply-banner"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            backgroundColor: '#334155',
+            borderTop: '1px solid #475569',
+            borderRadius: '0 0 0 0',
+            cursor: 'default'
+          } as React.CSSProperties}
+        >
+          <span style={{ color: '#3b82f6', fontSize: '16px' }}>↩</span>
+          <span style={{ color: '#94a3b8', fontSize: '14px' }}>Ответ на:</span>
+          <span style={{ color: '#f1f5f9', fontSize: '14px', fontWeight: 600 }}>{replyTo.text}</span>
+          <button
+            type="button"
+            onClick={() => setReplyTo(null)}
+            data-testid="cancel-reply"
+            aria-label="Отменить ответ"
+            title="Отменить ответ"
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '16px', cursor: 'pointer' } as React.CSSProperties}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
+      {/* v3.0 Phase 3: индикатор редактирования */}
+      {editingId && (
+        <div
+          data-testid="edit-banner"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            backgroundColor: '#f59e0b1a',
+            borderBottom: '1px solid #f59e0b',
+            cursor: 'default'
+          } as React.CSSProperties}
+        >
+          <span style={{ color: '#f59e0b', fontSize: '16px' }}>✏</span>
+          <span style={{ color: '#f59e0b', fontSize: '14px' }}>Редактирование сообщения</span>
+        </div>
+      )}
       {/* Input */}
       <form
         onSubmit={handleSubmit}
@@ -425,7 +489,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           x={ctx.x}
           y={ctx.y}
           items={[
-            { id: 'reply', icon: '↩\uFE0F', label: 'Ответить', onClick: () => console.log('[PILIGRIM] Reply (Phase 3)') },
+            { id: 'reply', icon: '↩\uFE0F', label: 'Ответить', onClick: () => {
+                const msg = messages.find((m) => m.id === ctx.messageId);
+                if (msg) {
+                  setReplyTo(msg);
+                  setEditingId(null);
+                }
+                setCtx(null);
+            }},
             {
               id: 'copy',
               icon: '\u{1F4CB}',
@@ -439,7 +510,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 }
               }
             },
-            { id: 'edit', icon: '✏\uFE0F', label: 'Редактировать', onClick: () => console.log('[PILIGRIM] Edit (Phase 3)') },
+            { id: 'edit', icon: '✏\uFE0F', label: 'Редактировать', onClick: () => {
+                const msg = messages.find((m) => m.id === ctx.messageId);
+                if (msg && onEditMessage) {
+                  setEditingId(msg.id);
+                  setDraft(msg.text);
+                  setReplyTo(null);
+                  setCtx(null);
+                  inputRef.current?.focus();
+                }
+            }},
             {
               id: 'delete',
               icon: '\u{1F5D1}\uFE0F',
@@ -447,7 +527,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               dangerous: true,
               onClick: () => {
                 console.log('[PILIGRIM] Delete message:', ctx.messageId);
-                // TODO Phase 3: подключить удаление из state
+                if (onDeleteMessage) {
+                  onDeleteMessage(ctx.messageId);
+                }
+                setCtx(null);
               }
             }
           ]}

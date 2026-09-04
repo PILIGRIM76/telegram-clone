@@ -334,7 +334,7 @@ const App: React.FC = () => {
   // v1.5.2 Stage 4: handleSendMessage вЂ” С€РёС„СЂСѓРµС‚ СЃРѕРѕР±С‰РµРЅРёРµ РїСѓР±Р»РёС‡РЅС‹Рј РєР»СЋС‡РѕРј РєРѕРЅС‚Р°РєС‚Р°
   // (RSA-OAEP) РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј РІ localStorage. Р•СЃР»Рё publicKey РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ вЂ”
   // РѕС‚РїСЂР°РІР»СЏРµРј РІ plaintext СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј (graceful fallback РґР»СЏ UX).
-  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[]) => {
+  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
@@ -371,8 +371,9 @@ const App: React.FC = () => {
       isEncrypted,
       senderId: identity.uid,
       timestamp: new Date().toISOString(),
-      status: 'sent',
-      attachments: attachments && attachments.length > 0 ? attachments : undefined
+                  status: 'sent',
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      replyTo
     };
     console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
     setChats((prev) => {
@@ -398,8 +399,36 @@ const App: React.FC = () => {
         console.error('[PILIGRIM] WS: send failed', e);
       }
     } else {
-      console.log(`[PILIGRIM] WS offline, message saved locally only`);
+            console.log(`[PILIGRIM] WS offline, message saved locally only`);
     }
+  };
+  // v3.0 Phase 3: удаление сообщения из чата
+  const handleDeleteMessage = (chatId: string, messageId: string) => {
+    console.log('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
+    setChats((prev) => {
+      const updated = { ...prev };
+      if (!updated[chatId]) return prev;
+      updated[chatId] = {
+        ...updated[chatId],
+        messages: updated[chatId].messages.filter((m) => m.id !== messageId),
+      };
+      return updated;
+    });
+  };
+  // v3.0 Phase 3: редактирование сообщения (локальное изменение текста)
+  const handleEditMessage = (chatId: string, messageId: string, newText: string) => {
+    console.log('[PILIGRIM] handleEditMessage:', { chatId, messageId });
+    setChats((prev) => {
+      const updated = { ...prev };
+      if (!updated[chatId]) return prev;
+      updated[chatId] = {
+        ...updated[chatId],
+        messages: updated[chatId].messages.map((m) =>
+          m.id === messageId ? { ...m, text: newText, status: 'sent' } : m
+        ),
+      };
+      return updated;
+    });
   };
   const handleLogout = () => {
     localStorage.removeItem('piligrim-identity');
@@ -624,7 +653,7 @@ const App: React.FC = () => {
                 <ChatWindow
                   chatId={selectedChatId}
                   messages={chats[selectedChatId]?.messages || []}
-                  onSendMessage={(text, attachments) => handleSendMessage(selectedChatId, text, attachments)}
+                  onSendMessage={(text, attachments, replyTo) => handleSendMessage(selectedChatId, text, attachments, replyTo)}
                   partner={(() => {
                     const c = contacts.find((c) => c.id === selectedChatId);
                     if (c) return c;
@@ -633,6 +662,8 @@ const App: React.FC = () => {
                     return undefined;
                   })()}
                   currentUserUid={identity?.uid}
+                  onDeleteMessage={(messageId) => handleDeleteMessage(selectedChatId, messageId)}
+                  onEditMessage={(messageId, newText) => handleEditMessage(selectedChatId, messageId, newText)}
                   onStartCall={() => {
                     const target = contacts.find((c) => c.id === selectedChatId);
                     if (target && target.uid) {

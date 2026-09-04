@@ -90,11 +90,13 @@ export interface Message {
   // Для сложных данных (заказы, обновления, подарки)
   payload?: any;
 
-  // Phase 7.6 / Stage 4: E2EE (RSA-OAEP)
+    // Phase 7.6 / Stage 4: E2EE (RSA-OAEP)
   /** Зашифрованный текст (base64). Если есть — UI показывает иконку 🔒. */
   encryptedPayload?: string;
   /** Флаг: true если сообщение было зашифровано при отправке. */
   isEncrypted?: boolean;
+  /** v3.0 Phase 3: ID родительского сообщения, на которое данное является ответом */
+  replyTo?: string;
 }
 
 export interface Chat {
