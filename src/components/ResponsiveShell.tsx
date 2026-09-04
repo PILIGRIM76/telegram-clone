@@ -10,9 +10,15 @@ import { useBreakpoint, type Breakpoint } from '../hooks/useBreakpoint';
 interface ResponsiveShellProps {
   leftPanel: React.ReactNode;   // список чатов / контактов
   rightPanel: React.ReactNode;  // активный чат или welcome placeholder
-  tabBar?: React.ReactNode;     // нижний таббар (mobile + tablet)
-  fab?: React.ReactNode;        // floating action button (плавающая кнопка "Написать")
+  tabBar?: React.ReactNode;     // нижний таббар (tablet)
+  fab?: React.ReactNode;        // floating action button (tablet)
   topBar?: React.ReactNode;     // верхний бар (опционально, для будущего)
+  // v3.0 Phase 2G: mobile floating circle nav (заменяет tabBar на mobile)
+  mobileNav?: React.ReactNode;
+  // v3.0 Phase 2H: desktop joystick (фиксированный слева)
+  desktopNav?: React.ReactNode;
+  // v3.0 Phase 2H: 3rd panel on desktop (profile)
+  profilePanel?: React.ReactNode;
 }
 
 export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
@@ -21,6 +27,9 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
   tabBar,
   fab,
   topBar,
+  mobileNav,
+  desktopNav,
+  profilePanel,
 }) => {
   const bp: Breakpoint = useBreakpoint();
 
@@ -111,12 +120,12 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         {rightPanel}
       </div>
 
-      {/* Таббар (mobile + tablet, не показываем на desktop) */}
-      {tabBar && bp !== 'desktop' && (
+      {/* Таббар (только tablet). Mobile: FloatingCircleNav; Desktop: joystick */}
+      {tabBar && bp === 'tablet' && (
         <div
           data-testid="tab-bar"
           style={{
-            position: bp === 'mobile' ? 'fixed' : 'relative',
+            position: 'relative',
             bottom: 0,
             left: 0,
             right: 0,
@@ -127,8 +136,8 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         </div>
       )}
 
-      {/* FAB (плавающая кнопка) — на tablet/desktop, на mobile она в таббаре */}
-      {fab && bp !== 'mobile' && (
+      {/* FAB (tablet), на mobile заменён floating circle */}
+      {fab && bp === 'tablet' && (
         <div
           data-testid="fab"
           style={{
@@ -140,6 +149,11 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         >
           {fab}
         </div>
+      )}
+
+      {/* v3.0 Phase 2G: mobile floating circle nav */}
+      {mobileNav && bp === 'mobile' && (
+        <div data-testid="mobile-nav">{mobileNav}</div>
       )}
     </div>
   );

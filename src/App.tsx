@@ -21,6 +21,8 @@ import { LeftAppBar } from './components/LeftAppBar';
 import { RightAppBar } from './components/RightAppBar';
 import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { FloatingActionButton } from './components/FloatingActionButton';
+// v3.0 Phase 2G: mobile floating circle nav
+import { FloatingCircleNav } from './components/FloatingCircleNav';
 import { useLogout } from './hooks/useLogout';
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import { CallsHistoryView } from './components/CallsHistoryView';
@@ -702,6 +704,17 @@ const App: React.FC = () => {
               // которое слушает ContactList (он владеет модалкой внутри себя)
               window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
               console.log('[PILIGRIM] FAB clicked: requested AddContactModal open');
+            }}
+          />
+        }
+        // v3.0 Phase 2G: mobile floating circle nav (заменяет tabBar на ≤640px)
+        mobileNav={
+          <FloatingCircleNav
+            activeView={activeTab}
+            onViewChange={setActiveTab}
+            onCompose={() => {
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              console.log('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
             }}
           />
         }
