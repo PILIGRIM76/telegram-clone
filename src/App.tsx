@@ -1,6 +1,6 @@
 ﻿// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
 // Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CreateIdentity from './components/CreateIdentity';
 import SeedPhraseModal from './components/SeedPhraseModal';
 import { RestoreIdentity } from './components/RestoreIdentity';
@@ -26,6 +26,7 @@ import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import { CallsHistoryView } from './components/CallsHistoryView';
 import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
+import { SearchModal } from './components/SearchModal';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -47,6 +48,8 @@ const App: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   // v3.0 Phase 2D: Drawer (боковая штора профиля)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  // v3.0 Phase 2E: Search modal (Ctrl+K command palette)
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
   // для открытия Drawer через window event (loose coupling)
@@ -54,6 +57,18 @@ const App: React.FC = () => {
     const handler = () => setIsDrawerOpen(true);
     window.addEventListener('piligrim:open-drawer', handler);
     return () => window.removeEventListener('piligrim:open-drawer', handler);
+  }, []);
+
+  // v3.0 Phase 2E: Ctrl+K (Cmd+K на Mac) hotkey для command palette
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
   // v3.0 Logout: hook для очистки identity + WebSocket + reload
   const logout = useLogout({ clearData: false });
@@ -71,6 +86,13 @@ const App: React.FC = () => {
   const [showFeatures, setShowFeatures] = useState(false);
   // v1.6 Batch 4: toast-СѓРІРµРґРѕРјР»РµРЅРёСЏ (РѕР±СЉСЏРІР»РµРЅС‹ СЂР°РЅСЊС€Рµ handlers, С‡С‚РѕР±С‹ РёС… РјРѕР¶РЅРѕ Р±С‹Р»Рѕ РІС‹Р·С‹РІР°С‚СЊ)
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+
+  // v3.0 Phase 2E: search index - контакты + последние сообщения для command palette
+  const searchableContacts = useMemo(() => contacts.map((c) => ({
+    uid: c.uid,
+    name: c.name,
+    lastMessage: chats[c.uid]?.messages?.slice(-1)[0]?.text,
+  })), [contacts, chats]);
 
   // v1.5.2 Stage 2: Р·Р°РіСЂСѓР·РєР° РєРѕРЅС‚Р°РєС‚РѕРІ, РіСЂСѓРїРї Рё С‡Р°С‚РѕРІ РёР· localStorage РїРѕСЃР»Рµ РјРѕРЅС‚РёСЂРѕРІР°РЅРёСЏ
   useEffect(() => {
@@ -536,7 +558,7 @@ const App: React.FC = () => {
             {/* Phase 2B-2: LeftAppBar — burger + "Чаты" + search */}
             <LeftAppBar
               onMenuClick={() => setIsDrawerOpen(true)}
-              onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')}
+              onSearchClick={() => setIsSearchOpen(true)}
             />
             {/* Scrollable ContactList area */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -691,7 +713,7 @@ const App: React.FC = () => {
           <LeftAppBar
             title="Контакты"
             onMenuClick={() => console.log('[PILIGRIM] Drawer (Phase 2D)')}
-            onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')}
+            onSearchClick={() => setIsSearchOpen(true)}
           />
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
             <ContactList
@@ -761,6 +783,18 @@ const App: React.FC = () => {
         onLogout={() => {
           setIsDrawerOpen(false);
           setShowLogoutModal(true);
+        }}
+      />
+
+      {/* v3.0 Phase 2E: Search command palette (Ctrl+K) */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        contacts={searchableContacts}
+        onSelect={(uid) => {
+          setIsSearchOpen(false);
+          setActiveTab('chats');
+          setSelectedChatId(uid);
         }}
       />
 
