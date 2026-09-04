@@ -11,7 +11,9 @@
     "tauri:build": "tauri build",
     "preview": "vite preview",
     "server": "node server.js",
-    "test": "jest"
+    "test": "jest",
+    "check:encoding": "python scripts/check_encoding.py",
+    "fix:encoding": "python scripts/check_encoding.py --fix"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
