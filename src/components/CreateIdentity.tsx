@@ -7,9 +7,10 @@ import FeaturesList from './FeaturesList';
 interface CreateIdentityProps {
   onCreateIdentity: () => void;
   onRestore?: () => void;
+  onLogin?: () => void;
 }
 
-const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRestore }) => {
+const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRestore, onLogin }) => {
   const { language, t } = useTranslation();
 
   return (
@@ -87,12 +88,12 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRes
           {t('create_identity_btn')}
         </button>
 
-        {/* v3.0 Restore Identity: открыть экран восстановления через 12 seed-слов */}
+                {/* v3.0 LoginPage: кнопка входа с паролем/2FA */}
         <button
           type="button"
           onClick={() => {
-            if (onRestore) {
-              onRestore();
+            if (onLogin) {
+              onLogin();
             } else {
               alert(
                 language === 'ru'
@@ -101,8 +102,8 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRes
               );
             }
           }}
-          data-testid="restore-identity-btn"
-          aria-label="Restore identity from seed phrase"
+          data-testid="login-btn"
+          aria-label="Login with existing account"
           style={{
             width: '100%',
             padding: '12px 20px',
@@ -116,6 +117,29 @@ const CreateIdentity: React.FC<CreateIdentityProps> = ({ onCreateIdentity, onRes
         >
           {language === 'ru' ? 'Войти с существующим аккаунтом' : 'Login with existing account'}
         </button>
+
+        {/* v3.0 Restore Identity: открыть экран восстановления через 12 seed-слов */}
+                {onRestore && (
+          <button
+            type="button"
+            onClick={onRestore}
+            data-testid="restore-identity-btn"
+            aria-label="Restore identity from seed phrase"
+            style={{
+              width: '100%',
+              padding: '12px 20px',
+              background: 'transparent',
+              color: '#94a3b8',
+              border: '1px solid #475569',
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              marginTop: '8px'
+            }}
+          >
+            {language === 'ru' ? 'Восстановить через seed-фразу' : 'Restore via Seed Phrase'}
+          </button>
+        )}
       </div>
 
       {/* FeaturesList — МАКСИМАЛЬНО ВИДИМЫЙ на CreateIdentity */}

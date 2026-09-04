@@ -2,6 +2,7 @@
 // Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
 import React, { useState, useEffect, useMemo } from 'react';
 import CreateIdentity from './components/CreateIdentity';
+import LoginPage from './components/LoginPage';
 import SeedPhraseModal from './components/SeedPhraseModal';
 import { RestoreIdentity } from './components/RestoreIdentity';
 import ContactList from './components/ContactList';
@@ -45,8 +46,10 @@ const App: React.FC = () => {
   });
   const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
-  // v3.0 Restore Identity: переключатель между Create и Restore screens
+    // v3.0 Restore Identity: переключатель между Create и Restore screens
   const [authView, setAuthView] = useState<'create' | 'restore'>('create');
+  // LoginPage: переход на экран входа с паролем/2FA
+  const [showLoginPage, setShowLoginPage] = useState(false);
   // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
   const [activeTab, setActiveTab] = useState<TabView>('chats');
   // v3.0 Logout: модалка подтверждения выхода из аккаунта
@@ -464,6 +467,11 @@ const App: React.FC = () => {
     );
   }
 
+    
+  if (showLoginPage) {
+    return <LoginPage onLogin={() => setShowLoginPage(false)} />;
+  }
+
   if (!identity) {
     // v3.0 Restore Identity: выбор между созданием новой личности и восстановлением
     if (authView === 'restore') {
@@ -484,9 +492,10 @@ const App: React.FC = () => {
       );
     }
     return (
-      <CreateIdentity
+            <CreateIdentity
         onCreateIdentity={handleCreateIdentity}
         onRestore={() => setAuthView('restore')}
+        onLogin={() => setShowLoginPage(true)}
       />
     );
   }

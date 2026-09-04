@@ -38,4 +38,6 @@ export * from './CheckIcon';
 export * from './DoubleCheckIcon';
 export * from './EmojiIcon';
 export * from './CameraIcon';
+export * from './WarningIcon';
+export * from './QRIcon';
 
