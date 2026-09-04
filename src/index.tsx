@@ -11,6 +11,7 @@ import ReactDOM from 'react-dom/client';
 
 import App from './App';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Phase 9.5 fix: глобальная защита от ошибок, чтобы видеть что падает на устройстве
 window.addEventListener('error', (event) => {
@@ -44,9 +45,11 @@ try {
 
   root.render(
     <React.StrictMode>
-      <LanguageProvider>
-        <App />
-      </LanguageProvider>
+      <ErrorBoundary>
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
   console.log('[PILIGRIM] BOOT: render() called SUCCESS');
