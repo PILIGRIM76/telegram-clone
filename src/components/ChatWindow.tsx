@@ -6,6 +6,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Message, Contact } from '../types';
 import { useImagePicker } from '../hooks/useImagePicker';
 import { AttachmentSheet } from './AttachmentSheet';
+import { ContextMenu } from './ContextMenu';
 
 interface ChatWindowProps {
   chatId: string;
@@ -41,6 +42,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const [draft, setDraft] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  // v3.0 Phase 2F: context menu (right-click / long-press)
+  const [ctx, setCtx] = useState<{ x: number; y: number; messageId: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // v3.0 Phase 5: вложения фото
@@ -248,6 +251,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 data-testid="message"
                 className='piligrim-message-in'
                 data-sender={msg.senderId}
+                // v3.0 Phase 2F: right-click / long-press → ContextMenu
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setCtx({ x: e.clientX, y: e.clientY, messageId: msg.id });
+                }}
+                onTouchStart={(e) => {
+                  const t = window.setTimeout(() => {
+                    const touch = e.touches[0];
+                    if (touch) setCtx({ x: touch.clientX, y: touch.clientY, messageId: msg.id });
+                  }, 600);
+                  (e.currentTarget as unknown as { __longpress: number }).__longpress = t;
+                }}
+                onTouchEnd={(e) => {
+                  window.clearTimeout((e.currentTarget as unknown as { __longpress: number }).__longpress);
+                }}
+                onTouchMove={(e) => {
+                  window.clearTimeout((e.currentTarget as unknown as { __longpress: number }).__longpress);
+                }}
                 style={{
                   alignSelf: isOwn ? 'flex-end' : 'flex-start',
                   backgroundColor: isOwn ? '#3b82f6' : '#475569',
@@ -396,6 +417,43 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           Send
         </button>
       </form>
+
+      {/* v3.0 Phase 2F: Context Menu для сообщений (right-click / long-press) */}
+      {ctx && (
+        <ContextMenu
+          isOpen={!!ctx}
+          x={ctx.x}
+          y={ctx.y}
+          items={[
+            { id: 'reply', icon: '↩\uFE0F', label: 'Ответить', onClick: () => console.log('[PILIGRIM] Reply (Phase 3)') },
+            {
+              id: 'copy',
+              icon: '\u{1F4CB}',
+              label: 'Копировать',
+              onClick: () => {
+                const msg = messages.find((m) => m.id === ctx.messageId);
+                if (msg?.text && typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(msg.text).catch((err: unknown) =>
+                    console.warn('[PILIGRIM] Clipboard write failed:', err)
+                  );
+                }
+              }
+            },
+            { id: 'edit', icon: '✏\uFE0F', label: 'Редактировать', onClick: () => console.log('[PILIGRIM] Edit (Phase 3)') },
+            {
+              id: 'delete',
+              icon: '\u{1F5D1}\uFE0F',
+              label: 'Удалить',
+              dangerous: true,
+              onClick: () => {
+                console.log('[PILIGRIM] Delete message:', ctx.messageId);
+                // TODO Phase 3: подключить удаление из state
+              }
+            }
+          ]}
+          onClose={() => setCtx(null)}
+        />
+      )}
     </div>
   );
 };

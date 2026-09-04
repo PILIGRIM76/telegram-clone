@@ -9,6 +9,8 @@ interface AnimatedAvatarProps {
   name: string;
   size?: number;
   accentColor?: string;
+  /** v3.0 Phase 2F: белая обводка 3px + дополнительная тень (для крупных аватаров в шапках) */
+  bordered?: boolean;
 }
 
 /**
@@ -38,7 +40,8 @@ function getInitials(name: string): string {
 export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
   name,
   size = 48,
-  accentColor
+  accentColor,
+  bordered = false
 }) => {
   const color1 = accentColor || 'var(--color-accent, #E86A58)';
   const color2 = hashColor(name);
@@ -56,7 +59,12 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
         overflow: 'hidden',
         position: 'relative',
         flexShrink: 0,
-        boxShadow: `0 4px 12px ${color1 === 'var(--color-accent, #E86A58)' ? 'rgba(232, 106, 88, 0.2)' : `${color1}33`}`
+        // v3.0 Phase 2F: Aurora spec — белая обводка 3px (для Drawer header 72px)
+        border: bordered ? '3px solid white' : 'none',
+        boxShadow: bordered
+          ? '0 2px 8px rgba(0,0,0,0.1), 0 4px 12px ' +
+            (color1 === 'var(--color-accent, #E86A58)' ? 'rgba(232, 106, 88, 0.2)' : `${color1}33`)
+          : `0 4px 12px ${color1 === 'var(--color-accent, #E86A58)' ? 'rgba(232, 106, 88, 0.2)' : `${color1}33`}`
       }}
     >
       <motion.div

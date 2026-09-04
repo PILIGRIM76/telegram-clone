@@ -781,6 +781,9 @@ const App: React.FC = () => {
         identity={identity}
         lang={language}
         onToggleLang={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
+        // v3.0 Phase 2F: активная вкладка для индикатора в Drawer
+        activeView={activeTab}
+        onNavigate={(view) => setActiveTab(view)}
         onLogout={() => {
           setIsDrawerOpen(false);
           setShowLogoutModal(true);
