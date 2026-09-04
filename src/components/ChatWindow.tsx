@@ -420,7 +420,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         </div>
       )}
       {/* Input */}
-      <form
+      
+      {/* v3.0 Phase 3: reply banner */}
+      {replyTo && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 8px 16px', margin: '0 16px', background: 'var(--color-bubble-incoming)', borderLeft: '3px solid var(--color-accent)', borderRadius: 8, fontSize: 13 }} data-testid="reply-banner">
+          <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>↩️</span>
+          <span style={{ flex: 1, color: 'var(--color-text-secondary)' }}>Ответ на: {replyTo.text?.slice(0, 50)}{replyTo.text?.length > 50 && '…'}</span>
+          <button type="button" onClick={() => setReplyTo(null)} aria-label="Отменить ответ" style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: 2, color: 'var(--color-text-secondary)' }}>✕</button>
+        </div>
+      )}
+
+      {/* v3.0 Phase 3: edit banner */}
+      {editingId && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 8px 16px', margin: '0 16px', background: 'var(--color-bubble-outgoing)', borderLeft: '3px solid #f59e0b', borderRadius: 8, fontSize: 13 }} data-testid="edit-banner">
+          <span style={{ fontWeight: 600, color: '#f59e0b' }}>✏️</span>
+          <span style={{ flex: 1, color: 'var(--color-text-secondary)' }}>Редактирование сообщения</span>
+          <button type="button" onClick={() => { setEditingId(null); setDraft(''); }} aria-label="Отменить редактирование" style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: 2, color: 'var(--color-text-secondary)' }}>✕</button>
+        </div>
+      )}
+
+<form
         onSubmit={handleSubmit}
         style={{
           display: 'flex',
