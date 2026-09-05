@@ -1,15 +1,12 @@
 ﻿// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
 // Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
 import React, { useState, useEffect, useMemo } from 'react';
-import CreateIdentity from './components/CreateIdentity';
 import LoginPage from './components/LoginPage';
 import SeedPhraseModal from './components/SeedPhraseModal';
-import { RestoreIdentity } from './components/RestoreIdentity';
 import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import VerifyModal from './components/VerifyModal';
 import Toasts from './components/Toast';
-import FeaturesList from './components/FeaturesList';
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
 import { generateIdentity, encrypt, restoreIdentityFromSeed } from './services/cryptoService';
@@ -46,10 +43,6 @@ const App: React.FC = () => {
   });
   const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
-    // v3.0 Restore Identity: переключатель между Create и Restore screens
-  const [authView, setAuthView] = useState<'create' | 'restore'>('create');
-  // LoginPage: переход на экран входа с паролем/2FA
-  const [showLoginPage, setShowLoginPage] = useState(false);
   // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
   const [activeTab, setActiveTab] = useState<TabView>('chats');
   // v3.0 Logout: модалка подтверждения выхода из аккаунта
@@ -93,11 +86,8 @@ const App: React.FC = () => {
   // v1.6 Batch 4: РїРѕРєР°Р·С‹РІР°С‚СЊ РјРѕРґР°Р»РєСѓ РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р°
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const { language, setLanguage } = useTranslation();
-  const [showFeatures, setShowFeatures] = useState(false);
   // v1.6 Batch 4: toast-СѓРІРµРґРѕРјР»РµРЅРёСЏ (РѕР±СЉСЏРІР»РµРЅС‹ СЂР°РЅСЊС€Рµ handlers, С‡С‚РѕР±С‹ РёС… РјРѕР¶РЅРѕ Р±С‹Р»Рѕ РІС‹Р·С‹РІР°С‚СЊ)
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
-
-  // v3.0 Phase 2E: search index - контакты + последние сообщения для command palette
   const searchableContacts = useMemo(() => contacts.map((c) => ({
     uid: c.uid,
     name: c.name,
@@ -496,46 +486,23 @@ const App: React.FC = () => {
         console.error('[PILIGRIM] Failed to save restored identity:', e);
       }
       setIdentity(restored);
-      setShowLoginPage(false);
     } catch (err) {
       console.error('[PILIGRIM] LoginPage restore failed:', err);
       // Error остаётся в state LoginPage через её own error handling
     }
   };
 
-  if (showLoginPage) {
+  // v3.0 Neuro-Minimalist LoginPage: единая точка входа (Login / Register / Restore)
+  // LoginPage сама переключает mode между login/register/restore.
+  // Register → handleCreateIdentity (BIP39 generation + SeedPhraseModal).
+  // Restore → handleRestoreFromLoginPage (multi-device flow с encryptedKeyPair).
+  // Login → handleCreateIdentity stub (гибридный режим, для существующих identity).
+  if (!identity) {
+    console.log('[PILIGRIM] LoginPage rendered (Neuro-Minimalist UI)');
     return (
       <LoginPage
-        onLogin={() => setShowLoginPage(false)}
+        onLogin={handleCreateIdentity}
         onRestore={handleRestoreFromLoginPage}
-      />
-    );
-  }
-
-  if (!identity) {
-    // v3.0 Restore Identity: выбор между созданием новой личности и восстановлением
-    if (authView === 'restore') {
-      return (
-        <RestoreIdentity
-          onRestore={(restoredIdentity: Identity) => {
-            console.log('[PILIGRIM] Identity restored from seed phrase, uid=', restoredIdentity.uid);
-            try {
-              localStorage.setItem('piligrim-identity', JSON.stringify(restoredIdentity));
-            } catch (e) {
-              console.error('[PILIGRIM] Failed to save restored identity to localStorage:', e);
-            }
-            setIdentity(restoredIdentity);
-            setAuthView('create');
-          }}
-          onBack={() => setAuthView('create')}
-        />
-      );
-    }
-    return (
-            <CreateIdentity
-        onCreateIdentity={handleCreateIdentity}
-        onRestore={() => setAuthView('restore')}
-        onLogin={() => setShowLoginPage(true)}
       />
     );
   }
@@ -576,25 +543,6 @@ const App: React.FC = () => {
           }}
         >
           {language === 'ru' ? '🇷🇺 RU' : '🇬🇧 EN'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowFeatures(!showFeatures)}
-          data-testid="features-toggle"
-          title="Show available features"
-          aria-label="Show features"
-          style={{
-            padding: '4px 10px',
-            backgroundColor: showFeatures ? '#3b82f6' : '#334155',
-            color: '#ffffff',
-            border: '1px solid #475569',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          ✨ {language === 'ru' ? 'Что умеет?' : 'Features'}
         </button>
       </div>
       {/* Stage 5: РёРЅРґРёРєР°С‚РѕСЂ СЃС‚Р°С‚СѓСЃР° WebSocket (РїСЂР°РІС‹Р№ РІРµСЂС…РЅРёР№ СѓРіРѕР») */}
@@ -766,10 +714,6 @@ const App: React.FC = () => {
                   >
                     Logout
                   </button>
-
-                  {showFeatures && (
-                    <FeaturesList lang={language} />
-                  )}
                 </div>
               )}
             </div>

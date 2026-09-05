@@ -12,6 +12,7 @@ import { useBreakpoint, type Breakpoint } from '../hooks/useBreakpoint';
 interface IdentityLite {
   uid: string;
   name?: string;
+  isBIP39?: boolean; // v3.0 Phase 5: E2EE multi-device indicator
 }
 
 interface DrawerProps {
@@ -143,7 +144,13 @@ export const Drawer: React.FC<DrawerProps> = ({
       >
         <div data-testid="drawer-profile" style={{ height: cfg.headerH, padding: 24, background: 'linear-gradient(135deg, rgba(232,106,88,0.15) 0%, rgba(179,136,235,0.10) 100%)', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <AnimatedAvatar name={identity?.name || 'PILIGRIM'} size={cfg.avatar} bordered />
+            {/* v3.0 Phase 5: AnimatedAvatar с E2EE статусом */}
+            <AnimatedAvatar
+              name={identity?.name || 'PILIGRIM'}
+              size={cfg.avatar}
+              bordered
+              e2eeStatus={identity?.isBIP39 === true ? 'verified' : 'pending'}
+            />
             <div>
               <div style={{ fontSize: cfg.nameFont, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.3px' } as React.CSSProperties}>
                 {identity?.name || 'Пилигрим'}
@@ -152,6 +159,28 @@ export const Drawer: React.FC<DrawerProps> = ({
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38A169', display: 'inline-block' } as React.CSSProperties} />
                 <span>online</span>
               </div>
+              {/* v3.0 Phase 5: E2EE status badge под аватаром */}
+              {identity && (
+                <div
+                  data-testid="e2ee-badge"
+                  title={identity.isBIP39 ? 'BIP39 детерминированный recovery — multi-device ready' : 'Legacy PBKDF2 — нужен migrate для multi-device'}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: identity.isBIP39 ? '#38A169' : '#F59E0B',
+                    marginTop: 4,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    background: identity.isBIP39 ? 'rgba(56, 161, 105, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                    border: `1px solid ${identity.isBIP39 ? 'rgba(56, 161, 105, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                  } as React.CSSProperties}
+                >
+                  {identity.isBIP39 ? '✓ Multi-device ready' : '⚠ Legacy keys'}
+                </div>
+              )}
             </div>
           </div>
           {identity && (
