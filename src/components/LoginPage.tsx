@@ -105,7 +105,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
       background: '#0D0C0F',
       fontFamily: 'Inter, sans-serif',
     }}>
-      {/* v3.0: Круглый логотип ВЫШЕ карточки — слово PILIGRIM ВНУТРИ */}
+      {/* v3.0: Пульсирующий круглый логотип ВЫШЕ карточки — как в первой версии */}
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -124,17 +124,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
           flexShrink: 0,
         }}
       >
-        <div style={{
-          width: 84,
-          height: 84,
-          borderRadius: '50%',
-          background: 'rgba(13, 12, 11, 0.85)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
+        {/* Внутренний пульсирующий круг (как в оригинальном логотипе) */}
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          data-testid="logo-badge-inner"
+          style={{
+            width: 84,
+            height: 84,
+            borderRadius: '50%',
+            background: 'rgba(13, 12, 11, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <LockIcon size={20} color="#FCF9F7" />
           <span style={{
             color: '#FCF9F7',
@@ -146,8 +152,20 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
           }}>
             PILIGRIM
           </span>
-        </div>
+        </motion.div>
       </motion.div>
+
+      {/* Подпись под пульсирующим логотипом (как в первой версии) */}
+      <span style={{
+        fontSize: 10,
+        color: 'rgba(252, 249, 247, 0.5)',
+        letterSpacing: '0.15em',
+        textTransform: 'uppercase',
+        flexShrink: 0,
+        marginTop: -8,
+      }} data-testid="logo-subtitle">
+        End-to-End Encrypted
+      </span>
 
       {/* Карточка входа/регистрации/restore */}
       <motion.div
@@ -367,16 +385,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
         {/* v3.0: Footer подпись вынесена наружу карточки (ниже) */}
         </motion.div>
 
-      {/* Footer подпись под карточкой */}
-      <span style={{
-        fontSize: 10,
-        color: 'rgba(252, 249, 247, 0.5)',
-        letterSpacing: '0.15em',
-        textTransform: 'uppercase',
-        flexShrink: 0,
-      }}>
-        End-to-End Encrypted
-      </span>
+      {/* v3.0: Footer "End-to-End Encrypted" перенесён под логотип (см. logo-subtitle) */}
     </div>
   );
 };
