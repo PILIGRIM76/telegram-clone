@@ -24,6 +24,7 @@ interface DrawerProps {
   onToggleLang: () => void;
   activeView?: string;
   onNavigate?: (view: 'chats' | 'contacts' | 'calls' | 'favorites') => void;
+  onOpenAccount?: () => void; // v3.0 Security Dashboard
 }
 
 const SLIDE_EASE = [0.2, 0.9, 0.4, 1] as const;
@@ -68,6 +69,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   onToggleLang,
   activeView,
   onNavigate,
+  onOpenAccount,
 }) => {
   const bp: Breakpoint = useBreakpoint();
   const cfg = CFG[bp];
@@ -113,7 +115,7 @@ export const Drawer: React.FC<DrawerProps> = ({
     { id: 'favorites', label: 'Избранное', onClick: () => { onNavigate?.('favorites'); onClose(); } },
     { id: 'qr', label: lang === 'ru' ? 'Мой QR-код' : 'My QR code', onClick: () => setShowQr((q) => !q) },
     { id: 'lang', label: lang === 'ru' ? 'Язык: Русский' : 'Language: English', onClick: onToggleLang },
-    { id: 'settings', label: 'Настройки', onClick: () => console.log('[PILIGRIM] Settings (Phase 5)') },
+    { id: 'settings', label: 'Настройки', onClick: () => { if (onOpenAccount) onOpenAccount(); } },
   ];
 
   if (!isOpen) return null;

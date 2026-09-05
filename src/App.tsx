@@ -30,6 +30,7 @@ import { CallsHistoryView } from './components/CallsHistoryView';
 import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
 import { SearchModal } from './components/SearchModal';
+import AccountPage from './components/AccountPage';
 import type { Contact, Group, Chat, Message, Identity } from './types';
 
 const App: React.FC = () => {
@@ -53,6 +54,8 @@ const App: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // v3.0 Phase 2H: Profile panel (3rd desktop panel)
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  // v3.0 Security Dashboard: AccountPage (Security settings)
+  const [showAccountPage, setShowAccountPage] = useState(false);
 
   // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
   // для открытия Drawer через window event (loose coupling)
@@ -858,11 +861,35 @@ const App: React.FC = () => {
         // v3.0 Phase 2F: активная вкладка для индикатора в Drawer
         activeView={activeTab}
         onNavigate={(view) => setActiveTab(view)}
+        onOpenAccount={() => {
+          setIsDrawerOpen(false);
+          setShowAccountPage(true);
+        }}
         onLogout={() => {
           setIsDrawerOpen(false);
           setShowLogoutModal(true);
         }}
       />
+
+      {/* v3.0 Security Dashboard: AccountPage (Настройки → Аккаунт) */}
+      {identity && showAccountPage && (
+        <AccountPage
+          user={{
+            name: identity.username || 'Пилигрим',
+            uid: identity.uid,
+            e2eeStatus: identity.isBIP39 ? 'verified' : 'pending',
+          }}
+          onBack={() => setShowAccountPage(false)}
+          onLogout={() => {
+            setShowAccountPage(false);
+            setShowLogoutModal(true);
+          }}
+          onBackupSeed={() => {
+            setShowAccountPage(false);
+            setShowSeedModal(true);
+          }}
+        />
+      )}
 
       {/* v3.0 Phase 2E: Search command palette (Ctrl+K) */}
       <SearchModal

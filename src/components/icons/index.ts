@@ -40,4 +40,8 @@ export * from './EmojiIcon';
 export * from './CameraIcon';
 export * from './WarningIcon';
 export * from './QRIcon';
+export * from './CopyIcon';
+export * from './DatabaseIcon';
+export * from './ShieldIcon';
+export * from './KeyIcon';
 
