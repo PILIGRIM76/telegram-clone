@@ -12,7 +12,7 @@ import Toasts from './components/Toast';
 import FeaturesList from './components/FeaturesList';
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
-import { generateIdentity, encrypt } from './services/cryptoService';
+import { generateIdentity, encrypt, restoreIdentityFromSeed } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
@@ -468,8 +468,48 @@ const App: React.FC = () => {
   }
 
     
+  // v3.0 Phase 5: handleRestore через LoginPage (BIP39)
+  const handleRestoreFromLoginPage = async (payload: { words: string[]; isBIP39: boolean }) => {
+    console.log('[PILIGRIM] LoginPage restore triggered, BIP39=', payload.isBIP39);
+    try {
+      // Получаем encryptedKeyPair из localStorage (multi-device flow)
+      let encryptedKeyPair: string | undefined;
+      try {
+        const saved = localStorage.getItem('piligrim-identity');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          encryptedKeyPair = parsed.encryptedKeyPair;
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      // Вызываем cryptoService.restoreIdentityFromSeed
+      const restored = await restoreIdentityFromSeed(payload.words, encryptedKeyPair);
+
+      console.log(`[PILIGRIM] Restored identity: uid=${restored.uid}, isBIP39=${restored.isBIP39}`);
+
+      // Сохраняем в localStorage и обновляем state
+      try {
+        localStorage.setItem('piligrim-identity', JSON.stringify(restored));
+      } catch (e) {
+        console.error('[PILIGRIM] Failed to save restored identity:', e);
+      }
+      setIdentity(restored);
+      setShowLoginPage(false);
+    } catch (err) {
+      console.error('[PILIGRIM] LoginPage restore failed:', err);
+      // Error остаётся в state LoginPage через её own error handling
+    }
+  };
+
   if (showLoginPage) {
-    return <LoginPage onLogin={() => setShowLoginPage(false)} />;
+    return (
+      <LoginPage
+        onLogin={() => setShowLoginPage(false)}
+        onRestore={handleRestoreFromLoginPage}
+      />
+    );
   }
 
   if (!identity) {

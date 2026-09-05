@@ -1,5 +1,12 @@
 
 import type { Identity } from '../types';
+import {
+  generateBIP39Identity,
+  deriveIdentityFromMnemonic,
+  restoreIdentityFromEncryptedBlob,
+  isValidBIP39Mnemonic,
+  normalizeMnemonicWords,
+} from '../crypto/bip39Derivation';
 
 /**
  * Генерирует криптографический отпечаток ключа для визуальной верификации.
@@ -72,14 +79,20 @@ export const generateSeedPhrase = (): string => {
 };
 
 /**
- * Генерирует криптографически стойкие ключи.
- * Использует Web Crypto API для генерации ECDSA P-256 ключей
- * (в 100 раз быстрее RSA-2048 на слабых устройствах, та же безопасность для нашего use-case).
- * Phase 7.6.5: также генерирует 12-словную seed-фразу для восстановления.
+ * Генерирует криптографически стойкие ключи через BIP39 детерминированную деривацию.
+ *
+ * v3.0 Phase 5: обновлено для BIP39 — 12 слов из 2048-словного словаря,
+ * BIP32 derivation m/44'/1987'/0'/0/0, ECDSA P-256 ключи шифруются через AES-GCM.
+ *
+ * Преимущества новой схемы:
+ *   - Multi-device sync: те же 12 слов + encryptedKeyPair → та же identity
+ *   - Стандарт BIP39: совместимость с аппаратными кошельками (Trezor, Ledger)
+ *   - Детерминизм: fingerprint и UID битово-идентичны на любом устройстве
+ *
  * Phase 9.5 fix: добавлен 10-секундный timeout для предотвращения зависания.
  */
 export const generateIdentity = async (): Promise<Identity> => {
-    console.log('🔐 [cryptoService] generateIdentity START');
+    console.log('🔐 [cryptoService] generateIdentity START (BIP39)');
 
     // Phase 9.5 fix: добавляем timeout чтобы избежать зависания на слабых устройствах
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -87,43 +100,24 @@ export const generateIdentity = async (): Promise<Identity> => {
     });
 
     const generatePromise = async (): Promise<Identity> => {
-        // Phase 9.5 fix: используем ECDSA P-256 вместо RSA-2048
-        // RSA-2048 зависает на 5-30 секунд на слабых Android-планшетах
-        const keyPair = await crypto.subtle.generateKey(
-            {
-                name: "ECDSA",
-                namedCurve: "P-256",
-            },
-            true,
-            ["sign", "verify"]
-        );
-
-        // Экспортируем ключи в JWK формат
-        const publicKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-        const privateKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
-
-        // Создаём строковые представления ключей
-        const publicKeyStr = JSON.stringify(publicKeyJwk);
-        const privateKeyStr = JSON.stringify(privateKeyJwk);
-
-        // Генерируем UID на основе публичного ключа
-        const uid = `uid_${btoa(publicKeyStr).substring(0, 32)}`;
-        const keyFingerprint = await generateFingerprint(publicKeyStr);
-
-        // Phase 7.6.5: генерируем seed-фразу для резервного копирования
-        const seedPhrase = generateSeedPhrase();
+        // BIP39 derivation (12 слов + secp256k1 + AES-GCM encrypted ECDSA P-256 pair)
+        const derived = await generateBIP39Identity();
 
         return {
-            uid,
-            publicKey: publicKeyStr,
-            privateKey: privateKeyStr,
-            keyFingerprint,
-            seedPhrase
-        };
+            uid: derived.uid,
+            publicKey: derived.publicKey,
+            privateKey: derived.privateKey,
+            keyFingerprint: derived.keyFingerprint,
+            seedPhrase: derived.seedPhrase,
+            // v3.0 Phase 5: encryptedKeyPair нужен для multi-device restore
+            encryptedKeyPair: derived.encryptedKeyPair,
+            // Migration flag: новая identity помечается для обратной совместимости
+            isBIP39: true,
+        } as Identity;
     };
 
     const result = await Promise.race([generatePromise(), timeoutPromise]);
-    console.log('🔐 [cryptoService] generateIdentity SUCCESS');
+    console.log('🔐 [cryptoService] generateIdentity SUCCESS (BIP39)');
     return result;
 };
 
@@ -203,32 +197,26 @@ export const decryptSync = (encryptedText: string, _key: string): string => {
 
 
 /**
- * Phase 7.6.5 + Restore Identity: детерминированная seed → identity.
+ * Восстанавливает identity из 12-словной BIP39 seed-фразы.
  *
- * Принимает 12 слов seed-phrase и возвращает Identity с **тем же UID и fingerprint**,
- * что и при первом создании через generateIdentity().
+ * v3.0 Phase 5: использует BIP39 стандарт (2048 слов) + BIP32 HD derivation.
  *
- * Это НЕ полный BIP39-style recovery (ключи ECDSA P-256 не детерминированы в Web Crypto),
- * но для нашего offline-first use-case достаточно:
- *   - Восстановленная identity имеет тот же UID (по которому находят контакт)
- *   - Тот же keyFingerprint (для визуальной верификации)
- *   - Новые ECDSA ключи (для шифрования) — они разные с технической стороны,
- *     но идентичность с точки зрения пользователя восстановлена
+ * Multi-device flow:
+ *   - Если передан `encryptedKeyPair` (из localStorage) — расшифровываем ТУ ЖЕ пару,
+ *     что была на устройстве A. Это даёт полную детерминированность.
+ *   - Если НЕ передан — генерируется НОВАЯ пара (legacy-путь). Identity с тем же
+ *     UID/fingerprint, но новыми ключами. Старые зашифрованные сообщения
+ *     НЕ расшифруются — пользователь должен мигрировать.
  *
- * Если нужна полная key recovery — потребуется BIP39 wordlist (2048 слов) и
- * secp256k1 derivation. Это работа для Phase 4+.
- *
- * Алгоритм:
- *   1. PBKDF2(seed) → 256-bit derived seed (100k итераций, salt="piligrim-v1-seed")
- *   2. derived seed используется для:
- *      - uid (детерминированный SHA-256 → base64 → substring(0,32))
- *      - publicKeyStr (derived bytes → base64)
- *      - privateKeyStr (derived bytes → base64)
- *      - keyFingerprint (SHA-256(publicKeyStr) → substring(0,16))
- *   3. Те же 12 слов ВСЕГДА дают ту же Identity
+ * @param words 12-словная BIP39 фраза
+ * @param encryptedKeyPair опциональный зашифрованный blob (из localStorage на устройстве A)
+ * @returns Identity с пометкой isBIP39: true
  */
-export const restoreIdentityFromSeed = async (words: string[]): Promise<Identity> => {
-    console.log('[PILIGRIM] restoreIdentityFromSeed START');
+export const restoreIdentityFromSeed = async (
+    words: string[],
+    encryptedKeyPair?: string
+): Promise<Identity> => {
+    console.log('[PILIGRIM] restoreIdentityFromSeed START (BIP39)');
 
     // Валидация: должно быть ровно 12 слов
     if (!Array.isArray(words) || words.length !== 12) {
@@ -236,11 +224,62 @@ export const restoreIdentityFromSeed = async (words: string[]): Promise<Identity
     }
 
     // Валидация: все слова непустые
-    const cleanedWords = words.map(w => (w || '').trim().toLowerCase());
+    const cleanedWords = normalizeMnemonicWords(words);
     if (cleanedWords.some(w => w.length === 0)) {
         throw new Error('All 12 words must be non-empty');
     }
 
+    // Проверка BIP39 валидности (если legacy словарь — fallback)
+    const isBIP39 = isValidBIP39Mnemonic(cleanedWords);
+    const seedString = cleanedWords.join(' ');
+
+    if (!isBIP39) {
+        console.warn('[PILIGRIM] Non-BIP39 mnemonic detected, using legacy PBKDF2 fallback');
+        return legacyRestoreFromSeed(cleanedWords);
+    }
+
+    // BIP39 path: детерминированное восстановление
+    try {
+        let identity;
+
+        if (encryptedKeyPair) {
+            // Multi-device: расшифровываем сохранённый blob
+            console.log('[PILIGRIM] Restoring from encrypted blob (multi-device)');
+            const restored = await restoreIdentityFromEncryptedBlob(seedString, encryptedKeyPair);
+            identity = {
+                ...restored,
+                seedPhrase: seedString,
+                isBIP39: true,
+                encryptedKeyPair,
+            };
+        } else {
+            // Single-device: генерируем новую пару (UID/fingerprint детерминированы, ключи — нет)
+            console.log('[PILIGRIM] No encryptedKeyPair, generating new ECDSA pair');
+            const generated = await deriveIdentityFromMnemonic(seedString);
+            identity = {
+                uid: generated.uid,
+                publicKey: generated.publicKey,
+                privateKey: generated.privateKey,
+                keyFingerprint: generated.keyFingerprint,
+                seedPhrase: generated.seedPhrase,
+                encryptedKeyPair: generated.encryptedKeyPair,
+                isBIP39: true,
+            };
+        }
+
+        console.log(`[PILIGRIM] restoreIdentityFromSeed SUCCESS (BIP39), uid=${identity.uid}`);
+        return identity as Identity;
+    } catch (e) {
+        console.error('[PILIGRIM] BIP39 restore failed:', e);
+        // Fallback на legacy PBKDF2
+        return legacyRestoreFromSeed(cleanedWords);
+    }
+};
+
+/**
+ * Legacy PBKDF2-based restore (для обратной совместимости со старыми 256-словными seed-фразами).
+ */
+async function legacyRestoreFromSeed(cleanedWords: string[]): Promise<Identity> {
     const seedString = cleanedWords.join(' ');
     const seedBytes = new TextEncoder().encode(seedString);
 
@@ -278,7 +317,7 @@ export const restoreIdentityFromSeed = async (words: string[]): Promise<Identity
 
     const keyFingerprint = await generateFingerprint(publicKeyStr);
 
-    console.log(`[PILIGRIM] restoreIdentityFromSeed SUCCESS, uid=${uid}, fingerprint=${keyFingerprint}`);
+    console.log(`[PILIGRIM] legacyRestoreFromSeed SUCCESS, uid=${uid}, fingerprint=${keyFingerprint}`);
 
     return {
         uid,
@@ -286,6 +325,7 @@ export const restoreIdentityFromSeed = async (words: string[]): Promise<Identity
         privateKey: privateKeyStr,
         keyFingerprint,
         seedPhrase: seedString,
+        isBIP39: false, // legacy — ключи случайные, нет multi-device
     };
-};
+}
 

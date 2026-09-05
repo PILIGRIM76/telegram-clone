@@ -2,27 +2,79 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LockIcon, EyeOffIcon, EyeIcon, WarningIcon, QRIcon } from './icons';
 import { useAccentColor } from '../hooks/useAccentColor';
+import { isValidBIP39Mnemonic, normalizeMnemonicWords } from '../crypto/bip39Derivation';
 
 type AuthMode = 'login' | 'register' | 'restore';
 
 interface LoginPageProps {
   onLogin: () => void;
+  onRestore?: (identity: any) => void; // v3.0 Phase 5: Restore через BIP39
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
   const [mode, setMode] = React.useState<AuthMode>('login');
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [twoFACode, setTwoFACode] = React.useState('');
   const [uid, setUid] = React.useState('');
-    const [seedPhrase, setSeedPhrase] = React.useState('');
+  const [seedPhrase, setSeedPhrase] = React.useState('');
+  const [restoreError, setRestoreError] = React.useState('');
+  const [isRestoring, setIsRestoring] = React.useState(false);
+  const [mnemonicStatus, setMnemonicStatus] = React.useState<{
+    isBIP39: boolean;
+    wordCount: number;
+  }>({ isBIP39: false, wordCount: 0 });
 
   // v3.0 Phase 4: Dynamic accent theme
   const theme = useAccentColor();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // v3.0 Phase 5: real-time BIP39 validation
+  React.useEffect(() => {
+    if (mode !== 'restore' || !seedPhrase.trim()) {
+      setMnemonicStatus({ isBIP39: false, wordCount: 0 });
+      return;
+    }
+    const words = normalizeMnemonicWords(seedPhrase.split(/\s+/));
+    const isBIP39 = words.length > 0 && isValidBIP39Mnemonic(words);
+    setMnemonicStatus({ isBIP39, wordCount: words.length });
+  }, [seedPhrase, mode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRestoreError('');
+
+    // Restore: вызываем callback onRestore для multi-device flow
+    if (mode === 'restore') {
+      if (!onRestore) {
+        setRestoreError('Restore handler not provided. Use RestoreIdentity component.');
+        return;
+      }
+      setIsRestoring(true);
+      try {
+        // Делегируем обработку в App.tsx (через onRestore callback)
+        // App.tsx вызовет cryptoService.restoreIdentityFromSeed(words, encryptedKeyPair)
+        const words = normalizeMnemonicWords(seedPhrase.split(/\s+/));
+        if (words.length !== 12) {
+          throw new Error(`Требуется ровно 12 слов, получено ${words.length}`);
+        }
+        if (mnemonicStatus.isBIP39) {
+          console.log('[PILIGRIM] BIP39 mnemonic detected — proceeding with deterministic recovery');
+        } else {
+          console.warn('[PILIGRIM] Non-BIP39 mnemonic — will use legacy PBKDF2 fallback');
+        }
+        // Сигнал для App.tsx: тип flow (BIP39 → детерминированный, legacy → fallback)
+        onRestore({
+          words,
+          isBIP39: mnemonicStatus.isBIP39,
+        });
+      } catch (err) {
+        setRestoreError(err instanceof Error ? err.message : 'Restore failed');
+        setIsRestoring(false);
+      }
+      return;
+    }
+
     console.log('[PILIGRIM] Auth:', mode, { username, password, twoFACode });
     onLogin();
   };
@@ -88,14 +140,79 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             {/* Restore form */}
             {mode === 'restore' && (
               <div style={{ marginBottom: 16 }}>
-                <input type="text" placeholder="UID" value={uid} onChange={(e) => setUid(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, fontSize: 14, outline: 'none', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#FCF9F7', fontFamily: '"JetBrains Mono", monospace', marginBottom: 12 }} />
-                <textarea placeholder="Seed Phrase (12 words)" value={seedPhrase} onChange={(e) => setSeedPhrase(e.target.value)} rows={3} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, fontSize: 14, outline: 'none', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#FCF9F7', fontFamily: '"JetBrains Mono", monospace', resize: 'none' }} />
+                <input type="text" placeholder="UID (optional)" value={uid} onChange={(e) => setUid(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, fontSize: 14, outline: 'none', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#FCF9F7', fontFamily: '"JetBrains Mono", monospace', marginBottom: 12 }} />
+                <textarea
+                  placeholder="Seed Phrase (12 words)"
+                  value={seedPhrase}
+                  onChange={(e) => setSeedPhrase(e.target.value)}
+                  rows={3}
+                  data-testid="restore-seed-phrase"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    outline: 'none',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${mnemonicStatus.isBIP39 ? theme.color : 'rgba(255, 255, 255, 0.1)'}`,
+                    color: '#FCF9F7',
+                    fontFamily: '"JetBrains Mono", monospace',
+                    resize: 'none',
+                    boxShadow: mnemonicStatus.isBIP39 ? `0 0 0 3px ${theme.color}33` : 'none',
+                    transition: 'all 200ms ease-out',
+                  }}
+                />
+                {/* v3.0 Phase 5: BIP39 валидация + visual feedback */}
+                {seedPhrase.trim() && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                    {mnemonicStatus.isBIP39 ? (
+                      <>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.color, boxShadow: `0 0 8px ${theme.glow}` }} />
+                        <span style={{ color: theme.color, fontWeight: 500 }}>
+                          ✓ BIP39 — детерминированный recovery
+                        </span>
+                      </>
+                    ) : mnemonicStatus.wordCount > 0 ? (
+                      <>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#FFC107' }} />
+                        <span style={{ color: '#FFC107', fontWeight: 500 }}>
+                          ⚠ Не BIP39 (legacy fallback, {mnemonicStatus.wordCount}/12)
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+                {restoreError && (
+                  <div data-testid="restore-error" style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 8, color: '#EF4444', fontSize: 12 }}>
+                    {restoreError}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Submit button */}
-            <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} style={{ width: '100%', padding: '14px', borderRadius: 12, fontSize: 15, fontWeight: 600, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, theme.color 0%, theme.color 100%)', color: '#0D0C0F', boxShadow: `0 4px 20px ${theme.glow}`, marginBottom: 16 }}>
-              {mode === 'login' ? 'Login' : mode === 'register' ? 'Register' : 'Restore'}
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={isRestoring}
+              data-testid={`${mode}-submit`}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: 12,
+                fontSize: 15,
+                fontWeight: 600,
+                border: 'none',
+                cursor: isRestoring ? 'wait' : 'pointer',
+                background: `linear-gradient(135deg, ${theme.color} 0%, ${theme.color}cc 100%)`,
+                color: '#0D0C0F',
+                boxShadow: `0 4px 20px ${theme.glow}`,
+                marginBottom: 16,
+                opacity: isRestoring ? 0.7 : 1,
+              }}
+            >
+              {isRestoring ? 'Восстановление...' : (mode === 'login' ? 'Login' : mode === 'register' ? 'Register' : 'Restore Identity')}
             </motion.button>
 
             {/* Links */}

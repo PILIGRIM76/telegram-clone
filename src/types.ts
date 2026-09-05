@@ -37,6 +37,11 @@ export interface Identity {
   boards?: NoticeBoard[];
   keyFingerprint?: string;
   seedPhrase?: string; // Phase 7.6.5: 12-словная фраза для восстановления (опционально для старых Identity)
+  /** v3.0 Phase 5: BIP39 encryptedKeyPair — для multi-device restore (опционально для legacy identity) */
+  encryptedKeyPair?: string;
+  /** v3.0 Phase 5: BIP39 флаг. true = новая identity с детерминированными ключами.
+   *  false/undefined = legacy PBKDF2 identity (ключи случайные, multi-device не работает) */
+  isBIP39?: boolean;
 }
 
 export interface Contact {
