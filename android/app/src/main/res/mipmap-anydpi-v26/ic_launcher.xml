@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- v3.0: Use gradient drawable as background instead of solid color (was #FFFFFF → white square).
+     Foreground stays PILIGRIM logo from mipmap/ic_launcher_foreground (108x108 PNG). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@drawable/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>

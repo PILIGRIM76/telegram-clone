@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- v3.0: PILIGRIM brand gradient (purple → blue) replaces default white.
+         White caused "white square" on Android 8+ adaptive icons. -->
+    <color name="ic_launcher_background">#7c3aed</color>
 </resources>

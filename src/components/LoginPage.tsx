@@ -113,15 +113,75 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
           </div>
 
           <form onSubmit={handleSubmit}>
+            {/* v3.0: Register mode — улучшенный UX с пояснением и большой CTA-кнопкой */}
+            {mode === 'register' && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                style={{ marginBottom: 20 }}
+              >
+                <h2 style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: '#FCF9F7',
+                  margin: '0 0 6px',
+                  letterSpacing: '-0.2px',
+                }}>
+                  Создание новой личности
+                </h2>
+                <p style={{
+                  fontSize: 13,
+                  color: 'rgba(252, 249, 247, 0.6)',
+                  margin: '0 0 16px',
+                  lineHeight: 1.5,
+                }}>
+                  Сгенерируйте 12-словную seed-фразу для восстановления на любом устройстве
+                </p>
+
+                {/* Info box — local key generation */}
+                <div style={{
+                  padding: 14,
+                  background: `${theme.color}0d`,
+                  borderRadius: 12,
+                  border: `1px solid ${theme.color}33`,
+                  marginBottom: 16,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: `${theme.color}20`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <LockIcon size={16} color={theme.color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FCF9F7', marginBottom: 4 }}>
+                        🔒 Локальная генерация ключей
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(252, 249, 247, 0.7)', lineHeight: 1.5 }}>
+                        Ключи создаются <strong>на вашем устройстве</strong>. Сервер не получает seed-фразу и приватные ключи. Multi-device recovery через BIP39.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Username */}
-            {mode !== 'restore' && (
+            {mode !== 'restore' && mode !== 'register' && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ marginBottom: 16 }}>
                 <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, fontSize: 14, outline: 'none', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#FCF9F7' }} />
               </motion.div>
             )}
 
             {/* Password */}
-            {mode !== 'restore' && (
+            {mode !== 'restore' && mode !== 'register' && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ marginBottom: 16, position: 'relative' }}>
                 <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '12px 16px 12px 44px', borderRadius: 12, fontSize: 14, outline: 'none', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#FCF9F7' }} />
                 <motion.button type="button" onClick={() => setShowPassword(!showPassword)} whileTap={{ scale: 0.9 }} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'rgba(252, 249, 247, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label={showPassword ? 'Hide password' : 'Show password'}>
@@ -199,9 +259,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
               data-testid={`${mode}-submit`}
               style={{
                 width: '100%',
-                padding: '14px',
+                padding: mode === 'register' ? '16px' : '14px',
                 borderRadius: 12,
-                fontSize: 15,
+                fontSize: mode === 'register' ? 16 : 15,
                 fontWeight: 600,
                 border: 'none',
                 cursor: isRestoring ? 'wait' : 'pointer',
@@ -212,7 +272,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
                 opacity: isRestoring ? 0.7 : 1,
               }}
             >
-              {isRestoring ? 'Восстановление...' : (mode === 'login' ? 'Login' : mode === 'register' ? 'Register' : 'Restore Identity')}
+              {isRestoring ? 'Восстановление...' : (mode === 'login' ? 'Login' : mode === 'register' ? 'Создать безопасную личность' : 'Restore Identity')}
             </motion.button>
 
             {/* Links */}
