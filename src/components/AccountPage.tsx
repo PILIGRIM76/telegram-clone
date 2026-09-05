@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { useAccentColor } from '../hooks/useAccentColor';
 import AnimatedAvatar from './AnimatedAvatar';
 import {
-  ArrowLeftIcon, ShieldIcon, KeyIcon, CopyIcon,
-  DatabaseIcon, LogoutIcon, CheckIcon
+  ArrowLeftIcon, KeyIcon, CopyIcon, LogoutIcon, CheckIcon
 } from './icons';
 
 interface AccountPageProps {
@@ -152,31 +151,11 @@ const AccountPage: React.FC<AccountPageProps> = ({
         </div>
       </div>
 
-      <Section title="Криптография">
+      <Section title="Безопасность">
         <MenuItem icon={<KeyIcon size={20} />}
           label="Резервная копия Seed-фразы"
-          subLabel="Необходимо для восстановления"
+          subLabel="12 слов для восстановления"
           onClick={onBackupSeed} />
-        <MenuItem icon={<ShieldIcon size={20} />}
-          label="Двухфакторная аутентификация"
-          subLabel="Включена"
-          toggle isOn={true} />
-        <MenuItem icon={<ShieldIcon size={20} />}
-          label="Статус TOFU"
-          subLabel={'Ключи ' + (user.e2eeStatus === 'verified' ? 'верифицированы' : 'ожидают проверки')} />
-      </Section>
-
-      <Section title="Второй мозг">
-        <MenuItem icon={<DatabaseIcon size={20} />}
-          label="Obsidian Quick-Capture"
-          subLabel="Автосохранение важных сообщений"
-          toggle isOn={true} />
-      </Section>
-
-      <Section title="Система">
-        <MenuItem icon={<DatabaseIcon size={20} />}
-          label="Версия протокола"
-          subLabel="v3.0-phase4 (E2EE + WebRTC)" />
       </Section>
 
       <div style={{ marginTop: 32, paddingBottom: 32 }}>
