@@ -121,12 +121,63 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
                 transition={{ delay: 0.1 }}
                 style={{ marginBottom: 20 }}
               >
+                {/* v3.0: Компактный логотип PILIGRIM прямо над полями регистрации */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  marginBottom: 20,
+                }}>
+                  <div style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 20,
+                    background: theme.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: `0 8px 24px ${theme.glow}`,
+                    marginBottom: 12,
+                  }}>
+                    <div style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 14,
+                      background: 'rgba(13, 12, 11, 0.85)',
+                      backdropFilter: 'blur(8px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <LockIcon size={26} color="#FCF9F7" />
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: '#FCF9F7',
+                    letterSpacing: '0.25em',
+                    marginBottom: 2,
+                  }}>
+                    PILIGRIM
+                  </div>
+                  <div style={{
+                    fontSize: 11,
+                    color: 'rgba(252, 249, 247, 0.5)',
+                    letterSpacing: '0.15em',
+                    textTransform: 'uppercase',
+                  }}>
+                    End-to-End Encrypted
+                  </div>
+                </div>
+
                 <h2 style={{
                   fontSize: 18,
                   fontWeight: 600,
                   color: '#FCF9F7',
                   margin: '0 0 6px',
                   letterSpacing: '-0.2px',
+                  textAlign: 'center',
                 }}>
                   Создание новой личности
                 </h2>
