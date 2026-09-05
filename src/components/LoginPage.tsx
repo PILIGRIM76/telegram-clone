@@ -105,34 +105,48 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
       background: '#0D0C0F',
       fontFamily: 'Inter, sans-serif',
     }}>
-      {/* Логотип-бейдж ВЫШЕ карточки — слово PILIGRIM ВНУТРИ */}
+      {/* v3.0: Круглый логотип ВЫШЕ карточки — слово PILIGRIM ВНУТРИ */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, type: 'spring' }}
         data-testid="logo-badge"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '10px 24px',
-          borderRadius: R,
+          width: 96,
+          height: 96,
+          borderRadius: '50%',
           background: theme.gradient,
           border: BORDER,
-          boxShadow: `0 8px 24px ${theme.glow}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: `0 0 40px ${theme.glow}`,
           flexShrink: 0,
         }}
       >
-        <LockIcon size={22} color="white" />
-        <span style={{
-          color: 'white',
-          fontSize: 18,
-          fontWeight: 700,
-          letterSpacing: '0.2em',
-          lineHeight: 1,
+        <div style={{
+          width: 84,
+          height: 84,
+          borderRadius: '50%',
+          background: 'rgba(13, 12, 11, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
-          PILIGRIM
-        </span>
+          <LockIcon size={20} color="#FCF9F7" />
+          <span style={{
+            color: '#FCF9F7',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.2em',
+            marginTop: 4,
+            lineHeight: 1,
+          }}>
+            PILIGRIM
+          </span>
+        </div>
       </motion.div>
 
       {/* Карточка входа/регистрации/restore */}
