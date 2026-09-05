@@ -14,6 +14,8 @@ import { StoreIcon } from './icons/StoreIcon';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
 import { useTranslation } from '../contexts/LanguageContext';
 import { AnimatedAvatar } from './AnimatedAvatar';
+import { useAccentColor } from '../hooks/useAccentColor';
+
 
 interface ContactListProps {
   identity: Identity;
@@ -47,6 +49,8 @@ const ContactList: React.FC<ContactListProps> = ({
   onOpenBoards
 }) => {
   const { t } = useTranslation();
+  // v3.0 Phase 4: Dynamic accent theme
+  const theme = useAccentColor();
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -296,8 +300,8 @@ const ContactList: React.FC<ContactListProps> = ({
                             }`}
                         >
                             <div className="relative flex-shrink-0">
-                                <AnimatedAvatar name={contact.name} size={48} />
-                                {contact.verified && (
+                                <AnimatedAvatar name={contact.name} size={48} accentColor={theme.color} e2eeStatus={contact.e2eeStatus || (contact.verified ? 'verified' : 'unverified')} />
+                                {!contact.e2eeStatus && contact.verified && (
                                     <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5">
                                         <CheckCircleIcon className="w-4 h-4 text-green-500" />
                                     </div>

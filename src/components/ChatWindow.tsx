@@ -3,10 +3,12 @@
 // РџРѕР»РЅР°СЏ РІРµСЂСЃРёСЏ СЃ WebRTC/Timer/Export Р±СѓРґРµС‚ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР° РІ СЃР»РµРґСѓСЋС‰РёС… СЌС‚Р°РїР°С….
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import type { Message, Contact } from '../types';
+import type { Message, Contact, E2EEStatus } from '../types';
 import { useImagePicker } from '../hooks/useImagePicker';
 import { AttachmentSheet } from './AttachmentSheet';
 import { ContextMenu } from './ContextMenu';
+import AnimatedAvatar from './AnimatedAvatar';
+import { useAccentColor } from '../hooks/useAccentColor';
 
 interface ChatWindowProps {
   chatId: string;
@@ -46,6 +48,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onDeleteMessage,
   onEditMessage
 }) => {
+  // v3.0 Phase 4: Dynamic accent theme
+  const theme = useAccentColor();
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -325,7 +329,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     <span
                       title="Р—Р°С€РёС„СЂРѕРІР°РЅРѕ (E2EE)"
                       aria-label="Р—Р°С€РёС„СЂРѕРІР°РЅРѕ"
-                      style={{ fontSize: '10px' }}
+                      style={{ fontSize: '10px', color: msg.e2eeStatus === 'verified' ? '#22c55e' : msg.e2eeStatus === 'pending' ? '#f59e0b' : '#94a3b8' }}
                     >
                       рџ”’
                     </span>

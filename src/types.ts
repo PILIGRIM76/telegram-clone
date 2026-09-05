@@ -24,6 +24,7 @@ export interface User {
 }
 
 export type MessageStatus = 'sent' | 'delivered' | 'read' | 'received';
+export type E2EEStatus = 'verified' | 'pending' | 'unverified';
 export type OrderStatus = 'new' | 'processing' | 'shipped' | 'completed' | 'paid' | 'cancelled';
 
 export interface Identity {
@@ -47,6 +48,12 @@ export interface Contact {
   publicKey?: string; // Phase 7.6: JWK-строка публичного ключа для E2EE шифрования
   mutedUntil?: number | 'forever';
   archived?: boolean;
+  /** v3.0 Phase 4: E2EE status of contact */
+  e2eeStatus?: E2EEStatus;
+  /** Online status */
+  online?: boolean;
+  /** Last seen timestamp */
+  lastSeen?: string;
 }
 
 export interface Group {
@@ -95,8 +102,11 @@ export interface Message {
   encryptedPayload?: string;
   /** Флаг: true если сообщение было зашифровано при отправке. */
   isEncrypted?: boolean;
-  /** v3.0 Phase 3: ID родительского сообщения, на которое данное является ответом */
+    /** v3.0 Phase 3: ID родительского сообщения, на которое данное является ответом */
   replyTo?: string;
+
+  /** v3.0 Phase 4: E2EE status of individual message */
+  e2eeStatus?: E2EEStatus;
 }
 
 export interface Chat {

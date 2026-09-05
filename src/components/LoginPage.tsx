@@ -1,6 +1,7 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { LockIcon, EyeOffIcon, WarningIcon, QRIcon } from './icons';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LockIcon, EyeOffIcon, EyeIcon, WarningIcon, QRIcon } from './icons';
+import { useAccentColor } from '../hooks/useAccentColor';
 
 type AuthMode = 'login' | 'register' | 'restore';
 
@@ -15,7 +16,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [twoFACode, setTwoFACode] = React.useState('');
   const [uid, setUid] = React.useState('');
-  const [seedPhrase, setSeedPhrase] = React.useState('');
+    const [seedPhrase, setSeedPhrase] = React.useState('');
+
+  // v3.0 Phase 4: Dynamic accent theme
+  const theme = useAccentColor();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +36,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#0D0C0F', fontFamily: 'Inter, sans-serif' }}>
       {/* Left side — logo */}
-      <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 180, height: 180, borderRadius: '50%', background: 'linear-gradient(135deg, #B388EB 0%, #7B4B9A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(179, 136, 235, 0.4)', marginBottom: 32 }}>
-          <div style={{ width: 160, height: 160, borderRadius: '50%', background: '#0D0C0F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, color: '#FCF9F7', margin: 0 }}>P</h1>
-            <p style={{ fontSize: 12, color: 'rgba(252,249,247,0.6)', marginTop: 8 }}>End-to-End</p>
-            <p style={{ fontSize: 10, color: 'rgba(252,249,247,0.4)' }}>Encrypted</p>
-          </div>
+            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 192, height: 192, borderRadius: '50%', background: theme.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 40px ${theme.glow}`, marginBottom: 32 }}>
+          <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} style={{ width: 172, height: 172, borderRadius: '50%', background: '#0D0C0B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+            <h1 style={{ fontSize: 36, fontWeight: 700, color: '#FCF9F7', letterSpacing: '0.25em', margin: 0 }}>PILIGRIM</h1>
+            <p style={{ fontSize: 12, color: 'rgba(252,249,247,0.6)', marginTop: 8 }}>End-to-End Encrypted</p>
+          </motion.div>
         </div>
       </motion.div>
 
@@ -50,7 +53,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             {modes.map((m) => {
               const isActive = mode === m.key;
               return (
-                <motion.button key={m.key} onClick={() => setMode(m.key)} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: '10px 16px', borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: 'pointer', background: isActive ? 'rgba(179, 136, 235, 0.2)' : 'transparent', color: isActive ? '#B388EB' : 'rgba(252, 249, 247, 0.6)', border: isActive ? '1px solid rgba(179, 136, 235, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                <motion.button key={m.key} onClick={() => setMode(m.key)} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: '10px 16px', borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: 'pointer', background: isActive ? `${theme.color}20` : 'transparent', color: isActive ? theme.color : 'rgba(252, 249, 247, 0.6)', border: isActive ? `1px solid ${theme.color}50` : '1px solid rgba(255, 255, 255, 0.08)' }}>
                   {m.label}
                 </motion.button>
               );
@@ -91,14 +94,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             )}
 
             {/* Submit button */}
-            <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} style={{ width: '100%', padding: '14px', borderRadius: 12, fontSize: 15, fontWeight: 600, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #B388EB 0%, #7B4B9A 100%)', color: '#0D0C0F', boxShadow: '0 4px 20px rgba(179, 136, 235, 0.4)', marginBottom: 16 }}>
+            <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} style={{ width: '100%', padding: '14px', borderRadius: 12, fontSize: 15, fontWeight: 600, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, theme.color 0%, theme.color 100%)', color: '#0D0C0F', boxShadow: `0 4px 20px ${theme.glow}`, marginBottom: 16 }}>
               {mode === 'login' ? 'Login' : mode === 'register' ? 'Register' : 'Restore'}
             </motion.button>
 
             {/* Links */}
             {mode !== 'restore' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-                <motion.button onClick={() => setMode('restore')} whileHover={{ x: 2 }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'rgba(252, 249, 247, 0.6)', cursor: 'pointer' }} onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.color = '#B388EB'; }} onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.color = 'rgba(252, 249, 247, 0.6)'; }}>
+                <motion.button onClick={() => setMode('restore')} whileHover={{ x: 2 }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'rgba(252, 249, 247, 0.6)', cursor: 'pointer' }} onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.color = 'theme.color'; }} onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.color = 'rgba(252, 249, 247, 0.6)'; }}>
                   <WarningIcon size={14} color="#FF8A50" />
                   Restore via Seed Phrase
                 </motion.button>
