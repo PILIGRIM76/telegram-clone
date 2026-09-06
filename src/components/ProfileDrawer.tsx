@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Identity } from '../types';
+import { getPrivateKey } from '../services/cryptoService';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { UserCircleIcon } from './icons/UserCircleIcon';
@@ -144,7 +145,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                  </div>
                  <div className="relative flex items-center bg-slate-700 p-2 rounded-md">
                       <p className="text-xs text-red-400 truncate font-mono flex-1">********************</p>
-                      <button onClick={() => handleCopy(identity.privateKey)} className="ml-2">
+                      <button onClick={() => handleCopy(getPrivateKey(identity))} className="ml-2">
                         <ClipboardIcon className="w-5 h-5 text-slate-400" />
                       </button>
                  </div>

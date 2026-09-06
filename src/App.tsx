@@ -9,7 +9,7 @@ import VerifyModal from './components/VerifyModal';
 import Toasts from './components/Toast';
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
-import { generateIdentity, encrypt, restoreIdentityFromSeed } from './services/cryptoService';
+import { generateIdentity, encryptAESGCM, restoreIdentityFromSeed, getPublicKey, getPrivateKey } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
@@ -31,10 +31,10 @@ import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
 import { SearchModal } from './components/SearchModal';
 import AccountPage from './components/AccountPage';
-import type { Contact, Group, Chat, Message, Identity } from './types';
+import type { Contact, Group, Chat, Message, Identity, IdentityType, LegacyIdentity } from './types';
 
 const App: React.FC = () => {
-  const [identity, setIdentity] = useState<Identity | null>(() => {
+  const [identity, setIdentity] = useState<IdentityType | null>(() => {
     try {
       const saved = localStorage.getItem('piligrim-identity');
       return saved ? JSON.parse(saved) : null;
@@ -42,7 +42,7 @@ const App: React.FC = () => {
       return null;
     }
   });
-  const [pendingIdentity, setPendingIdentity] = useState<Identity | null>(null);
+  const [pendingIdentity, setPendingIdentity] = useState<IdentityType | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
   // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
   const [activeTab, setActiveTab] = useState<TabView>('chats');
@@ -153,7 +153,7 @@ const App: React.FC = () => {
       setShowSeedModal(true);
       console.log('рџЋ­ [PILIGRIM] setShowSeedModal(true) РІС‹РїРѕР»РЅРµРЅ');
 
-      apiService.register(newIdentity.uid, newIdentity.publicKey)
+      apiService.register(newIdentity.uid, getPublicKey(newIdentity))
         .then(() => console.log('вњ… [PILIGRIM] register success'))
         .catch((err: any) => console.warn('вљ пёЏ [PILIGRIM] register failed (ignored):', err?.message || err));
     } catch (error) {
@@ -346,7 +346,7 @@ const App: React.FC = () => {
     let isEncrypted = false;
     if (contact?.publicKey) {
       try {
-        encryptedPayload = await encrypt(trimmed, contact.publicKey);
+        encryptedPayload = await encryptAESGCM(trimmed, getPrivateKey(identity));
         isEncrypted = true;
         console.log(`рџ”’ [PILIGRIM] E2EE: Р·Р°С€РёС„СЂРѕРІР°РЅРѕ РґР»СЏ ${contact.name} (chatId=${chatId}, ciphertext_len=${encryptedPayload.length})`);
       } catch (error) {
@@ -838,7 +838,7 @@ const App: React.FC = () => {
           <VerifyModal
             partnerName={partner?.name || 'РљРѕРЅС‚Р°РєС‚'}
             partnerPublicKey={partner?.publicKey}
-            myPublicKey={identity?.publicKey}
+            myPublicKey={identity ? getPublicKey(identity) : undefined}
             partnerFingerprint={partner?.keyFingerprint}
             myFingerprint={identity?.keyFingerprint}
             isVerified={!!partner?.verified}

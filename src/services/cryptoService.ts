@@ -1,12 +1,111 @@
 
-import type { Identity } from '../types';
+import type { Identity, LegacyIdentity, IdentityType } from '../types';
 import {
   generateBIP39Identity,
   deriveIdentityFromMnemonic,
   restoreIdentityFromEncryptedBlob,
   isValidBIP39Mnemonic,
   normalizeMnemonicWords,
+  generateBIP39IdentityV7,
+  deriveIdentityFromMnemonicV7,
+  restoreIdentityFromMnemonicV7,
 } from '../crypto/bip39Derivation';
+
+/**
+ * Phase 7: Конвертирует secp256k1 privKey hex в ArrayBuffer для Web Crypto API.
+ * SHA-256(privKey) = 32 байта = AES-256 key
+ */
+export function deriveAesKeyFromPrivKey(privateKeyHex: string): ArrayBuffer {
+  // secp256k1 private key уже 32 байта, используем напрямую
+  const bytes = hexToBytes(privateKeyHex);
+  // Убеждаемся, что возвращаем именно ArrayBuffer
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+/**
+ * Phase 7: Шифрует сообщение через AES-GCM с ключом из secp256k1 privKey.
+ * 
+ * @param text - текст для шифрования
+ * @param privateKeyHex - secp256k1 приватный ключ (hex)
+ * @returns JSON строка с iv и ciphertext
+ */
+export async function encryptAESGCM(text: string, privateKeyHex: string): Promise<string> {
+  const key = deriveAesKeyFromPrivKey(privateKeyHex);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  const subtleKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    'AES-GCM',
+    false,
+    ['encrypt']
+  );
+  
+  const encoded = new TextEncoder().encode(text);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    subtleKey,
+    encoded
+  );
+  
+  return JSON.stringify({
+    iv: Array.from(iv),
+    data: Array.from(new Uint8Array(encrypted)),
+  });
+}
+
+/**
+ * Phase 7: Расшифровывает сообщение через AES-GCM.
+ * 
+ * @param encryptedJSON - JSON строка с iv и ciphertext
+ * @param privateKeyHex - secp256k1 приватный ключ (hex)
+ * @returns расшифрованный текст
+ */
+export async function decryptAESGCM(encryptedJSON: string, privateKeyHex: string): Promise<string> {
+  const key = deriveAesKeyFromPrivKey(privateKeyHex);
+  const parsed = JSON.parse(encryptedJSON);
+  
+  const iv = new Uint8Array(parsed.iv);
+  const ciphertext = new Uint8Array(parsed.data);
+  
+  const subtleKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    'AES-GCM',
+    false,
+    ['decrypt']
+  );
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    subtleKey,
+    ciphertext
+  );
+  
+  return new TextDecoder().decode(decrypted);
+}
+
+/**
+ * hex → Uint8Array
+ */
+export function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
+}
+
+/**
+ * Uint8Array → hex
+ */
+export function bytesToHex(bytes: Uint8Array): string {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
 
 /**
  * Генерирует криптографический отпечаток ключа для визуальной верификации.
@@ -19,6 +118,28 @@ export const generateFingerprint = async (key: string): Promise<string> => {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16).toUpperCase();
 };
+
+/**
+ * Phase 7: Type-safe accessor for identity public key.
+ * Works with both v7 (publicKeyHex) and legacy (publicKey) identities.
+ */
+export function getPublicKey(identity: IdentityType): string {
+  if ('publicKeyHex' in identity && identity.publicKeyHex) {
+    return identity.publicKeyHex;
+  }
+  return (identity as LegacyIdentity).publicKey ?? '';
+}
+
+/**
+ * Phase 7: Type-safe accessor for identity private key.
+ * Works with both v7 (privateKeyHex) and legacy (privateKey) identities.
+ */
+export function getPrivateKey(identity: IdentityType): string {
+  if ('privateKeyHex' in identity && identity.privateKeyHex) {
+    return identity.privateKeyHex;
+  }
+  return (identity as LegacyIdentity).privateKey ?? '';
+}
 
 /**
  * Phase 7.6.5: Генерирует 12-словную seed-фразу из 128 бит энтропии.
@@ -79,46 +200,29 @@ export const generateSeedPhrase = (): string => {
 };
 
 /**
- * Генерирует криптографически стойкие ключи через BIP39 детерминированную деривацию.
- *
- * v3.0 Phase 5: обновлено для BIP39 — 12 слов из 2048-словного словаря,
- * BIP32 derivation m/44'/1987'/0'/0/0, ECDSA P-256 ключи шифруются через AES-GCM.
- *
- * Преимущества новой схемы:
- *   - Multi-device sync: те же 12 слов + encryptedKeyPair → та же identity
- *   - Стандарт BIP39: совместимость с аппаратными кошельками (Trezor, Ledger)
- *   - Детерминизм: fingerprint и UID битово-идентичны на любом устройстве
- *
- * Phase 9.5 fix: добавлен 10-секундный timeout для предотвращения зависания.
+ * Phase 7: Генерирует чистую BIP39 + secp256k1 identity.
+ * 
+ * Без ECDSA P-256 wrapper, без encryptedKeyPair.
+ * UUID = uid_ + первые 16 байт приватного ключа (hex).
+ * 
+ * Benefits:
+ * - Быстрее keygen (нет Web Crypto API round-trip)
+ * - Меньше кода, меньше attack surface  
+ * - Детерминированно: одни и те же 12 слов → одни и те же ключи
  */
-export const generateIdentity = async (): Promise<Identity> => {
-    console.log('🔐 [cryptoService] generateIdentity START (BIP39)');
-
-    // Phase 9.5 fix: добавляем timeout чтобы избежать зависания на слабых устройствах
-    const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('generateIdentity timeout (10s)')), 10000);
-    });
-
-    const generatePromise = async (): Promise<Identity> => {
-        // BIP39 derivation (12 слов + secp256k1 + AES-GCM encrypted ECDSA P-256 pair)
-        const derived = await generateBIP39Identity();
-
-        return {
-            uid: derived.uid,
-            publicKey: derived.publicKey,
-            privateKey: derived.privateKey,
-            keyFingerprint: derived.keyFingerprint,
-            seedPhrase: derived.seedPhrase,
-            // v3.0 Phase 5: encryptedKeyPair нужен для multi-device restore
-            encryptedKeyPair: derived.encryptedKeyPair,
-            // Migration flag: новая identity помечается для обратной совместимости
-            isBIP39: true,
-        } as Identity;
-    };
-
-    const result = await Promise.race([generatePromise(), timeoutPromise]);
-    console.log('🔐 [cryptoService] generateIdentity SUCCESS (BIP39)');
-    return result;
+export const generateIdentity = async (): Promise<IdentityType> => {
+  console.log('[PILIGRIM] Phase 7: pure BIP39 + secp256k1 keygen');
+  
+  const v7Identity = await generateBIP39IdentityV7();
+  
+  return {
+    uid: v7Identity.uid,
+    publicKeyHex: v7Identity.publicKeyHex,
+    privateKeyHex: v7Identity.privateKeyHex,
+    seedPhrase: v7Identity.seedPhrase,
+    version: 'v7',
+    keyFingerprint: v7Identity.keyFingerprint,
+  } as IdentityType;
 };
 
 /**
@@ -197,89 +301,60 @@ export const decryptSync = (encryptedText: string, _key: string): string => {
 
 
 /**
- * Восстанавливает identity из 12-словной BIP39 seed-фразы.
- *
- * v3.0 Phase 5: использует BIP39 стандарт (2048 слов) + BIP32 HD derivation.
- *
- * Multi-device flow:
- *   - Если передан `encryptedKeyPair` (из localStorage) — расшифровываем ТУ ЖЕ пару,
- *     что была на устройстве A. Это даёт полную детерминированность.
- *   - Если НЕ передан — генерируется НОВАЯ пара (legacy-путь). Identity с тем же
- *     UID/fingerprint, но новыми ключами. Старые зашифрованные сообщения
- *     НЕ расшифруются — пользователь должен мигрировать.
- *
- * @param words 12-словная BIP39 фраза
- * @param encryptedKeyPair опциональный зашифрованный blob (из localStorage на устройстве A)
- * @returns Identity с пометкой isBIP39: true
+ * Phase 7: Восстанавливает identity из 12-словной BIP39 seed-фразы.
+ * 
+ * Детерминированный restore: те же 12 слов → те же secp256k1 ключи.
+ * 
+ * Backwards compatibility:
+ * - Если seed валиден как BIP39 → используем v7 схему
+ * - Если нет BIP39 валидности → fallback на legacy PBKDF2
+ * 
+ * @param words 12-словная BIP39 фраза (array)
+ * @returns Identity | LegacyIdentity
  */
 export const restoreIdentityFromSeed = async (
     words: string[],
     encryptedKeyPair?: string
-): Promise<Identity> => {
-    console.log('[PILIGRIM] restoreIdentityFromSeed START (BIP39)');
+  ): Promise<IdentityType> => {
+  console.log('[PILIGRIM] Phase 7: restoreIdentityFromSeed');
 
-    // Валидация: должно быть ровно 12 слов
-    if (!Array.isArray(words) || words.length !== 12) {
-        throw new Error('Seed phrase must contain exactly 12 words');
-    }
+  // Валидация: должно быть ровно 12 слов
+  if (!Array.isArray(words) || words.length !== 12) {
+    throw new Error('Seed phrase must contain exactly 12 words');
+  }
 
-    // Валидация: все слова непустые
-    const cleanedWords = normalizeMnemonicWords(words);
-    if (cleanedWords.some(w => w.length === 0)) {
-        throw new Error('All 12 words must be non-empty');
-    }
+  // Валидация: все слова непустые
+  const cleanedWords = normalizeMnemonicWords(words);
+  if (cleanedWords.some(w => w.length === 0)) {
+    throw new Error('All 12 words must be non-empty');
+  }
 
-    // Проверка BIP39 валидности (если legacy словарь — fallback)
-    const isBIP39 = isValidBIP39Mnemonic(cleanedWords);
-    const seedString = cleanedWords.join(' ');
+  // Проверка BIP39 валидности
+  const isBIP39 = isValidBIP39Mnemonic(cleanedWords);
+  const seedString = cleanedWords.join(' ');
 
-    if (!isBIP39) {
-        console.warn('[PILIGRIM] Non-BIP39 mnemonic detected, using legacy PBKDF2 fallback');
-        return legacyRestoreFromSeed(cleanedWords);
-    }
-
-    // BIP39 path: детерминированное восстановление
+  // Phase 7: чистая BIP39 схема
+  if (isBIP39) {
+    console.log('[PILIGRIM] Phase 7: valid BIP39 mnemonic detected');
     try {
-        let identity;
-
-        if (encryptedKeyPair) {
-            // Multi-device: расшифровываем сохранённый blob
-            console.log('[PILIGRIM] Restoring from encrypted blob (multi-device)');
-            const restored = await restoreIdentityFromEncryptedBlob(seedString, encryptedKeyPair);
-            identity = {
-                ...restored,
-                seedPhrase: seedString,
-                isBIP39: true,
-                encryptedKeyPair,
-            };
-        } else {
-            // Single-device: генерируем новую пару (UID/fingerprint детерминированы, ключи — нет)
-            console.log('[PILIGRIM] No encryptedKeyPair, generating new ECDSA pair');
-            const generated = await deriveIdentityFromMnemonic(seedString);
-            identity = {
-                uid: generated.uid,
-                publicKey: generated.publicKey,
-                privateKey: generated.privateKey,
-                keyFingerprint: generated.keyFingerprint,
-                seedPhrase: generated.seedPhrase,
-                encryptedKeyPair: generated.encryptedKeyPair,
-                isBIP39: true,
-            };
-        }
-
-        console.log(`[PILIGRIM] restoreIdentityFromSeed SUCCESS (BIP39), uid=${identity.uid}`);
-        return identity as Identity;
+      const v7Identity = await restoreIdentityFromMnemonicV7(seedString);
+      console.log(`[PILIGRIM] Phase 7: restore SUCCESS (BIP39), uid=${v7Identity.uid}`);
+      return v7Identity as Identity;
     } catch (e) {
-        console.error('[PILIGRIM] BIP39 restore failed:', e);
-        // Fallback на legacy PBKDF2
-        return legacyRestoreFromSeed(cleanedWords);
+      console.error('[PILIGRIM] Phase 7: BIP39 restore failed:', e);
+      // Fallback на legacy
+      return legacyRestoreFromSeed(cleanedWords);
     }
+  }
+
+  console.warn('[PILIGRIM] Phase 7: Non-BIP39 mnemonic detected, using legacy PBKDF2 fallback');
+  return legacyRestoreFromSeed(cleanedWords);
 };
 
 /**
  * Legacy PBKDF2-based restore (для обратной совместимости со старыми 256-словными seed-фразами).
  */
-async function legacyRestoreFromSeed(cleanedWords: string[]): Promise<Identity> {
+async function legacyRestoreFromSeed(cleanedWords: string[]): Promise<LegacyIdentity> {
     const seedString = cleanedWords.join(' ');
     const seedBytes = new TextEncoder().encode(seedString);
 

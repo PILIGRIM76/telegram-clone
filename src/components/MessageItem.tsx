@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { Message, Identity } from '../types';
-import { decrypt } from '../services/cryptoService';
+import { decryptAESGCM, getPrivateKey } from '../services/cryptoService';
 import { ClockIcon } from './icons/ClockIcon';
 import { GiftIcon } from './icons/GiftIcon';
 
@@ -52,8 +52,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
         }
 
         // Fallback: если есть зашифрованный пейлоад и App.tsx не расшифровал — делаем это сами
-        if (encryptedPayload && !isPlaintextFallback && currentIdentity.privateKey) {
-            decrypt(encryptedPayload, currentIdentity.privateKey)
+        if (encryptedPayload && !isPlaintextFallback && getPrivateKey(currentIdentity)) {
+            decryptAESGCM(encryptedPayload, getPrivateKey(currentIdentity))
                 .then(text => setDecryptedText(text))
                 .catch(error => {
                     console.error('MessageItem: Ошибка расшифровки:', error);

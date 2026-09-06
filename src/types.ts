@@ -27,30 +27,82 @@ export type MessageStatus = 'sent' | 'delivered' | 'read' | 'received';
 export type E2EEStatus = 'verified' | 'pending' | 'unverified';
 export type OrderStatus = 'new' | 'processing' | 'shipped' | 'completed' | 'paid' | 'cancelled';
 
+/**
+ * Phase 7: Pure BIP39 + secp256k1 Identity (v7)
+ * 
+ * Новая схема: BIP39 → secp256k1 → identity (ключи напрямую, без ECDSA wrapper)
+ * - publicKeyHex: 33 байта compressed secp256k1 public key (hex string, 66 chars)
+ * - privateKeyHex: 32 байта secp256k1 private key (hex string, 64 chars)
+ * - UID = uid_ + первые 16 байт приватного ключа (hex)
+ * 
+ * Benefits:
+ * - Быстрее keygen (нет Web Crypto API round-trip)
+ * - Меньше кода, меньше attack surface
+ * - Детерминированно: одни и те же 12 слов → одни и те же ключи
+ */
 export interface Identity {
   uid: string;
+  /** Phase 7: secp256k1 public key in compressed hex format (33 bytes = 66 hex chars) */
+  publicKeyHex: string;
+  /** Phase 7: secp256k1 private key in hex format (32 bytes = 64 hex chars) */
+  privateKeyHex: string;
+  /** Username for display */
+  username?: string;
+  /** Avatar image base64 data URL */
+  avatar?: string;
+  /** Store data (for marketplace feature) */
+  store?: Store;
+  /** Announcement boards */
+  boards?: NoticeBoard[];
+  /** 8-hex-char fingerprint for visual verification (SHA-256(truncated) of publicKeyHex) */
+  keyFingerprint?: string;
+  /** 12-word BIP39 seed phrase (stored as space-separated string for Phase 7) */
+  seedPhrase?: string;
+  /** Version marker: 'v7' for new pure BIP39/secp256k1 scheme */
+  version?: 'v7';
+  /** Always true for new identities */
+  isBIP39?: boolean;
+}
+
+/**
+ * Legacy identity (pre-Phase 7): с использованием ECDSA P-256 и encryptedKeyPair.
+ * Автоматически мигрируется при восстановлении из seed-фразы.
+ */
+export interface LegacyIdentity {
+  uid: string;
+  /** ECDSA P-256 JWK public key (legacy) */
   publicKey: string;
+  /** ECDSA P-256 JWK private key (legacy) */
   privateKey: string;
   username?: string;
   avatar?: string;
   store?: Store;
   boards?: NoticeBoard[];
   keyFingerprint?: string;
-  seedPhrase?: string; // Phase 7.6.5: 12-словная фраза для восстановления (опционально для старых Identity)
-  /** v3.0 Phase 5: BIP39 encryptedKeyPair — для multi-device restore (опционально для legacy identity) */
+  /** 12-словная BIP39 фраза */
+  seedPhrase?: string;
+  /** Зашифрованный ECDSA JWK (legacy) */
   encryptedKeyPair?: string;
-  /** v3.0 Phase 5: BIP39 флаг. true = новая identity с детерминированными ключами.
-   *  false/undefined = legacy PBKDF2 identity (ключи случайные, multi-device не работает) */
+  /** false/undefined = legacy PBKDF2 identity */
   isBIP39?: boolean;
 }
+
+/**
+ * Union type for all identity variants.
+ * Use isBIP39/version to distinguish at runtime.
+ */
+export type IdentityType = Identity | LegacyIdentity;
 
 export interface Contact {
   id: string; // Локальный ID
   uid: string;
   name: string;
   verified: boolean;
+  /** Phase 7: secp256k1 public key in hex format (66 chars) OR ECDSA JWK (legacy) */
+  publicKey?: string;
+  /** Phase 7: secp256k1 public key hex (preferred) */
+  publicKeyHex?: string;
   keyFingerprint?: string;
-  publicKey?: string; // Phase 7.6: JWK-строка публичного ключа для E2EE шифрования
   mutedUntil?: number | 'forever';
   archived?: boolean;
   /** v3.0 Phase 4: E2EE status of contact */

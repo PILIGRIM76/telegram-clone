@@ -79,8 +79,13 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   useEffect(() => {
     if (identity && showQr && !qrDataUrl) {
-      const payloadObj: { v: string; uid: string; publicKey?: string } = { v: 'piligrim-contact-v2', uid: identity.uid };
-      const pk = (identity as { publicKey?: string }).publicKey;
+      // Phase 7: publicKeyHex for new identity, publicKey for legacy
+      const pk = (identity as { publicKeyHex?: string }).publicKeyHex || 
+                 (identity as { publicKey?: string }).publicKey;
+      const payloadObj: { v: string; uid: string; publicKey?: string } = {
+        v: 'piligrim-contact-v2',
+        uid: identity.uid
+      };
       if (pk) payloadObj.publicKey = pk;
       const payload = JSON.stringify(payloadObj);
       QRCode.toDataURL(payload, { width: 200, margin: 2, color: { dark: '#1C1816', light: '#FCF9F7' } })

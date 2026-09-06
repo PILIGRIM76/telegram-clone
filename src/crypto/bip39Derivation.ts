@@ -333,3 +333,119 @@ async function generateFingerprintFromJWK(publicKeyJwk: JsonWebKey): Promise<str
   const hashHex = await sha256Hex(jwkStr);
   return hashHex.substring(0, 8).toUpperCase();
 }
+// =============================================================
+// Phase 7: Pure BIP39 + secp256k1 (требует @noble/secp256k1)
+// =============================================================
+
+import { Point, getPublicKey } from '@noble/secp256k1';
+
+/**
+ * Phase 7 Identity: чистая BIP39 + secp256k1 схема (без ECDSA wrapper).
+ *
+ * Benefits:
+ * - Быстрее keygen (нет Web Crypto API round-trip)
+ * - Меньше кода, меньше attack surface
+ * - Детерминированно: одни и те же 12 слов → одни и те же ключи
+ */
+export interface IdentityV7 {
+  /** UID = uid_ + первые 16 байт приватного ключа (hex) */
+  uid: string;
+  /** secp256k1 приватный ключ (32 байта = 64 hex символа) */
+  privateKeyHex: string;
+  /** secp256k1 публичный ключ (33 байта compressed = 66 hex символов) */
+  publicKeyHex: string;
+  /** 12-словная BIP39 фраза (space-separated) */
+  seedPhrase: string;
+  /** 8-hex-char отпечаток (SHA-256(publicKeyHex) first 8 chars) */
+  keyFingerprint?: string;
+  /** Версия схемы: всегда 'v7' для новых identity */
+  version: 'v7';
+  /** Всегда true для Phase 7 identity */
+  isBIP39: true;
+}
+
+/**
+ * Phase 7: Генерирует новую identity из случайного BIP39 seed (12 слов).
+ * Использует @noble/secp256k1 для получения compressed public key.
+ *
+ * Быстрее чем гибридная схема: нет Web Crypto API round-trip.
+ */
+export async function generateBIP39IdentityV7(
+  derivationPath: string = DEFAULT_DERIVATION_PATH
+): Promise<IdentityV7> {
+  // 128 бит энтропии = 12 слов
+  const mnemonic = generateMnemonic(wordlist, 128);
+  return deriveIdentityFromMnemonicV7(mnemonic, derivationPath);
+}
+
+/**
+ * Phase 7: Детерминированно создаёт identity из 12-словной BIP39 фразы.
+ *
+ * Использует @scure/bip32 → secp256k1 privKey → @noble/secp256k1 → compressed pubKey
+ *
+ * Результат: те же 12 слов → те же secp256k1 ключи (битово идентичны).
+ *
+ * @param mnemonic 12-словная BIP39 фраза
+ * @param derivationPath BIP44 path (по умолчанию m/44'/1987'/0'/0/0)
+ */
+export async function deriveIdentityFromMnemonicV7(
+  mnemonic: string,
+  derivationPath: string = DEFAULT_DERIVATION_PATH
+): Promise<IdentityV7> {
+  // 1. Нормализуем mnemonic
+  const normalizedMnemonic = (mnemonic || '').trim().toLowerCase();
+
+  if (!validateMnemonic(normalizedMnemonic, wordlist)) {
+    throw new Error('Invalid BIP39 mnemonic (wrong words or checksum)');
+  }
+
+  // 2. Получаем secp256k1 приватный ключ через BIP32
+  const seed = mnemonicToSeedSync(normalizedMnemonic);
+  const master = HDKey.fromMasterSeed(seed);
+  const child = master.derive(derivationPath);
+
+  if (!child.privateKey) {
+    throw new Error('Key derivation failed (HDKey has no private)');
+  }
+
+  // 3. ИСПОЛЬЗУЕМ getPublicKey из @noble/secp256k1 для compressed public key
+  const publicKeyCompressed = getPublicKey(child.privateKey, true); // 33 bytes compressed
+
+  // 4. Конвертируем в hex строки
+  const privateKeyHex = bytesToHex(child.privateKey);
+  const publicKeyHex = bytesToHex(publicKeyCompressed);
+
+  // 5. UID = первые 16 байт приватного ключа (hex)
+  const uid = `uid_${privateKeyHex.slice(0, 32)}`;
+
+  // 6. Fingerprint = SHA-256(publicKeyHex).slice(0, 8).toUpperCase()
+  const fingerprint = await generateFingerprintFromHex(publicKeyHex);
+
+  return {
+    uid,
+    privateKeyHex,
+    publicKeyHex,
+    seedPhrase: normalizedMnemonic,
+    keyFingerprint: fingerprint,
+    version: 'v7',
+    isBIP39: true,
+  };
+}
+
+/**
+ * Phase 7: Восстанавливает identity из 12-словной BIP39 фразы.
+ * Детерминированный restore без encryptedKeyPair.
+ *
+ * @param mnemonic 12-словная BIP39 фраза (space-separated)
+ */
+export async function restoreIdentityFromMnemonicV7(
+  mnemonic: string
+): Promise<IdentityV7> {
+  return deriveIdentityFromMnemonicV7(mnemonic);
+}
+
+async function generateFingerprintFromHex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return bytesToHex(new Uint8Array(hash)).substring(0, 8).toUpperCase();
+}

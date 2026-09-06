@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { Identity, Contact, Chat, Group } from '../types';
+import type { Identity, Contact, Chat, Group, IdentityType } from '../types';
 import AddContactModal from './AddContactModal';
 import CreateGroupModal from './CreateGroupModal';
 import { UserPlusIcon } from './icons/UserPlusIcon';
@@ -18,7 +18,7 @@ import { useAccentColor } from '../hooks/useAccentColor';
 
 
 interface ContactListProps {
-  identity: Identity;
+  identity: IdentityType;
   contacts: Contact[];
   groups: Group[];
   onAddContact: (name: string, uid: string, publicKey?: string) => void;
