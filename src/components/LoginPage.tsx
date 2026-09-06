@@ -105,67 +105,93 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
       background: '#0D0C0F',
       fontFamily: 'Inter, sans-serif',
     }}>
-      {/* v3.0: Пульсирующий круглый логотип ВЫШЕ карточки — как в первой версии */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, type: 'spring' }}
-        data-testid="logo-badge"
+      {/* v3.0: Пульсирующий логотип (user design) — radial gradient + blur(20px) кольцо,
+           основное кольцо 192×192 (w-48, чтобы помещалось в no-scroll layout на 800×1280).
+           "End-to-End Encrypted" ВНУТРИ кольца (как требовал дизайн пользователя). */}
+      <div
+        data-testid="logo-outer"
         style={{
-          width: 96,
-          height: 96,
-          borderRadius: '50%',
-          background: theme.gradient,
-          border: BORDER,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: `0 0 40px ${theme.glow}`,
+          position: 'relative',
+          width: 192,
+          height: 192,
           flexShrink: 0,
         }}
       >
-        {/* Внутренний пульсирующий круг (как в оригинальном логотипе) */}
+        {/* Пульсирующее кольцо: radial-gradient + blur(20px) + scale [1, 1.1, 1] */}
         <motion.div
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-          data-testid="logo-badge-inner"
+          animate={{
+            scale: [1, 1.1, 1],
+            opacity: [0.5, 0.8, 0.5],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          data-testid="logo-pulse"
           style={{
-            width: 84,
-            height: 84,
+            position: 'absolute',
+            inset: 0,
             borderRadius: '50%',
-            background: 'rgba(13, 12, 11, 0.85)',
-            backdropFilter: 'blur(8px)',
+            background: 'radial-gradient(circle, rgba(179, 136, 235, 0.3) 0%, transparent 70%)',
+            filter: 'blur(20px)',
+          }}
+        />
+
+        {/* Основное кольцо: gradient #B388EB → #7B4B9A + glow */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
+            background: 'linear-gradient(135deg, #B388EB 0%, #7B4B9A 100%)',
+            boxShadow: '0 0 60px rgba(179, 136, 235, 0.5)',
           }}
         >
-          <LockIcon size={20} color="#FCF9F7" />
-          <span style={{
-            color: '#FCF9F7',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.2em',
-            marginTop: 4,
-            lineHeight: 1,
-          }}>
-            PILIGRIM
-          </span>
-        </motion.div>
-      </motion.div>
-
-      {/* Подпись под пульсирующим логотипом (как в первой версии) */}
-      <span style={{
-        fontSize: 10,
-        color: 'rgba(252, 249, 247, 0.5)',
-        letterSpacing: '0.15em',
-        textTransform: 'uppercase',
-        flexShrink: 0,
-        marginTop: -8,
-      }} data-testid="logo-subtitle">
-        End-to-End Encrypted
-      </span>
+          {/* Внутренний круг: тёмный фон с PILIGRIM + subtitle */}
+          <div
+            style={{
+              width: 176,
+              height: 176,
+              borderRadius: '50%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#0D0C0F',
+            }}
+          >
+            <h1
+              style={{
+                fontSize: 36,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                color: '#FCF9F7',
+                fontFamily: 'Inter, sans-serif',
+                margin: 0,
+                lineHeight: 1,
+              }}
+            >
+              PILIGRIM
+            </h1>
+            <p
+              data-testid="logo-subtitle"
+              style={{
+                fontSize: 12,
+                margin: '8px 0 0',
+                letterSpacing: '0.05em',
+                color: 'rgba(252, 249, 247, 0.6)',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              End-to-End Encrypted
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Карточка входа/регистрации/restore */}
       <motion.div
