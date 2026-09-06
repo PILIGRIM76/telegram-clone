@@ -115,6 +115,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
           width: 192,
           height: 192,
           flexShrink: 0,
+          marginTop: -5,
         }}
       >
         {/* Пульсирующее кольцо: radial-gradient + blur(20px) + scale [1, 1.1, 1] */}
