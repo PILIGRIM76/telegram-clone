@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from 'qrcode';
 import { AnimatedAvatar } from './AnimatedAvatar';
+import { Tooltip } from './Tooltip';
 // v3.0 Phase 2J: responsive cfg через useBreakpoint
 import { useBreakpoint, type Breakpoint } from '../hooks/useBreakpoint';
 
@@ -152,6 +153,8 @@ export const Drawer: React.FC<DrawerProps> = ({
               size={cfg.avatar}
               bordered
               e2eeStatus={identity?.isBIP39 === true ? 'verified' : 'pending'}
+              hoverable={true}
+              glowIntensity="high"
             />
             <div>
               <div style={{ fontSize: cfg.nameFont, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.3px' } as React.CSSProperties}>
@@ -163,25 +166,32 @@ export const Drawer: React.FC<DrawerProps> = ({
               </div>
               {/* v3.0 Phase 5: E2EE status badge под аватаром */}
               {identity && (
-                <div
-                  data-testid="e2ee-badge"
-                  title={identity.isBIP39 ? 'BIP39 детерминированный recovery — multi-device ready' : 'Legacy PBKDF2 — нужен migrate для multi-device'}
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: identity.isBIP39 ? '#38A169' : '#F59E0B',
-                    marginTop: 4,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '2px 6px',
-                    borderRadius: 6,
-                    background: identity.isBIP39 ? 'rgba(56, 161, 105, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                    border: `1px solid ${identity.isBIP39 ? 'rgba(56, 161, 105, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-                  } as React.CSSProperties}
+                <Tooltip
+                  content={identity.isBIP39
+                    ? '✓ Multi-device ready — восстановите на любом устройстве'
+                    : '⚠ Legacy keys — создайте новую личность для multi-device'}
+                  position="right"
                 >
-                  {identity.isBIP39 ? '✓ Multi-device ready' : '⚠ Legacy keys'}
-                </div>
+                  <div
+                    data-testid="e2ee-badge"
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: identity.isBIP39 ? '#38A169' : '#F59E0B',
+                      marginTop: 4,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 6px',
+                      borderRadius: 6,
+                      background: identity.isBIP39 ? 'rgba(56, 161, 105, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                      border: `1px solid ${identity.isBIP39 ? 'rgba(56, 161, 105, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                      cursor: 'help',
+                    } as React.CSSProperties}
+                  >
+                    {identity.isBIP39 ? '✓ Multi-device ready' : '⚠ Legacy keys'}
+                  </div>
+                </Tooltip>
               )}
             </div>
           </div>

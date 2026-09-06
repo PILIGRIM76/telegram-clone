@@ -2,7 +2,7 @@
 // Использует Framer Motion для плавного вращения.
 // Цвет генерируется из имени (детерминированно), что даёт стабильный визуал.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface AnimatedAvatarProps {
@@ -21,6 +21,10 @@ interface AnimatedAvatarProps {
   avatarUrl?: string;
   /** Custom border color (default white for bordered, or avatar container color) */
   borderColor?: string;
+  /** Enable hover effect (scale + translateY) */
+  hoverable?: boolean;
+  /** Glow intensity for E2EE status indication */
+  glowIntensity?: 'none' | 'low' | 'high';
 }
 
 /**
@@ -62,7 +66,10 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
   isTyping = false,
   avatarUrl,
   borderColor = '#0D0C0F',
+  hoverable = false,
+  glowIntensity = 'none',
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const color1 = accentColor || 'var(--color-accent, #E86A58)';
   const color2 = hashColor(name);
   const initials = getInitials(name) || '?';
@@ -89,25 +96,44 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
     return isOnline ? '#4CAF50' : 'rgba(255, 255, 255, 0.3)';
   };
 
+  const getGlowColor = (): string => {
+    if (e2eeStatus === 'verified') return 'rgba(56, 161, 105, 0.4)';
+    if (e2eeStatus === 'pending') return 'rgba(245, 158, 11, 0.4)';
+    return 'rgba(232, 106, 88, 0.4)';
+  };
+
+  const getGlowOpacity = (): number => {
+    if (glowIntensity === 'high') return 0.4;
+    if (glowIntensity === 'low') return 0.2;
+    return 0;
+  };
+
   const borderStyle = bordered ? {
     border: '3px solid white',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   } : {};
+
+  const containerStyles: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    overflow: 'hidden',
+    position: 'relative',
+    flexShrink: 0,
+    transform: isHovered && hoverable ? 'scale(1.05) translateY(-2px)' : 'scale(1)',
+    transition: 'transform 200ms ease',
+    boxShadow: glowIntensity !== 'none' ? `0 0 ${glowIntensity === 'high' ? '20px' : '10px'} ${getGlowColor()}` : 'none',
+    ...borderStyle,
+  };
 
   return (
     <div
       data-testid="animated-avatar"
       role="img"
       aria-label={`Avatar of ${name}`}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        overflow: 'hidden',
-        position: 'relative',
-        flexShrink: 0,
-        ...borderStyle,
-      }}
+      style={containerStyles}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* E2EE ring */}
       <motion.div
