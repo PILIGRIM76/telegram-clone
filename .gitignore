@@ -51,3 +51,4 @@ certs/*.key
 certs/*.csr
 certs/*.srl
 # certs/*.crt КОММИТИМ (для Docker volumes), но НЕ приватные ключи
+test-results/; playwright-report/
