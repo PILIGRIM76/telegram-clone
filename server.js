@@ -20,7 +20,6 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 // Хранилище в памяти
 const пользователи = new Map(); // { uid: { публичныйКлюч, ws, магазин, доски } }
 const группы = new Map(); // { id: { название, участники[], idВладельца, тип, токен } }
-const офлайнСообщения = new Map();
 
 console.log('[DB] Инициализация слоя данных, тип:', STORAGE_TYPE);
 console.log('Сервер ШифроСвязь запускается...');
@@ -78,7 +77,8 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
         totalGroups: группы.size,
         publicStores,
         totalBoards,
-        offlineMessagesStored: офлайнСообщения.size
+        // Phase 3: Dumb Server — сервер НЕ хранит офлайн-сообщения.
+        // Клиенты используют IndexedDB queue (OfflineQueue service).
     });
 });
 
@@ -469,11 +469,8 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
   ws.sessionId = юзер.sessionId;
   console.log(`[WS] client connected: uid=${uid} (session=${юзер.sessionId}, client=${clientType})`);
 
-  // 1. Отправка офлайн сообщений
-  if (офлайнСообщения.has(uid)) {
-    офлайнСообщения.get(uid).forEach(с => ws.send(JSON.stringify(с)));
-    офлайнСообщения.delete(uid);
-  }
+  // 1. Phase 3: Dumb Server — сервер НЕ хранит офлайн-сообщения.
+  // Клиент сам хранит очередь в IndexedDB (см. src/services/offlineQueue.ts).
 
   // 2. Проверка сроков аренды досок и отправка системных уведомлений
   if (юзер.доски) {
@@ -599,18 +596,31 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
       // v2.0 Stage 5.3: Delivery receipt — подтверждаем отправителю,
       // что сообщение доставлено адресату (или поставлено в очередь offline).
       if (msg.id) {
-          // Если получатель онлайн и мы только что отправили — receipt "delivered".
-          // Если онлайн → отправляется мгновенно, если нет — ставится в очередь.
+          // Phase 3: Dumb Server — receipt "delivered" ТОЛЬКО если получатель онлайн.
+          // Если офлайн — receipt "queued" (на стороне клиента).
           const получательЮзер = пользователи.get(кому);
           const доставленоСразу = получательЮзер && получательЮзер.ws && получательЮзер.ws.readyState === WebSocket.OPEN;
-          отправить(uid, {
-              type: 'receipt',
-              receipt: 'delivered',
-              messageId: msg.id,
-              to: кому,
-              timestamp: new Date().toISOString(),
-              queued: !доставленоСразу
-          });
+          if (доставленоСразу) {
+              отправить(uid, {
+                  type: 'receipt',
+                  receipt: 'delivered',
+                  messageId: msg.id,
+                  to: кому,
+                  timestamp: new Date().toISOString(),
+                  queued: false
+              });
+          } else {
+              // Сервер не хранит офлайн — клиент получит 'recipient_offline' через
+              // функцию отправить() выше и сам сохранит в IndexedDB.
+              отправить(uid, {
+                  type: 'receipt',
+                  receipt: 'queued',
+                  messageId: msg.id,
+                  to: кому,
+                  timestamp: new Date().toISOString(),
+                  queued: true
+              });
+          }
       }
 
     } catch (e) { console.error(e); }
@@ -626,8 +636,23 @@ function отправить(uidПолучателя, данные) {
     if (юзер && юзер.ws && юзер.ws.readyState === WebSocket.OPEN) {
         юзер.ws.send(JSON.stringify(данные));
     } else {
-        if (!офлайнСообщения.has(uidПолучателя)) офлайнСообщения.set(uidПолучателя, []);
-        офлайнСообщения.get(uidПолучателя).push(данные);
+        // Phase 3: Dumb Server — НЕ сохраняем на сервере.
+        // Отправляем 'recipient_offline' error обратно отправителю.
+        // Отправитель сам хранит сообщение в IndexedDB и ретраит при reconnect.
+        const senderUid = данные.от;
+        if (senderUid) {
+            const senderUser = пользователи.get(senderUid);
+            if (senderUser && senderUser.ws && senderUser.ws.readyState === WebSocket.OPEN) {
+                senderUser.ws.send(JSON.stringify({
+                    type: 'error',
+                    error: 'recipient_offline',
+                    messageId: данные.id,
+                    recipientUid: uidПолучателя,
+                    originalPayload: данные,
+                }));
+            }
+        }
+        console.log(`[OFFLINE] recipient ${uidПолучателя} not connected, sender ${senderUid || 'unknown'} notified`);
     }
 }
 

@@ -7,6 +7,8 @@ import type { PreKeyBundle } from '../crypto/signal/types';
 // Phase 2: Metadata protection — traffic padding и Tor proxy.
 import { TrafficPadder, padMessage, unpadMessage, encodeConstantSizePacket, decodeConstantSizePacket } from './trafficPadding';
 import { torProxy } from './torProxy';
+// Phase 3: Dumb Server — клиентская офлайн-очередь в IndexedDB.
+import { offlineQueue, type QueuedMessage } from './offlineQueue';
 
 // v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
@@ -181,6 +183,10 @@ class ApiService {
     // Шумовые пакеты отправляются каждые 30-60 секунд.
     this.ws.onopen = () => {
       this.trafficPadder.connect(this.ws!);
+      // Phase 3: обрабатываем офлайн-очередь при (re)connect.
+      this.processOfflineQueue().catch(e => {
+        console.warn('[API] processOfflineQueue failed:', e);
+      });
     };
 
     this.ws.onmessage = (event) => {
@@ -203,6 +209,30 @@ class ApiService {
         // Невалидный JSON — пропускаем.
       }
       const data = JSON.parse(rawData);
+
+      // Phase 3: Dumb Server — обработка ошибки recipient_offline.
+      // Сервер сообщает что получатель не в сети.
+      // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
+      if (data.type === 'error' && data.error === 'recipient_offline') {
+        console.log(`[API] Recipient ${data.recipientUid} offline, queuing message ${data.messageId}`);
+        const queued: QueuedMessage = {
+          id: data.messageId,
+          recipientUid: data.recipientUid,
+          payload: data.originalPayload || { id: data.messageId, to: data.recipientUid },
+          timestamp: Date.now(),
+          retryCount: 0,
+          type: 'direct',
+        };
+        offlineQueue.enqueue(queued).catch(e => {
+          console.warn('[API] Failed to enqueue offline message:', e);
+        });
+        // Сигнализируем processOfflineQueue (если ждёт) что recipient offline.
+        window.dispatchEvent(new CustomEvent('piligrim:recipient-offline', {
+          detail: { messageId: data.messageId, recipientUid: data.recipientUid },
+        }));
+        return;
+      }
+
       let content = data.content || '';
 
       // E2EE: Дешифрование сообщения (Phase 1: hybrid Signal/NaCl)
@@ -277,6 +307,40 @@ class ApiService {
     // Phase 2: останавливаем traffic padder перед закрытием WS.
     this.trafficPadder.disconnect();
     if (this.ws) { this.ws.close(); this.ws = null; }
+  }
+
+  // Phase 3: Dumb Server — обрабатывает офлайн-очередь при reconnect.
+  // Для каждого сообщения пытается отправить через WS.
+  // Если получатель offline — увеличивает retryCount (max 3).
+  // Использует OfflineQueue из IndexedDB для персистентности.
+  async processOfflineQueue(): Promise<{ sent: number; failed: number; retried: number }> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.log('[API] processOfflineQueue: WS not connected, skipping');
+      return { sent: 0, failed: 0, retried: 0 };
+    }
+    return offlineQueue.processQueue(async (payload: any) => {
+      // Пытаемся отправить payload через WS. Если получатель offline —
+      // сервер пришлёт 'recipient_offline' error → enqueue снова.
+      const json = JSON.stringify(payload);
+      const padded = encodeConstantSizePacket(json);
+      this.ws!.send(padded);
+      // Даём серверу время прислать response. Если 3 сек нет error — считаем доставлено.
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          window.removeEventListener('piligrim:recipient-offline', onError);
+          resolve();
+        }, 3000);
+        const onError = (e: Event) => {
+          const detail = (e as CustomEvent).detail;
+          if (detail?.messageId === payload.id) {
+            clearTimeout(timer);
+            window.removeEventListener('piligrim:recipient-offline', onError);
+            reject(new Error('recipient_offline'));
+          }
+        };
+        window.addEventListener('piligrim:recipient-offline', onError);
+      });
+    });
   }
 
   // E2EE: Отправка зашифрованных сообщений
