@@ -20,3 +20,8 @@ Object.defineProperty(globalThis, 'crypto', {
   writable: true,
   configurable: true,
 });
+
+// Phase 1: structuredClone is needed by fake-indexeddb.
+// jsdom does not provide it globally, so we polyfill from node:util.
+const { structuredClone } = require('node:util');
+globalThis.structuredClone = structuredClone;
