@@ -54,7 +54,10 @@ describe('WebSocket API Service', () => {
       apiService.connect('sender-uid');
       apiService.sendMessage('receiver-uid', 'Hello');
       expect(mockWebSocket.send).toHaveBeenCalled();
-      const sentData = JSON.parse(mockWebSocket.send.mock.calls[0][0]);
+      // Phase 2: пакеты padded с constant-size prefix. Извлекаем JSON.
+      const { decodeConstantSizePacket } = require('../src/services/trafficPadding');
+      const raw = mockWebSocket.send.mock.calls[0][0];
+      const sentData = JSON.parse(decodeConstantSizePacket(raw));
       expect(sentData.to).toBe('receiver-uid');
       expect(sentData.content).toBe('Hello');
     });

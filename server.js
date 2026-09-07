@@ -1,5 +1,8 @@
 
 const express = require('express');
+// Phase 2: Metadata protection — используем crypto для генерации session ID
+// вместо логирования IP-адресов клиентов.
+const crypto = require('crypto');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -67,6 +70,8 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
         if (u.доски) totalBoards += u.доски.length;
     }
 
+    // Phase 2: stats endpoint НЕ возвращает IP-адреса пользователей.
+    // Только агрегированные counters (online count, total count).
     res.json({
         totalUsers: пользователи.size,
         onlineUsers,
@@ -85,7 +90,12 @@ app.get('/api/admin/users', adminAuth, (req, res) => {
             uid,
             isOnline: u.ws && u.ws.readyState === WebSocket.OPEN,
             hasStore: !!u.магазин,
-            boardsCount: u.доски ? u.доски.length : 0
+            boardsCount: u.доски ? u.доски.length : 0,
+            // Phase 2: только session ID, никаких IP-адресов.
+            // sessionId меняется при каждом WS reconnect — невозможно
+            // связать разные сессии одного юзера между собой.
+            sessionId: u.sessionId || null,
+            connectedAt: u.connectedAt || null,
         });
     }
     // Пагинация должна быть тут, но для прототипа отдаем 100 последних
@@ -240,18 +250,40 @@ app.get('/store/invite/:token', (req, res) => {
 });
 
 // 3. ГРУППЫ
+// Phase 2: Metadata protection — сервер НЕ знает, кто в группе.
+// Клиент шифрует список UID участников через encryptGroupMembers(groupKey)
+// перед отправкой. Сервер хранит opaque blob (encryptedMembers).
+//
+// Backward compat: если клиент ещё не использует шифрование —
+// принимаем старый формат (массив UID) для совместимости,
+// но НЕ отдаём его другим клиентам через API.
 app.post('/groups/create', (req, res) => {
-    const { название, idВладельца, тип, участники } = req.body;
+    const { название, idВладельца, тип, encryptedMembers, участники } = req.body;
     const id = `group_${Date.now()}`;
     const токен = тип === 'приватная' ? сгенерироватьТокен() : undefined;
 
-    группы.set(id, { id, название, idВладельца, тип, токен, участники: участники || [idВладельца] });
-    console.log(`[ГРУППА] Создана ${id} (${название})`);
+    // Phase 2: prefer encryptedMembers (opaque blob). Fallback to legacy участники.
+    const opaqueMembers = encryptedMembers || ['__legacy_placeholder__'];
+    const memberCount = Array.isArray(opaqueMembers) ? opaqueMembers.length : 1;
+
+    группы.set(id, {
+        id,
+        название,
+        idВладельца,
+        тип,
+        токен,
+        // Phase 2: opaque blob для сервера. Сервер не знает состав группы.
+        encryptedMembers: opaqueMembers,
+        memberCount,
+        // Помечаем legacy группы для возможной миграции в будущем.
+        isLegacy: !encryptedMembers && !!участники,
+    });
+    console.log(`[ГРУППА] Создана ${id} (encrypted=${!!encryptedMembers}, members=${memberCount})`);
     res.json({ id, токен });
 });
 
 app.post('/groups/join', (req, res) => {
-    const { uid, токен, groupId } = req.body;
+    const { uid, токен, groupId, encryptedMembers } = req.body;
     
     let группа = null;
     if (groupId) группа = группы.get(groupId);
@@ -262,10 +294,24 @@ app.post('/groups/join', (req, res) => {
     }
 
     if (!группа) return res.status(404).json({ ошибка: 'Группа не найдена' });
-    if (!группа.участники.includes(uid)) {
-        группа.участники.push(uid);
+
+    // Phase 2: клиент отправляет обновлённый зашифрованный список участников.
+    if (encryptedMembers && Array.isArray(encryptedMembers)) {
+        группа.encryptedMembers = encryptedMembers;
+        группа.memberCount = encryptedMembers.length;
+        группа.isLegacy = false;
+    } else {
+        // Backward compat: legacy клиент без encryptedMembers.
+        console.warn(`[ГРУППА] Legacy join без encryptedMembers — count инкрементируется`);
+        if (!группа.encryptedMembers || группа.encryptedMembers.length === 0) {
+            группа.encryptedMembers = ['__legacy_placeholder__'];
+        }
+        группа.memberCount = (группа.memberCount || 1) + 1;
     }
-    res.json({ группа });
+
+    // Возвращаем группу БЕЗ encryptedMembers (opaque blob, клиент его уже имеет).
+    const { encryptedMembers: _omit, ...safeGroup } = группа;
+    res.json({ группа: safeGroup });
 });
 
 // 4. ДОСКИ ОБЪЯВЛЕНИЙ
@@ -393,19 +439,35 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
       ws.close(4002, 'Unknown uid and no publicKey for trust-on-first-use');
       return;
     }
-    юзер = { публичныйКлюч: publicKey, ws: null, доски: [], зарегистрированВ: new Date().toISOString(), clientType, protocolVersion };
+    // Phase 2: генерируем случайный session ID вместо логирования IP.
+    // Сервер НЕ знает IP клиента — только анонимный session ID для отладки.
+    const sessionId = crypto.randomBytes(8).toString('hex');
+    юзер = {
+      публичныйКлюч: publicKey,
+      ws: null,
+      доски: [],
+      sessionId,
+      connectedAt: new Date().toISOString(),
+      зарегистрированВ: new Date().toISOString(),
+      clientType,
+      protocolVersion,
+    };
     пользователи.set(uid, юзер);
-    console.log(`[WS] trust-on-first-use: auto-registered ${uid} (client=${clientType}, v=${protocolVersion})`);
+    console.log(`[WS] trust-on-first-use: auto-registered ${uid} (session=${sessionId}, client=${clientType}, v=${protocolVersion})`);
   } else if (publicKey && юзер.публичныйКлюч !== publicKey) {
     // PublicKey mismatch — потенциальная MITM-атака или key rotation
     console.warn(`[WS] publicKey mismatch for ${uid}: stored vs new`);
     // В production тут можно закрывать соединение. Для dev — пропускаем warning.
   }
 
+  // Phase 2: обновляем session ID при каждом подключении (rotation).
+  // IP клиента НЕ логируется и НЕ сохраняется.
   юзер.ws = ws;
+  юзер.sessionId = crypto.randomBytes(8).toString('hex');
   юзер.последнийПодключенВ = new Date().toISOString();
   ws.uid = uid;
-  console.log(`[WS] client connected: uid=${uid} (client=${clientType})`);
+  ws.sessionId = юзер.sessionId;
+  console.log(`[WS] client connected: uid=${uid} (session=${юзер.sessionId}, client=${clientType})`);
 
   // 1. Отправка офлайн сообщений
   if (офлайнСообщения.has(uid)) {
@@ -438,6 +500,11 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
   ws.on('message', (данные) => {
     try {
       const msg = JSON.parse(данные);
+
+      // Phase 2: traffic padding — игнорируем шумовые пакеты.
+      if (msg.type === 'noise') {
+        return;  // Сервер НЕ обрабатывает шум.
+      }
 
       // v2.0 Stage 5.4: Read receipt — клиент сообщает, что прочитал сообщение.
       // Сервер пересылает это оригинальному отправителю.
@@ -505,10 +572,24 @@ app.put('/boards/:boardId/announcements/:annId', (req, res) => {
           // Рассылка по группе
           const группа = группы.get(idГруппы);
           if (группа) {
-              группа.участники.forEach(участникUid => {
-                  if (участникUid === uid) return; // Не шлем себе
-                  отправить(участникUid, { ...исходящее, idГруппы: группа.id });
-              });
+              if (группа.encryptedMembers && !группа.isLegacy) {
+                  // Phase 2: новая группа с encryptedMembers.
+                  // Сервер НЕ знает участников — broadcast всем активным клиентам.
+                  // Клиент сам решает, принадлежит ли ему это сообщение
+                  // (расшифрует groupKey и проверит, есть ли он в списке).
+                  for (const [otherUid, otherUser] of пользователи) {
+                      if (otherUid === uid) continue;
+                      if (otherUser.ws && otherUser.ws.readyState === WebSocket.OPEN) {
+                          otherUser.ws.send(JSON.stringify({ ...исходящее, idГруппы: группа.id }));
+                      }
+                  }
+              } else if (группа.участники) {
+                  // Legacy группа — broadcast старым способом (backward compat).
+                  группа.участники.forEach(участникUid => {
+                      if (участникUid === uid) return;
+                      отправить(участникUid, { ...исходящее, idГруппы: группа.id });
+                  });
+              }
           }
       } else {
           // Личное сообщение

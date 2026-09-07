@@ -4,6 +4,9 @@ import * as nacl from 'tweetnacl';
 import { buildWsAuthUrl, redactWsUrl } from '../utils/websocketAuth';
 import { hybridEncrypt, hybridDecrypt, type EncryptedPayload } from '../crypto/signal/SignalMessageLayer';
 import type { PreKeyBundle } from '../crypto/signal/types';
+// Phase 2: Metadata protection — traffic padding и Tor proxy.
+import { TrafficPadder, padMessage, unpadMessage, encodeConstantSizePacket, decodeConstantSizePacket } from './trafficPadding';
+import { torProxy } from './torProxy';
 
 // v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
@@ -26,6 +29,8 @@ class ApiService {
   private closeListeners: (() => void)[] = [];
   private errorListeners: ((error: any) => void)[] = [];
   private typingListeners: ((chatId: string) => void)[] = [];
+  // Phase 2: TrafficPadder для отправки шумовых пакетов каждые 30-60 секунд.
+  private trafficPadder: TrafficPadder = new TrafficPadder();
 
   // E2EE Keys
   private myKeyPair: { publicKey: Uint8Array; secretKey: Uint8Array } | null = null;
@@ -172,8 +177,32 @@ class ApiService {
     console.log(`[PILIGRIM apiService] Connecting to: ${redactWsUrl(authUrl)}`);
     this.ws = new WebSocket(authUrl);
 
+    // Phase 2: запускаем traffic padder после открытия WS.
+    // Шумовые пакеты отправляются каждые 30-60 секунд.
+    this.ws.onopen = () => {
+      this.trafficPadder.connect(this.ws!);
+    };
+
     this.ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      // Phase 2: constant-size padding unpadding.
+      // Если сообщение padded (содержит null bytes в конце) — извлекаем payload.
+      let rawData = event.data;
+      try {
+        const decoded = decodeConstantSizePacket(typeof rawData === 'string' ? rawData : '');
+        if (decoded && decoded.length > 0) {
+          rawData = decoded;
+        }
+      } catch (e) {
+        // Не constant-size пакет — оставляем как есть.
+      }
+      // Игнорируем шумовые пакеты.
+      try {
+        const peek = JSON.parse(rawData);
+        if (peek.type === 'noise') return;
+      } catch {
+        // Невалидный JSON — пропускаем.
+      }
+      const data = JSON.parse(rawData);
       let content = data.content || '';
 
       // E2EE: Дешифрование сообщения (Phase 1: hybrid Signal/NaCl)
@@ -245,6 +274,8 @@ class ApiService {
   }
 
   disconnect() {
+    // Phase 2: останавливаем traffic padder перед закрытием WS.
+    this.trafficPadder.disconnect();
     if (this.ws) { this.ws.close(); this.ws = null; }
   }
 
@@ -259,15 +290,19 @@ class ApiService {
           this.myKeyPair.secretKey
         );
 
-        this.ws.send(JSON.stringify({
+        const legacyPayload = JSON.stringify({
           to,
           encryptedContent: btoa(String.fromCharCode(...encrypted.encrypted)),
           nonce: btoa(String.fromCharCode(...encrypted.nonce)),
           senderPublicKey: this.myPublicKeyBase64,
           ...extraOptions
-        }));
+        });
+        // Phase 2: constant-size padding.
+        this.ws.send(encodeConstantSizePacket(legacyPayload));
       } else {
-        this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
+        const plainPayload = JSON.stringify({ to, content, ...extraOptions });
+        // Phase 2: constant-size padding.
+        this.ws.send(encodeConstantSizePacket(plainPayload));
       }
     }
   }
@@ -297,14 +332,17 @@ class ApiService {
     const mySecretKey = this.myKeyPair!.secretKey;
     const payload = await hybridEncrypt(to, content, mySecretKey, recipientKey);
     console.log(`[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`);
-    this.ws.send(JSON.stringify({
+    const jsonPayload = JSON.stringify({
       to,
       encryptionType: payload.type,
       encryptedContent: payload.data,
       nonce: payload.nonce,
       senderPublicKey: this.myPublicKeyBase64,
       ...extraOptions,
-    }));
+    });
+    // Phase 2: constant-size packet padding (2KB).
+    const padded = encodeConstantSizePacket(jsonPayload);
+    this.ws.send(padded);
     return { type: payload.type };
   }
 

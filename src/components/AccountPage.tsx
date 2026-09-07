@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import { useAccentColor } from '../hooks/useAccentColor';
 import AnimatedAvatar from './AnimatedAvatar';
 import {
-  ArrowLeftIcon, KeyIcon, CopyIcon, LogoutIcon, CheckIcon
+  ArrowLeftIcon, KeyIcon, CopyIcon, LogoutIcon, CheckIcon, ShieldIcon
 } from './icons';
+// Phase 2: Tor proxy toggle — анонимизация IP через Tor daemon.
+import { torProxy } from '../services/torProxy';
 
 interface AccountPageProps {
   user: {
@@ -22,6 +24,21 @@ const AccountPage: React.FC<AccountPageProps> = ({
 }) => {
   const theme = useAccentColor();
   const [copiedUid, setCopiedUid] = useState(false);
+  // Phase 2: Tor proxy toggle (загружается из localStorage).
+  const [torEnabled, setTorEnabled] = useState<boolean>(
+    () => localStorage.getItem('piligrim-tor-enabled') === 'true',
+  );
+
+  const handleToggleTor = () => {
+    const newValue = !torEnabled;
+    setTorEnabled(newValue);
+    localStorage.setItem('piligrim-tor-enabled', String(newValue));
+    if (newValue) {
+      torProxy.enable();
+    } else {
+      torProxy.disable();
+    }
+  };
 
   const handleCopyUid = async () => {
     try {
@@ -156,6 +173,15 @@ const AccountPage: React.FC<AccountPageProps> = ({
           label="Резервная копия Seed-фразы"
           subLabel="12 слов для восстановления"
           onClick={onBackupSeed} />
+        {/* Phase 2: Tor proxy toggle — анонимизация IP через Tor daemon. */}
+        <MenuItem
+          icon={<ShieldIcon size={20} />}
+          label="Использовать Tor"
+          subLabel={torEnabled ? 'Активен (требуется Tor daemon)' : 'Неактивен'}
+          toggle
+          isOn={torEnabled}
+          onClick={handleToggleTor}
+        />
       </Section>
 
       <div style={{ marginTop: 32, paddingBottom: 32 }}>
