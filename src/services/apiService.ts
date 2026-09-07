@@ -2,6 +2,7 @@ import type { Message, Store, Group, NoticeBoard } from '../types';
 import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
 import { buildWsAuthUrl, redactWsUrl } from '../utils/websocketAuth';
+import { hybridEncrypt, hybridDecrypt, type EncryptedPayload } from '../crypto/signal/SignalMessageLayer';
 
 // v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
@@ -124,39 +125,41 @@ class ApiService {
       const data = JSON.parse(event.data);
       let content = data.content || '';
 
-      // E2EE: Дешифрование сообщения
+      // E2EE: Дешифрование сообщения (Phase 1: hybrid Signal/NaCl)
       if (data.encryptedContent && this.myKeyPair) {
-        try {
-          const recipientKey = this.myKeyPair.secretKey;
-          const senderKey = this.base64ToKey(data.senderPublicKey);
-          content = decryptMessage(
-            this.base64ToKey(data.encryptedContent),
-            this.base64ToKey(data.nonce),
-            recipientKey,
-            senderKey
-          );
-        } catch (e) {
-          console.error('Decryption failed, showing raw data');
-        }
+        (async () => {
+          try {
+            if (data.encryptionType === 'signal') {
+              const senderKey = this.base64ToKey(data.senderPublicKey);
+              const payload: EncryptedPayload = {
+                type: 'signal',
+                data: data.encryptedContent,
+              };
+              content = await hybridDecrypt(
+                data.from,
+                payload,
+                this.myKeyPair!.secretKey,
+                senderKey
+              );
+            } else {
+              const recipientKey = this.myKeyPair!.secretKey;
+              const senderKey = this.base64ToKey(data.senderPublicKey);
+              content = decryptMessage(
+                this.base64ToKey(data.encryptedContent),
+                this.base64ToKey(data.nonce),
+                recipientKey,
+                senderKey
+              );
+            }
+          } catch (e) {
+            console.error('Decryption failed, showing raw data', e);
+          }
+          this.dispatchMessage(data, content);
+        })();
+        return;
       }
 
-      const message: Message = {
-        id: crypto.randomUUID(),
-        senderId: data.from,
-        text: content,
-        timestamp: data.timestamp,
-        groupId: data.groupId,
-        type: data.type,
-        payload: data.payload,
-        disappearIn: data.disappearIn,
-        timerSetAt: data.timerSetAt
-      };
-      this.messageListeners.forEach(cb => cb(message));
-
-      // Обработка события "печитает"
-      if (data.type === 'typing') {
-        this.typingListeners.forEach(cb => cb(data.chatId));
-      }
+      this.dispatchMessage(data, content);
     };
 
     this.ws.onopen = () => {
@@ -170,6 +173,24 @@ class ApiService {
     this.ws.onerror = (error) => {
       this.errorListeners.forEach(cb => cb(error));
     };
+  }
+
+  private dispatchMessage(data: any, content: string) {
+    const message: Message = {
+      id: crypto.randomUUID(),
+      senderId: data.from,
+      text: content,
+      timestamp: data.timestamp,
+      groupId: data.groupId,
+      type: data.type,
+      payload: data.payload,
+      disappearIn: data.disappearIn,
+      timerSetAt: data.timerSetAt
+    };
+    this.messageListeners.forEach(cb => cb(message));
+    if (data.type === "typing") {
+      this.typingListeners.forEach(cb => cb(data.chatId));
+    }
   }
 
   disconnect() {
@@ -198,6 +219,30 @@ class ApiService {
         this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
       }
     }
+  }
+
+  /** Phase 1: hybrid send with Signal/NaCl fallback. */
+  async sendMessageSecure(
+    to: string,
+    content: string,
+    recipientPublicKeyBase64: string,
+    extraOptions: Partial<Message> = {},
+  ) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!recipientPublicKeyBase64 || !this.myKeyPair) {
+      this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
+      return;
+    }
+    const recipientKey = this.base64ToKey(recipientPublicKeyBase64);
+    const payload = await hybridEncrypt(to, content, this.myKeyPair.secretKey, recipientKey);
+    this.ws.send(JSON.stringify({
+      to,
+      encryptionType: payload.type,
+      encryptedContent: payload.data,
+      nonce: payload.nonce,
+      senderPublicKey: this.myPublicKeyBase64,
+      ...extraOptions,
+    }));
   }
 
   onMessage(cb: (msg: Message) => void) { this.messageListeners.push(cb); }

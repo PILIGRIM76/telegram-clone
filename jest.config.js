@@ -4,7 +4,9 @@ const tsJestTransformCfg = createDefaultPreset().transform;
 
 module.exports = {
   testEnvironment: "jsdom",
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: [
+    '<rootDir>/jest.setup.js',
+  ],
   // E2E тесты (Playwright) исключены - они запускаются через `npm run test:e2e`
   testPathIgnorePatterns: ['/node_modules/', '/test-results/', '/playwright-report/', '/e2e-.*\\.spec\\.ts$'],
   transform: {

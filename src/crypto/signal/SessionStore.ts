@@ -1,4 +1,6 @@
 // IndexedDB SessionStore for Signal Protocol
+// Falls back to an in-memory store when IndexedDB is unavailable
+// (e.g. in Node tests via jsdom, which has no IDB).
 import type { StoredSession, StoredPreKey, StoredSignedPreKey, StoredKyberPreKey, StoredIdentityKeyPair } from './types';
 
 const DB_NAME = 'piligrim-signal';
@@ -7,9 +9,22 @@ const STORES = { SESSIONS: 'sessions', PRE_KEYS: 'preKeys', SIGNED_PRE_KEYS: 'si
 type StoreName = typeof STORES[keyof typeof STORES];
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+const hasIndexedDB = typeof indexedDB !== 'undefined';
+const memStore: Record<string, Map<any, any>> = {
+  sessions: new Map(),
+  preKeys: new Map(),
+  signedPreKeys: new Map(),
+  kyberPreKeys: new Map(),
+  identity: new Map(),
+};
+function memKey(sn: string, v: any): any {
+  if (sn === 'sessions') return v.sessionKey;
+  return v.id;
+}
 
 function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
+  if (!hasIndexedDB) return Promise.resolve({} as IDBDatabase);
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -30,6 +45,7 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 function getAll<T>(sn: StoreName): Promise<T[]> {
+  if (!hasIndexedDB) return Promise.resolve(Array.from(memStore[sn].values()) as T[]);
   return openDB().then(db => new Promise<T[]>((res, rej) => {
     const tx = db.transaction(sn, 'readonly'); const s = tx.objectStore(sn); const r = s.getAll();
     r.onsuccess = () => res(r.result as T[]); r.onerror = () => rej(r.error);
@@ -37,6 +53,7 @@ function getAll<T>(sn: StoreName): Promise<T[]> {
 }
 
 function get<T>(sn: StoreName, k: IDBValidKey): Promise<T | undefined> {
+  if (!hasIndexedDB) return Promise.resolve(memStore[sn].get(k) as T | undefined);
   return openDB().then(db => new Promise<T | undefined>((res, rej) => {
     const tx = db.transaction(sn, 'readonly'); const s = tx.objectStore(sn); const r = s.get(k);
     r.onsuccess = () => res(r.result as T | undefined); r.onerror = () => rej(r.error);
@@ -44,6 +61,7 @@ function get<T>(sn: StoreName, k: IDBValidKey): Promise<T | undefined> {
 }
 
 function put<T>(sn: StoreName, v: T): Promise<IDBValidKey> {
+  if (!hasIndexedDB) { const k = memKey(sn, v); memStore[sn].set(k, v); return Promise.resolve(k as IDBValidKey); }
   return openDB().then(db => new Promise<IDBValidKey>((res, rej) => {
     const tx = db.transaction(sn, 'readwrite'); const s = tx.objectStore(sn); const r = s.put(v as any);
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
@@ -51,6 +69,7 @@ function put<T>(sn: StoreName, v: T): Promise<IDBValidKey> {
 }
 
 function del(sn: StoreName, k: IDBValidKey): Promise<void> {
+  if (!hasIndexedDB) { memStore[sn].delete(k); return Promise.resolve(); }
   return openDB().then(db => new Promise<void>((res, rej) => {
     const tx = db.transaction(sn, 'readwrite'); const s = tx.objectStore(sn); const r = s.delete(k);
     r.onsuccess = () => res(); r.onerror = () => rej(r.error);
@@ -58,6 +77,7 @@ function del(sn: StoreName, k: IDBValidKey): Promise<void> {
 }
 
 function clear(sn: StoreName): Promise<void> {
+  if (!hasIndexedDB) { memStore[sn].clear(); return Promise.resolve(); }
   return openDB().then(db => new Promise<void>((res, rej) => {
     const tx = db.transaction(sn, 'readwrite'); const s = tx.objectStore(sn); const r = s.clear();
     r.onsuccess = () => res(); r.onerror = () => rej(r.error);

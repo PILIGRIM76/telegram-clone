@@ -1,5 +1,4 @@
 // Integration test for libsignal v6.0.0
-import 'fake-indexeddb/auto';
 import { SignalStorage } from '../src/crypto/signal/SignalStorage';
 import { SessionStore } from '../src/crypto/signal/SessionStore';
 

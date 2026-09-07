@@ -1,5 +1,4 @@
 // End-to-end crypto test: Alice <-> Bob via Signal Protocol Double Ratchet
-import 'fake-indexeddb/auto';
 import {
   ProtocolAddress,
   SessionBuilder,
