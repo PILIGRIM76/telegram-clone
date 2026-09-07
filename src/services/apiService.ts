@@ -3,6 +3,7 @@ import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
 import { buildWsAuthUrl, redactWsUrl } from '../utils/websocketAuth';
 import { hybridEncrypt, hybridDecrypt, type EncryptedPayload } from '../crypto/signal/SignalMessageLayer';
+import type { PreKeyBundle } from '../crypto/signal/types';
 
 // v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
@@ -63,6 +64,51 @@ class ApiService {
     return response.json();
   }
 
+  // Phase 2: получить pre-key bundle собеседника для инициализации Signal сессии.
+  // Возвращает null если у собеседника нет Signal bundle (fallback на NaCl).
+  async getPreKeyBundle(uid: string): Promise<PreKeyBundle | null> {
+    try {
+      const response = await fetch(API_URL + '/key/' + uid);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (!data.preKeyBundle) return null;
+      // Маппинг snake_case → camelCase из серверного JSON в типизированный PreKeyBundle
+      return {
+        registrationId: data.preKeyBundle.registrationId,
+        deviceId: data.preKeyBundle.deviceId ?? 1,
+        preKeyId: data.preKeyBundle.preKeyId,
+        preKey: data.preKeyBundle.preKey,
+        signedPreKeyId: data.preKeyBundle.signedPreKeyId,
+        signedPreKey: data.preKeyBundle.signedPreKey,
+        signature: data.preKeyBundle.signature,
+        identityKey: data.preKeyBundle.identityKey,
+      };
+    } catch (e) {
+      console.warn(`[API] getPreKeyBundle(${uid}) failed:`, e);
+      return null;
+    }
+  }
+
+  // Phase 2: опубликовать свой pre-key bundle на сервер для инициаторов Signal сессий.
+  async publishPreKeyBundle(uid: string, bundle: PreKeyBundle): Promise<boolean> {
+    try {
+      const response = await fetch(API_URL + '/keys/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, preKeyBundle: bundle }),
+      });
+      if (!response.ok) {
+        console.warn(`[API] publishPreKeyBundle(${uid}): server returned ${response.status}`);
+        return false;
+      }
+      console.log(`[API] Pre-key bundle published for ${uid}`);
+      return true;
+    } catch (e) {
+      console.warn(`[API] publishPreKeyBundle(${uid}) failed:`, e);
+      return false;
+    }
+  }
+
   async createOrUpdateStore(uid: string, store: Store): Promise<any> {
     const response = await fetch(API_URL + '/store', {
       method: 'POST',
@@ -114,6 +160,11 @@ class ApiService {
 
   connect(uid: string) {
     if (this.ws) this.disconnect();
+    // Phase 2: ленивая инициализация E2EE ключей для транспортного NaCl box.
+    // Гарантирует что sendMessageSecure не упадёт в silent fallback на plaintext.
+    if (!this.myKeyPair) {
+      this.initKeys();
+    }
     // v2.0 Stage 4: используем buildWsAuthUrl для передачи publicKey в handshake
     const identityStr = localStorage.getItem('piligrim-identity');
     const identity = identityStr ? JSON.parse(identityStr) : null;
@@ -221,20 +272,31 @@ class ApiService {
     }
   }
 
-  /** Phase 1: hybrid send with Signal/NaCl fallback. */
+  /** Phase 2: hybrid send with Signal (PFS) preferred, NaCl fallback. */
   async sendMessageSecure(
     to: string,
     content: string,
     recipientPublicKeyBase64: string,
     extraOptions: Partial<Message> = {},
-  ) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    if (!recipientPublicKeyBase64 || !this.myKeyPair) {
+  ): Promise<{ type: 'signal' | 'nacl' } | null> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn(`[API] sendMessageSecure: WS not open, message dropped`);
+      return null;
+    }
+    // Phase 2: ленивая инициализация NaCl keyPair если connect() не был вызван
+    if (!this.myKeyPair) {
+      this.initKeys();
+    }
+    if (!recipientPublicKeyBase64) {
+      console.warn(`[API] sendMessageSecure: no recipientPublicKey for ${to}, sending plaintext`);
       this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
-      return;
+      return null;
     }
     const recipientKey = this.base64ToKey(recipientPublicKeyBase64);
-    const payload = await hybridEncrypt(to, content, this.myKeyPair.secretKey, recipientKey);
+    // this.myKeyPair гарантированно не null после lazy initKeys() выше.
+    const mySecretKey = this.myKeyPair!.secretKey;
+    const payload = await hybridEncrypt(to, content, mySecretKey, recipientKey);
+    console.log(`[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`);
     this.ws.send(JSON.stringify({
       to,
       encryptionType: payload.type,
@@ -243,6 +305,7 @@ class ApiService {
       senderPublicKey: this.myPublicKeyBase64,
       ...extraOptions,
     }));
+    return { type: payload.type };
   }
 
   onMessage(cb: (msg: Message) => void) { this.messageListeners.push(cb); }

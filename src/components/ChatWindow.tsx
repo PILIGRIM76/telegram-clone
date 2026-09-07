@@ -9,6 +9,7 @@ import { AttachmentSheet } from './AttachmentSheet';
 import { ContextMenu } from './ContextMenu';
 import AnimatedAvatar from './AnimatedAvatar';
 import { useAccentColor } from '../hooks/useAccentColor';
+import { EncryptionBadge, type EncryptionType } from './EncryptionBadge';
 
 interface ChatWindowProps {
   chatId: string;
@@ -32,6 +33,8 @@ interface ChatWindowProps {
   onDeleteMessage?: (messageId: string) => void;
   /** v3.0 Phase 3: редактирование сообщения */
   onEditMessage?: (messageId: string, newText: string) => void;
+  /** Phase 1: тип шифрования чата (Signal = PFS, NaCl = legacy) */
+  encryptionType?: EncryptionType;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -47,6 +50,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     onVerifyContact,
   onDeleteMessage,
   onEditMessage
+,
+  encryptionType = "unknown"
 }) => {
   // v3.0 Phase 4: Dynamic accent theme
   const theme = useAccentColor();
@@ -165,6 +170,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             }}
           >
             {partnerName}
+            <EncryptionBadge encryptionType={encryptionType} />
             {mutedUntil !== undefined && mutedUntil > Date.now() && (
               <span
                 title={

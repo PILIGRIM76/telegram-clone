@@ -174,6 +174,8 @@ export interface Chat {
   mutedUntil?: number;
   /** v1.6 Batch 4: чат в архиве (скрыт из основного списка) */
   archived?: boolean;
+  /** v3.0 Phase 4 (Signal Protocol): тип шифрования чата — 'signal' (PFS, Double Ratchet) или 'nacl' (legacy). */
+  encryptionType?: 'signal' | 'nacl';
 }
 
 // --- E-Commerce и Доски ---

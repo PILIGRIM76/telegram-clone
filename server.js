@@ -181,12 +181,36 @@ app.get('/key/:uid', (req, res) => {
 
   const активныеДоски = (юзер.доски || []).filter(д => !д.срокИстекаетВ || д.срокИстекаетВ > Date.now());
 
-  res.json({ 
-      uid, 
-      публичныйКлюч: юзер.публичныйКлюч, 
+  res.json({
+      uid,
+      публичныйКлюч: юзер.публичныйКлюч,
+      // Phase 2: публикация Signal pre-key bundle для PFS сессий.
+      // Если у юзера нет bundle → null, клиент делает fallback на NaCl.
+      preKeyBundle: юзер.preKeyBundle || null,
       магазин: магазинДанные,
-      доски: активныеДоски 
+      доски: активныеДоски
   });
+});
+
+// Phase 2: публикация pre-key bundle для Signal Protocol (PFS Double Ratchet).
+// Клиент вызывает при инициализации identity или при ротации pre-keys.
+app.post('/keys/publish', (req, res) => {
+  const { uid, preKeyBundle } = req.body;
+  const юзер = пользователи.get(uid);
+  if (!юзер) return res.status(404).json({ ошибка: 'Пользователь не найден' });
+  if (!preKeyBundle || typeof preKeyBundle !== 'object') {
+    return res.status(400).json({ ошибка: 'preKeyBundle обязателен' });
+  }
+  // Валидация минимально необходимых полей для Signal pre-key bundle
+  const required = ['registrationId', 'preKeyId', 'preKey', 'signedPreKeyId', 'signedPreKey', 'identityKey'];
+  for (const field of required) {
+    if (preKeyBundle[field] === undefined || preKeyBundle[field] === null) {
+      return res.status(400).json({ ошибка: `Поле ${field} обязательно в preKeyBundle` });
+    }
+  }
+  юзер.preKeyBundle = preKeyBundle;
+  console.log(`[KEYS] Pre-key bundle published for ${uid} (deviceId=${preKeyBundle.deviceId || 1})`);
+  res.json({ ok: true });
 });
 
 // 2. МАГАЗИНЫ

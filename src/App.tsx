@@ -9,7 +9,7 @@ import VerifyModal from './components/VerifyModal';
 import Toasts from './components/Toast';
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
-import { generateIdentity, encryptAESGCM, restoreIdentityFromSeed, getPublicKey, getPrivateKey } from './services/cryptoService';
+import { generateIdentity, restoreIdentityFromSeed, getPublicKey } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
@@ -32,6 +32,12 @@ import { Drawer } from './components/Drawer';
 import { SearchModal } from './components/SearchModal';
 import AccountPage from './components/AccountPage';
 import type { Contact, Group, Chat, Message, Identity, IdentityType, LegacyIdentity } from './types';
+// Phase 2: Signal Protocol — PFS via Double Ratchet.
+// handleSendMessage использует apiService.sendMessageSecure (Signal preferred, NaCl fallback).
+// handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
+import { SignalProtocolManager } from './crypto/signal/SignalProtocolManager';
+import { PreKeyManager } from './crypto/signal/PreKeyManager';
+import { bundleToPreKeyBundle } from './crypto/signal/SignalMessageLayer';
 
 const App: React.FC = () => {
   const [identity, setIdentity] = useState<IdentityType | null>(() => {
@@ -56,6 +62,9 @@ const App: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   // v3.0 Security Dashboard: AccountPage (Security settings)
   const [showAccountPage, setShowAccountPage] = useState(false);
+  // Phase 2: флаг публикации своего Signal pre-key bundle на сервер.
+  // Выставляется в true после успешного POST /keys/publish, чтобы не делать это повторно.
+  const [preKeysPublished, setPreKeysPublished] = useState(false);
 
   // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
   // для открытия Drawer через window event (loose coupling)
@@ -140,6 +149,32 @@ const App: React.FC = () => {
       console.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ chats:', e);
     }
   }, [chats]);
+// Phase 2: после инициализации identity → генерируем Signal pre-keys
+  // и публикуем свой pre-key bundle на сервер для инициаторов сессий.
+  // Этот шаг ОБЯЗАТЕЛЕН чтобы собеседники могли инициализировать Signal сессию с нами.
+  useEffect(() => {
+    if (!identity || preKeysPublished) return;
+    (async () => {
+      try {
+        const { SignalStorage } = await import('./crypto/signal/SignalStorage');
+        const storage = new SignalStorage();
+        const signalManager = new SignalProtocolManager();
+        await signalManager.initialize();
+        const preKeyMgr = new PreKeyManager(storage);
+        await preKeyMgr.generateAndStorePreKeys();
+        const myBundle = await preKeyMgr.getMyPreKeyBundle();
+        const ok = await apiService.publishPreKeyBundle(identity.uid, myBundle);
+        if (ok) {
+          setPreKeysPublished(true);
+          console.log('[PILIGRIM] Pre-key bundle published to server');
+        } else {
+          console.warn('[PILIGRIM] Pre-key bundle publish returned not-ok');
+        }
+      } catch (e) {
+        console.error('[PILIGRIM] Failed to publish pre-keys:', e);
+      }
+    })();
+  }, [identity, preKeysPublished]);
 
   const handleCreateIdentity = async () => {
     console.log('рџљЂ [PILIGRIM] START: handleCreateIdentity РІС‹Р·РІР°РЅ');
@@ -188,7 +223,7 @@ const App: React.FC = () => {
   };
 
   // v1.5.2 Stage 2: СЂРµР°Р»СЊРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє РґРѕР±Р°РІР»РµРЅРёСЏ РєРѕРЅС‚Р°РєС‚Р° (offline-first)
-  const handleAddContact = (name: string, uid: string, publicKey?: string) => {
+  const handleAddContact = async (name: string, uid: string, publicKey?: string) => {
     console.log('вћ• [PILIGRIM] handleAddContact:', name, uid, publicKey ? '(with pubKey)' : '(no pubKey)');
 
     // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёРєР°С‚РѕРІ: РµСЃР»Рё РєРѕРЅС‚Р°РєС‚ СЃ С‚Р°РєРёРј uid СѓР¶Рµ РµСЃС‚СЊ, РЅРµ РґРѕР±Р°РІР»СЏРµРј
@@ -221,6 +256,26 @@ const App: React.FC = () => {
     }));
 
     console.log('вњ… [PILIGRIM] РљРѕРЅС‚Р°РєС‚ РґРѕР±Р°РІР»РµРЅ:', newContact);
+// Phase 2: попытка инициализации Signal сессии в фоне.
+    // Не блокируем UI — если упадёт, остаётся NaCl fallback.
+    try {
+      const remoteBundle = await apiService.getPreKeyBundle(uid);
+      if (remoteBundle) {
+        const { SignalStorage } = await import('./crypto/signal/SignalStorage');
+        const storage = new SignalStorage();
+        await storage.warmCacheFromStorage();
+        const signalManager = new SignalProtocolManager();
+        await signalManager.initialize();
+        const deviceId = remoteBundle.deviceId ?? 1;
+        await signalManager.createSession(uid, deviceId, remoteBundle);
+        console.log(`[PILIGRIM] Signal session initialized with ${uid} (deviceId=${deviceId})`);
+        pushToast(`🔒 Signal PFS активирован с ${name}`, 'success');
+      } else {
+        console.log(`[PILIGRIM] No Signal bundle for ${uid}, will use NaCl fallback`);
+      }
+    } catch (e) {
+      console.warn(`[PILIGRIM] Signal init failed for ${uid}, fallback to NaCl:`, e);
+    }
   };
   const handleCreateGroup = (_name: string, _type: 'public' | 'private') => {
     console.log('[PILIGRIM] handleCreateGroup stub');
@@ -344,17 +399,42 @@ const App: React.FC = () => {
     // 2. РЁРёС„СЂСѓРµРј, РµСЃР»Рё РµСЃС‚СЊ publicKey
     let encryptedPayload: string | undefined;
     let isEncrypted = false;
-    if (contact?.publicKey) {
+    // Phase 2: Signal (PFS Double Ratchet) preferred, NaCl fallback.
+    // apiService.sendMessageSecure returns { type: 'signal' | 'nacl' } | null.
+    // Old encryptAESGCM was only at-rest AES-GCM (secp256k1 privKey), no PFS.
+    let encryptionType: 'signal' | 'nacl' | undefined;
+    if (contact?.publicKey && ws.isConnected) {
       try {
-        encryptedPayload = await encryptAESGCM(trimmed, getPrivateKey(identity));
-        isEncrypted = true;
-        console.log(`рџ”’ [PILIGRIM] E2EE: Р·Р°С€РёС„СЂРѕРІР°РЅРѕ РґР»СЏ ${contact.name} (chatId=${chatId}, ciphertext_len=${encryptedPayload.length})`);
+        const msgId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const secureResult = await apiService.sendMessageSecure(
+          contact.uid,
+          trimmed,
+          contact.publicKey,
+          { id: msgId }
+        );
+        encryptionType = secureResult?.type;
+        isEncrypted = !!encryptionType;
+        if (encryptionType) {
+          encryptedPayload = '[secure:' + encryptionType + ']';
+        }
+        console.log(`[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`);
       } catch (error) {
-        console.error(`вќЊ [PILIGRIM] E2EE: РѕС€РёР±РєР° С€РёС„СЂРѕРІР°РЅРёСЏ РґР»СЏ ${contact.name}:`, error);
-        // Fallback: СЃРѕС…СЂР°РЅСЏРµРј РІ plaintext, РЅРѕ РќР• С‚РµСЂСЏРµРј СЃРѕРѕР±С‰РµРЅРёРµ
+        console.error(`[PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
+        // Fallback: отправляем в plaintext, но НЕ теряем сообщение
+        if (contact?.publicKey && ws.isConnected) {
+          try {
+            apiService.sendMessage(contact.uid, trimmed, contact.publicKey);
+          } catch (e) {
+            console.error('[PILIGRIM] plaintext fallback send failed', e);
+          }
+        }
       }
-    } else {
-      console.warn(`вљ пёЏ [PILIGRIM] E2EE: publicKey РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РґР»СЏ chatId=${chatId}, СЃРѕРѕР±С‰РµРЅРёРµ Р±СѓРґРµС‚ СЃРѕС…СЂР°РЅРµРЅРѕ РІ plaintext`);
+    } else if (!contact?.publicKey) {
+      console.warn(`[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`);
+    } else if (!ws.isConnected) {
+      console.log(`[PILIGRIM] WS offline, message saved locally only (encryptionType deferred)`);
     }
 
     // 3. РЎРѕР·РґР°С‘Рј Message (text вЂ” РґР»СЏ Р»РѕРєР°Р»СЊРЅРѕРіРѕ UI, encryptedPayload вЂ” РґР»СЏ С…СЂР°РЅРµРЅРёСЏ/РїРµСЂРµРґР°С‡Рё)
@@ -387,15 +467,21 @@ const App: React.FC = () => {
     // Stage 5: РµСЃР»Рё WebSocket РїРѕРґРєР»СЋС‡С‘РЅ вЂ” РѕС‚РїСЂР°РІР»СЏРµРј СЃРѕРѕР±С‰РµРЅРёРµ РїРѕР»СѓС‡Р°С‚РµР»СЋ С‡РµСЂРµР· СЃРµСЂРІРµСЂ.
     // apiService РёСЃРїРѕР»СЊР·СѓРµС‚ NaCl box (X25519+XSalsa20) РґР»СЏ С‚СЂР°РЅСЃРїРѕСЂС‚РЅРѕРіРѕ С€РёС„СЂРѕРІР°РЅРёСЏ.
     // Р•СЃР»Рё WS РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” СЃРѕРѕР±С‰РµРЅРёРµ РѕСЃС‚Р°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ Р»РѕРєР°Р»СЊРЅРѕ (offline-first).
-    if (ws.isConnected) {
-      try {
-        ws.send(contact?.uid || chatId, trimmed, contact?.publicKey);
-        console.log(`рџ“Ў [PILIGRIM] WS: message dispatched to ${contact?.name || chatId}`);
-      } catch (e) {
-        console.error('[PILIGRIM] WS: send failed', e);
-      }
-    } else {
-            console.log(`[PILIGRIM] WS offline, message saved locally only`);
+    // Phase 2: apiService.sendMessageSecure уже отправил зашифрованное сообщение через WS.
+    // Здесь мы только обновляем encryptionType в чате для UI badge (🔒 PFS / 🔓 Legacy).
+    if (encryptionType) {
+      setChats((prev) => {
+        const updated = { ...prev };
+        if (!updated[chatId]) {
+          updated[chatId] = { contactId: chatId, messages: [] };
+        }
+        updated[chatId] = {
+          ...updated[chatId],
+          encryptionType,
+        };
+        return updated;
+      });
+      console.log(`[PILIGRIM] Chat ${chatId} encryptionType set to: ${encryptionType}`);
     }
   };
   // v3.0 Phase 3: удаление сообщения из чата
@@ -684,6 +770,7 @@ const App: React.FC = () => {
                   }
                   mutedUntil={chats[selectedChatId]?.mutedUntil}
                   onVerifyContact={() => setShowVerifyModal(true)}
+                  encryptionType={chats[selectedChatId]?.encryptionType}
                 />
               ) : (
             <div style={{
