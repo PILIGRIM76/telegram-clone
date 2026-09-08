@@ -18,7 +18,7 @@
     <!-- Phase 9.5 fix: inline <style> удалён — перенесён в src/index.css.
          Vite html-proxy не работает с inline CSS при наличии vite-plugin-pwa. -->
     <script>
-      // Phase 9.5 fix: simple-peer и некоторые Node.js полифиллы ожидают `require` и `global`.
+      // Phase 9.5 fix: simple-peer и некоторые Node.js полифиллы/wait `require` и `global`.
       // В браузере/Capacitor WebView их нет. Определяем no-op shim ДО загрузки bundle.
       window.global = window.global || window;
       if (typeof window.require !== 'function') {

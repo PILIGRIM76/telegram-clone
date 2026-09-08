@@ -1,6 +1,8 @@
 
 // Полифилл для crypto.randomUUID() ДОЛЖЕН быть первой строкой (до React/любых компонентов)
 import './polyfills/crypto';
+// Buffer polyfill для браузера (framer-motion/@emotion depend on Node.js Buffer)
+import './polyfills/buffer';
 
 // Tailwind CSS (PostCSS) — базовая тёмная тема + утилиты
 import './index.css';
