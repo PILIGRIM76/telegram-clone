@@ -30,7 +30,7 @@ dist-ssr
 public/assets/index-*.js
 public/assets/index-*.js.map
 public/assets/index-*.css
-public/index.html
+
 
 # Debug screenshots & UI dumps
 debug/

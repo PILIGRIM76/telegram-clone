@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+<script>
+  // CRITICAL: Buffer polyfill BEFORE bundle loads (RT9 white screen fix)
+  // Vite hoisting may reorder imports, so polyfill must be inline.
+  if (typeof window.Buffer === 'undefined') {
+    console.log('[PILIGRIM] Installing inline Buffer polyfill');
+    window.Buffer = function(data, encoding) {
+      if (typeof data === 'string') {
+        const arr = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i) & 0xff;
+        return arr;
+      }
+      if (data instanceof ArrayBuffer) return new Uint8Array(data);
+      if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+      return new Uint8Array(0);
+    };
+    window.Buffer.from = function(data, encoding) {
+      if (typeof data === 'string') {
+        const arr = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i) & 0xff;
+        return arr;
+      }
+      if (data instanceof ArrayBuffer) return new Uint8Array(data);
+      if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+      return new Uint8Array(0);
+    };
+    window.Buffer.alloc = function(size, fill) {
+      const arr = new Uint8Array(size);
+      if (fill !== undefined) arr.fill(fill);
+      return arr;
+    };
+    window.Buffer.isBuffer = function() { return false; };
+    window.Buffer.isView = ArrayBuffer.isView;
+    window.Buffer.byteLength = function(str) {
+      if (typeof str === 'string') return str.length;
+      if (str instanceof ArrayBuffer) return str.byteLength;
+      if (ArrayBuffer.isView(str)) return str.byteLength;
+      return 0;
+    };
+    window.Buffer.concat = function(list, totalLength) {
+      if (!list.length) return new Uint8Array(0);
+      const len = totalLength || list.reduce((s, b) => s + b.length, 0);
+      const result = new Uint8Array(len);
+      let pos = 0;
+      for (const b of list) { result.set(b, pos); pos += b.length; }
+      return result;
+    };
+    window.Buffer.prototype = Uint8Array.prototype;
+  }
+</script>
+    <meta charset="UTF-8" />
+    <!-- v3.0 Phase 1.5: Inter Variable шрифт (premium typography) -->
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="preconnect" href="https://rsms.me/" crossorigin>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <!-- Phase 9: PILIGRIM иконки -->
+    <link rel="icon" type="image/svg+xml" href="/icons/main.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PILIGRIM</title>
+    <!-- Phase 9.5 fix: inline <style> удалён — перенесён в src/index.css.
+         Vite html-proxy не работает с inline CSS при наличии vite-plugin-pwa. -->
+    <script>
+      // Phase 9.5 fix: simple-peer и некоторые Node.js полифиллы/wait `require` и `global`.
+      // В браузере/Capacitor WebView их нет. Определяем no-op shim ДО загрузки bundle.
+      window.global = window.global || window;
+      if (typeof window.require !== 'function') {
+        window.require = function (name) {
+          console.warn('[PILIGRIM] require("' + name + '") called in browser — returning empty stub');
+          return {};
+        };
+      }
+    </script>
+    <script>
+      // Phase 9.5 fix: глобальные обработчики ошибок и диагностика ДО загрузки bundle
+      window.__PILIGRIM_BOOT__ = { start: Date.now() };
+      window.addEventListener('error', function(event) {
+        console.error('[PILIGRIM] GLOBAL ERROR:', (event.error && event.error.message) || event.message);
+        console.error('[PILIGRIM] GLOBAL ERROR stack:', event.error && event.error.stack);
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('[PILIGRIM] UNHANDLED PROMISE:', event.reason);
+      });
+      console.log('[PILIGRIM] PRE-BOOT: HTML inline script executed');
+      console.log('[PILIGRIM] PRE-BOOT: typeof setTimeout =', typeof setTimeout);
+      console.log('[PILIGRIM] PRE-BOOT: typeof Promise =', typeof Promise);
+      console.log('[PILIGRIM] PRE-BOOT: typeof fetch =', typeof fetch);
+      console.log('[PILIGRIM] PRE-BOOT: typeof console =', typeof console);
+      console.log('[PILIGRIM] PRE-BOOT: typeof globalThis =', typeof globalThis);
+      console.log('[PILIGRIM] PRE-BOOT: typeof window =', typeof window);
+    </script>
+    <script>
+      // Phase 9.5 fix: очищаем Service Worker кэш при каждой загрузке
+      // (PWA был отключён в vite.config.ts, но старый SW может остаться)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var i = 0; i < regs.length; i++) {
+            regs[i].unregister().then(function() {
+              console.log('[PILIGRIM] Service Worker unregistered');
+            });
+          }
+        });
+      }
+    </script>
+  <script type="module" crossorigin src="/assets/index-528e80d2.js"></script>
+  <link rel="stylesheet" href="/assets/index-f75ef0e2.css">
+</head>
+  <body class="bg-slate-900 text-slate-200">
+    <div id="root"></div>
+  
+</body>
+</html>

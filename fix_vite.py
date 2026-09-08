@@ -1,11 +1,18 @@
-// Phase 9.5 + Vite Build Fix: VitePWA plugin removed entirely.
-// Раньше он вызывал html-proxy баг при наличии inline CSS в index.html или @tailwind директив.
-// Phase 1.5 (premium design) использует CSS-переменные, PWA не нужен.
-import path from 'path';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
-import react from '@vitejs/plugin-react';
+#!/usr/bin/env python3
+"""Add BufferPolyfillPlugin to vite.config.ts."""
+import io
 
+path = 'F:/AntiPiry/vite.config.ts'
+with io.open(path, 'r', encoding='utf-8') as f:
+    content = f.read()
 
+# 1. Update imports
+old_import = "import { defineConfig, loadEnv } from 'vite';"
+new_import = "import { defineConfig, loadEnv, type Plugin } from 'vite';"
+content = content.replace(old_import, new_import)
+
+# 2. Insert plugin function before export default
+plugin_code = '''
 /**
  * BufferPolyfillPlugin: injects inline Buffer polyfill into index.html BEFORE bundle loads.
  * Fixes ReferenceError: Buffer is not defined on Android WebView (RT9).
@@ -72,30 +79,23 @@ function bufferPolyfillPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      plugins: [react(), bufferPolyfillPlugin()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        // Phase 9.5 fix: simple-peer ожидает `global` (Node.js) и `require` (CommonJS).
-        // В браузере/Capacitor WebView их нет, поэтому перенаправляем на globalThis.
-        global: 'globalThis',
-        // Phase 9.5: critical — apiService использует хардкод (см. комментарий в apiService.ts)
-      },
-      build: {
-        sourcemap: true,
-        minify: false
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
-    };
-});
+'''
+
+# Insert before "export default defineConfig"
+marker = "export default defineConfig"
+if marker in content and "bufferPolyfillPlugin" not in content:
+    content = content.replace(marker, plugin_code + marker, 1)
+
+# 3. Add plugin to plugins array
+old_plugins = "      plugins: [react()],"
+new_plugins = "      plugins: [react(), bufferPolyfillPlugin()],"
+content = content.replace(old_plugins, new_plugins)
+
+with io.open(path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print("OK: vite.config.ts updated")
+print("has Plugin type:", "type Plugin" in content)
+print("has bufferPolyfillPlugin:", "bufferPolyfillPlugin" in content)
+print("has transformIndexHtml:", "transformIndexHtml" in content)
+print("plugins array:", "plugins: [react(), bufferPolyfillPlugin()]" in content)
