@@ -8,7 +8,7 @@ module.exports = {
     '<rootDir>/jest.setup.js',
   ],
   // E2E тесты (Playwright) исключены - они запускаются через `npm run test:e2e`
-  testPathIgnorePatterns: ['/node_modules/', '/test-results/', '/playwright-report/', '/e2e-.*\\.spec\\.ts$'],
+  testPathIgnorePatterns: ['/node_modules/', '/test-results/', '/playwright-report/', '/e2e-.*\\.spec\\.ts$', '/design-verification\\.spec\\.ts$', '/render-check\\.spec\\.ts$'],
   transform: {
     ...tsJestTransformCfg,
     // v3.0 Phase 5: ESM-only пакеты (@scure/bip39, @noble/hashes, @noble/secp256k1)
