@@ -137,7 +137,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: '#38A169',
+                    background: 'var(--color-online)',
                     display: 'inline-block',
                   } as React.CSSProperties}
                 />

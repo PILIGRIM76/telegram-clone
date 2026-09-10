@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0 Phase 2F: Drawer по Aurora-спецификации.
 // 320px width, gradient header 180px, active item indicator,
 // 7 menu items, Logout separated at bottom.
@@ -14,6 +15,7 @@ interface IdentityLite {
   uid: string;
   name?: string;
   isBIP39?: boolean; // v3.0 Phase 5: E2EE multi-device indicator
+  transportPublicKey?: string;
 }
 
 interface DrawerProps {
@@ -79,8 +81,9 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   useEffect(() => {
     if (identity && showQr && !qrDataUrl) {
-      // Phase 7: publicKeyHex for new identity, publicKey for legacy
-      const pk = (identity as { publicKeyHex?: string }).publicKeyHex || 
+      // Phase 1 fix: transport NaCl box public key for E2EE contact sharing
+      const pk = identity.transportPublicKey ||
+                 (identity as { publicKeyHex?: string }).publicKeyHex ||
                  (identity as { publicKey?: string }).publicKey;
       const payloadObj: { v: string; uid: string; publicKey?: string } = {
         v: 'piligrim-contact-v2',
@@ -90,7 +93,7 @@ export const Drawer: React.FC<DrawerProps> = ({
       const payload = JSON.stringify(payloadObj);
       QRCode.toDataURL(payload, { width: 200, margin: 2, color: { dark: '#1C1816', light: '#FCF9F7' } })
         .then(setQrDataUrl)
-        .catch((err: unknown) => console.error('[PILIGRIM] QR generation failed:', err));
+        .catch((err: unknown) => logger.error('[PILIGRIM] QR generation failed:', err));
     }
   }, [identity, showQr, qrDataUrl]);
 

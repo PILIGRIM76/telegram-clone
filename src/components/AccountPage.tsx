@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAccentColor } from '../hooks/useAccentColor';
@@ -46,7 +47,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
       setCopiedUid(true);
       setTimeout(() => setCopiedUid(false), 2000);
     } catch (e) {
-      console.error('[PILIGRIM] Clipboard failed:', e);
+      logger.error('[PILIGRIM] Clipboard failed:', e);
     }
   };
 

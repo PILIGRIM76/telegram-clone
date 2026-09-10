@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { Identity, Contact, Chat, Group, IdentityType } from '../types';
@@ -59,13 +60,13 @@ const ContactList: React.FC<ContactListProps> = ({
 
   // v1.5.2 Stage 2: логирование state для дебага
   useEffect(() => {
-    console.log('🔔 [ContactList] isContactModalOpen changed:', isContactModalOpen);
+    logger.info('🔔 [ContactList] isContactModalOpen changed:', isContactModalOpen);
   }, [isContactModalOpen]);
 
   // v3.0 Phase 2C: слушаем кастомное событие от FAB для открытия AddContactModal
   useEffect(() => {
     const handler = () => {
-      console.log('[PILIGRIM] ContactList: received FAB event, opening AddContactModal');
+      logger.info('[PILIGRIM] ContactList: received FAB event, opening AddContactModal');
       setIsContactModalOpen(true);
     };
     window.addEventListener('piligrim:open-add-contact', handler);
@@ -88,7 +89,7 @@ const ContactList: React.FC<ContactListProps> = ({
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, contact });
   };
-  
+
   const setMute = (duration: number | 'forever' | null) => {
     if (contextMenu) {
       const contactId = contextMenu.contact.id;
@@ -122,55 +123,38 @@ const ContactList: React.FC<ContactListProps> = ({
   return (
     <>
       <aside
-  style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0f172a', borderRight: '1px solid #334155', flexShrink: 0, position: 'relative', zIndex: 10 }}
-  onClick={(e) => {
-    // Event delegation: перехватываем клики в области header buttons
-    const target = e.target as HTMLElement;
-    const button = target.closest('button[data-action]');
-    if (button) {
-      const action = button.getAttribute('data-action');
-      console.log('🎯 [ContactList] Delegated click:', action);
-      if (action === 'add-contact') {
-        console.log('🎯 [ContactList] Setting isContactModalOpen = true');
-        setIsContactModalOpen(true);
-        console.log('🎯 [ContactList] After setState, isContactModalOpen is now:', true);
-      }
-      else if (action === 'create-group') setIsGroupModalOpen(true);
-      else if (action === 'open-profile') onOpenProfile();
-    }
-  }}
->
+        style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-primary)', borderRight: '1px solid var(--color-border)', flexShrink: 0, position: 'relative', zIndex: 10 }}
+        onClick={(e) => {
+          // Event delegation: перехватываем клики в области header buttons
+          const target = e.target as HTMLElement;
+          const button = target.closest('button[data-action]');
+          if (button) {
+            const action = button.getAttribute('data-action');
+            logger.info('🎯 [ContactList] Delegated click:', action);
+            if (action === 'add-contact') {
+              logger.info('🎯 [ContactList] Setting isContactModalOpen = true');
+              setIsContactModalOpen(true);
+              logger.info('🎯 [ContactList] After setState, isContactModalOpen is now:', true);
+            }
+            else if (action === 'create-group') setIsGroupModalOpen(true);
+            else if (action === 'open-profile') onOpenProfile();
+          }
+        }}
+      >
         {/* Заголовок */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', flexShrink: 0, minHeight: '56px' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border-strong)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', flexShrink: 0, minHeight: '56px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {showArchive && (
-                <button onClick={() => setShowArchive(false)} style={{ marginRight: '8px', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    ←
-                </button>
+              <button onClick={() => setShowArchive(false)} className="pg-icon-btn" style={{ marginRight: '8px' }}>←</button>
             )}
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap' }}>{showArchive ? t('archive_title') : t('chats_title')}</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', margin: 0 }}>{showArchive ? t('archive_title') : t('chats_title')}</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative', zIndex: 100 }}>
             <button
               data-action="add-contact"
               onClick={() => setIsContactModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: '#0891b2',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                minWidth: '60px',
-                minHeight: '36px',
-                pointerEvents: 'auto',
-                touchAction: 'manipulation',
-              }}
+              className="pg-primary-btn"
+              style={{ padding: '6px 12px', minWidth: 60, minHeight: 36, fontSize: 14 }}
               title={t('add_contact')}
             >
               <UserPlusIcon className="w-5 h-5" />
@@ -179,18 +163,8 @@ const ContactList: React.FC<ContactListProps> = ({
             <button
               data-action="create-group"
               onClick={() => setIsGroupModalOpen(true)}
-              style={{
-                padding: '6px 10px',
-                borderRadius: '8px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#94a3b8',
-                minWidth: '36px',
-                minHeight: '36px',
-                pointerEvents: 'auto',
-                touchAction: 'manipulation',
-              }}
+              className="pg-icon-btn"
+              style={{ minWidth: 36, minHeight: 36 }}
               title={t('create_group')}
             >
               <UsersIcon className="w-5 h-5" />
@@ -198,18 +172,8 @@ const ContactList: React.FC<ContactListProps> = ({
             <button
               data-action="open-profile"
               onClick={onOpenProfile}
-              style={{
-                padding: '6px 10px',
-                borderRadius: '8px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#94a3b8',
-                minWidth: '36px',
-                minHeight: '36px',
-                pointerEvents: 'auto',
-                touchAction: 'manipulation',
-              }}
+              className="pg-icon-btn"
+              style={{ minWidth: 36, minHeight: 36 }}
               title="Settings"
             >
               <SettingsIcon className="w-5 h-5" />
@@ -218,140 +182,145 @@ const ContactList: React.FC<ContactListProps> = ({
         </div>
 
         {/* Список */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {/* Системный чат (всегда сверху, если не в архиве) */}
-            {!showArchive && systemChat && (
-                 <button
-                 onClick={() => onSelectChat(systemChat.id)}
-                 className={`w-full text-left p-3 flex items-center space-x-3 transition-colors hover:bg-slate-800 border-b border-slate-800 ${selectedChatId === systemChat.id ? 'bg-cyan-900/40' : ''}`}
-               >
-                 <div className="w-12 h-12 bg-red-900/50 rounded-full flex-shrink-0 flex items-center justify-center">
-                   <BellSlashIcon className="w-6 h-6 text-red-400" />
-                 </div>
-                 <div className="flex-1 overflow-hidden">
-                   <p className="font-semibold text-red-300">{t('system_notifications')}</p>
-                   <p className="text-sm text-slate-500 truncate">{t('system_desc')}</p>
-                 </div>
-               </button>
-            )}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {/* Системный чат (всегда сверху, если не в архиве) */}
+          {!showArchive && systemChat && (
+            <button
+              onClick={() => onSelectChat(systemChat.id)}
+              className="pg-list-row"
+              style={{ borderRadius: 0, borderBottom: '1px solid var(--color-divider)' }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BellSlashIcon className="w-6 h-6" />
+              </div>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <p style={{ fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{t('system_notifications')}</p>
+                <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('system_desc')}</p>
+              </div>
+            </button>
+          )}
 
-            {/* Папка Архив */}
-            {!showArchive && archivedContacts.length > 0 && (
-                <button 
-                    onClick={() => setShowArchive(true)}
-                    className="w-full text-left p-3 flex items-center space-x-3 hover:bg-slate-800 border-b border-slate-800"
-                >
-                    <div className="w-12 h-12 bg-slate-800 rounded-full flex-shrink-0 flex items-center justify-center">
-                        <ArchiveBoxIcon className="w-6 h-6 text-slate-400" />
-                    </div>
-                    <div className="flex-1">
-                        <p className="font-semibold text-slate-300">{t('archive_title')}</p>
-                        <p className="text-sm text-slate-500">{archivedContacts.length} chats</p>
-                    </div>
-                </button>
-            )}
+          {/* Папка Архив */}
+          {!showArchive && archivedContacts.length > 0 && (
+            <button
+              onClick={() => setShowArchive(true)}
+              className="pg-list-row"
+              style={{ borderRadius: 0, borderBottom: '1px solid var(--color-divider)' }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-surface-variant)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ArchiveBoxIcon className="w-6 h-6" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{t('archive_title')}</p>
+                <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: 0 }}>{archivedContacts.length} чатов</p>
+              </div>
+            </button>
+          )}
 
-            {/* Группы (если мы не в архиве) */}
-            {!showArchive && groups.map(group => {
-                const selected = group.id === selectedChatId;
-                const lastMessage = chats[group.id]?.messages.slice(-1)[0];
+          {/* Группы (если мы не в архиве) */}
+          {!showArchive && groups.map(group => {
+            const selected = group.id === selectedChatId;
+            const lastMessage = chats[group.id]?.messages.slice(-1)[0];
+            return (
+              <button
+                key={group.id}
+                onClick={() => onSelectChat(group.id)}
+                className={`pg-list-row ${selected ? 'is-selected' : ''}`}
+                style={{ borderRadius: 0, borderBottom: '1px solid var(--color-divider)' }}
+              >
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <UsersIcon className="w-6 h-6" />
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <p style={{ fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.name}</p>
+                    {group.type === 'private' && <span style={{ fontSize: 12, color: 'var(--color-warning)', flexShrink: 0 }}>🔒</span>}
+                  </div>
+                  {lastMessage && (
+                    <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {lastMessage.text.startsWith('{"') ? 'Системное сообщение' : 'Сообщение…'}
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+
+          {/* Контакты */}
+          {displayedContacts.length === 0 && groups.length === 0 && !systemChat ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+              {showArchive ? 'Архив пуст' : 'Нет активных чатов'}
+            </div>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {displayedContacts.map(contact => {
+                const selected = contact.id === selectedChatId;
+                const isMuted = contact.mutedUntil === 'forever' || (typeof contact.mutedUntil === 'number' && contact.mutedUntil > Date.now());
+                const lastMessage = chats[contact.id]?.messages.slice(-1)[0];
+
                 return (
+                  <li key={contact.id} onContextMenu={(e) => handleContextMenu(e, contact)}>
                     <button
-                        key={group.id}
-                        onClick={() => onSelectChat(group.id)}
-                        className={`w-full text-left p-3 flex items-center space-x-3 transition-colors hover:bg-slate-800 ${selected ? 'bg-cyan-900/50' : ''}`}
+                      onClick={() => onSelectChat(contact.id)}
+                      className={`pg-list-row ${selected ? 'is-selected' : ''}`}
+                      style={{ borderRadius: 0, borderBottom: '1px solid var(--color-divider)' }}
                     >
-                         <div className="w-12 h-12 bg-indigo-900/50 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-indigo-400">
-                             <UsersIcon className="w-6 h-6" />
-                         </div>
-                         <div className="flex-1 overflow-hidden">
-                             <div className="flex justify-between">
-                                 <p className="font-semibold text-slate-200 truncate">{group.name}</p>
-                                 {group.type === 'private' && <span className="text-xs text-yellow-500">🔒</span>}
-                             </div>
-                             {lastMessage && (
-                                <p className="text-sm text-slate-400 truncate">
-                                    {lastMessage.text.startsWith('{"') ? 'System message' : 'Message...'}
-                                </p>
-                             )}
-                         </div>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <AnimatedAvatar name={contact.name} size={48} accentColor={theme.color} e2eeStatus={contact.e2eeStatus || (contact.verified ? 'verified' : 'unverified')} />
+                        {!contact.e2eeStatus && contact.verified && (
+                          <div style={{ position: 'absolute', bottom: -1, right: -1, background: 'var(--color-surface)', borderRadius: '50%', padding: 1 }}>
+                            <CheckCircleIcon className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <p style={{ fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.name}</p>
+                          {isMuted && (
+                            <span style={{ color: 'var(--color-text-tertiary)', display: 'flex', flexShrink: 0 }}>
+                              <BellSlashIcon className="w-4 h-4" />
+                            </span>
+                          )}
+                        </div>
+                        {lastMessage && (
+                          <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lastMessage.senderId === identity.uid ? 'Вы: ' : ''}
+                            {lastMessage.text.startsWith('{"') ? 'Скрытые данные…' : 'Сообщение…'}
+                          </p>
+                        )}
+                      </div>
                     </button>
-                )
-            })}
-
-            {/* Контакты */}
-            {displayedContacts.length === 0 && groups.length === 0 && !systemChat ? (
-                 <div className="p-8 text-center text-slate-500 text-sm">
-                     {showArchive ? 'Archive is empty' : 'No active chats'}
-                 </div>
-            ) : (
-                <ul>
-                    {displayedContacts.map(contact => {
-                    const lastMessage = chats[contact.id]?.messages.slice(-1)[0];
-                    const selected = contact.id === selectedChatId;
-                    const isMuted = contact.mutedUntil === 'forever' || (typeof contact.mutedUntil === 'number' && contact.mutedUntil > Date.now());
-
-                    return (
-                        <li key={contact.id} onContextMenu={(e) => handleContextMenu(e, contact)}>
-                        <button
-                            onClick={() => onSelectChat(contact.id)}
-                            className={`w-full text-left p-3 flex items-center space-x-3 transition-colors hover:bg-slate-800 ${
-                            selected ? 'bg-cyan-900/50' : ''
-                            }`}
-                        >
-                            <div className="relative flex-shrink-0">
-                                <AnimatedAvatar name={contact.name} size={48} accentColor={theme.color} e2eeStatus={contact.e2eeStatus || (contact.verified ? 'verified' : 'unverified')} />
-                                {!contact.e2eeStatus && contact.verified && (
-                                    <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5">
-                                        <CheckCircleIcon className="w-4 h-4 text-green-500" />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex-1 overflow-hidden">
-                            <div className="flex justify-between items-center">
-                                <p className="font-semibold text-slate-200 truncate">{contact.name}</p>
-                                {isMuted && <BellSlashIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />}
-                            </div>
-                            {lastMessage && (
-                                <p className="text-sm text-slate-400 truncate">
-                                {lastMessage.senderId === identity.uid ? 'You: ' : ''}
-                                {lastMessage.text.startsWith('{"') ? 'Hidden data...' : 'Message...'}
-                                </p>
-                            )}
-                            </div>
-                        </button>
-                        </li>
-                    );
-                    })}
-                </ul>
-            )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         {/* Футер */}
-        <div className="p-3 border-t border-slate-700 bg-slate-800">
-            <div className="flex justify-around mb-3">
-                <button onClick={onOpenStore} className="flex flex-col items-center text-slate-400 hover:text-cyan-400 transition-colors">
-                    <StoreIcon className="w-6 h-6 mb-1" />
-                    <span className="text-[10px]">{t('store_btn')}</span>
-                </button>
-                <button onClick={onOpenBoards} className="flex flex-col items-center text-slate-400 hover:text-cyan-400 transition-colors">
-                    <ClipboardDocumentListIcon className="w-6 h-6 mb-1" />
-                    <span className="text-[10px]">{t('boards_btn')}</span>
-                </button>
+        <div style={{ padding: 12, borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
+            <button onClick={onOpenStore} className="pg-footer-btn">
+              <StoreIcon className="w-6 h-6" />
+              <span style={{ fontSize: 10 }}>{t('store_btn')}</span>
+            </button>
+            <button onClick={onOpenBoards} className="pg-footer-btn">
+              <ClipboardDocumentListIcon className="w-6 h-6" />
+              <span style={{ fontSize: 10 }}>{t('boards_btn')}</span>
+            </button>
+          </div>
+          <div style={{ background: 'var(--color-surface-2)', borderRadius: 12, padding: 8, display: 'flex', alignItems: 'center' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-accent-soft)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0 }}>
+              {identity.avatar || identity.uid.substring(0, 2).toUpperCase()}
             </div>
-            
-            <div className="bg-slate-900 rounded-lg p-2 flex items-center">
-                <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-cyan-400 mr-2">
-                    {identity.avatar || identity.uid.substring(0,2).toUpperCase()}
-                </div>
-                <div className="flex-1 overflow-hidden mr-2">
-                     <p className="text-xs font-bold text-white truncate">{identity.username || 'Anonymous'}</p>
-                     <p className="text-[10px] text-cyan-500 truncate font-mono">{identity.uid}</p>
-                </div>
-                <button onClick={handleCopyUid} className="text-slate-500 hover:text-white">
-                    {copied ? <CheckCircleIcon className="w-5 h-5 text-green-500"/> : <ClipboardIcon className="w-5 h-5"/>}
-                </button>
+            <div style={{ flex: 1, overflow: 'hidden', marginRight: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{identity.username || 'Anonymous'}</p>
+              <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-family-mono)' }}>{identity.uid}</p>
             </div>
+            <button onClick={handleCopyUid} className="pg-icon-btn" style={{ flexShrink: 0, color: copied ? 'var(--color-success)' : undefined }}>
+              {copied ? <CheckCircleIcon className="w-5 h-5" /> : <ClipboardIcon className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -362,38 +331,48 @@ const ContactList: React.FC<ContactListProps> = ({
         />
       )}
       {isGroupModalOpen && (
-          <CreateGroupModal 
-            onClose={() => setIsGroupModalOpen(false)}
-            onCreate={onCreateGroup}
-          />
+        <CreateGroupModal
+          onClose={() => setIsGroupModalOpen(false)}
+          onCreate={onCreateGroup}
+        />
       )}
 
       {contextMenu && (
-         <div
-            ref={menuRef}
-            className="fixed z-50 bg-slate-700 rounded-md shadow-xl py-1 w-52 text-sm border border-slate-600"
-            style={{ top: contextMenu.y, left: contextMenu.x }}
-         >
-            <div className="px-3 py-2 font-bold truncate text-white border-b border-slate-600">{contextMenu.contact.name}</div>
-            
-            <button onClick={() => toggleArchive(contextMenu.contact.id, !contextMenu.contact.archived)} className="w-full text-left px-3 py-2 hover:bg-slate-600 text-slate-200 flex items-center">
-                <ArchiveBoxIcon className="w-4 h-4 mr-2" />
-                {contextMenu.contact.archived ? 'Unarchive' : 'Archive'}
-            </button>
-            
-            <div className="border-t border-slate-600 my-1"></div>
-            
-            {contextMenu.contact.mutedUntil ? (
-              <button onClick={() => setMute(null)} className="w-full text-left px-3 py-2 hover:bg-slate-600 text-slate-200">Unmute</button>
-            ) : (
-              <>
-                <div className="px-3 py-1 text-xs text-slate-400 uppercase">Mute notifications</div>
-                <button onClick={() => setMute(3600 * 1000)} className="w-full text-left px-3 py-1.5 hover:bg-slate-600 text-slate-200 pl-6">For 1 hour</button>
-                <button onClick={() => setMute(8 * 3600 * 1000)} className="w-full text-left px-3 py-1.5 hover:bg-slate-600 text-slate-200 pl-6">For 8 hours</button>
-                <button onClick={() => setMute('forever')} className="w-full text-left px-3 py-1.5 hover:bg-slate-600 text-slate-200 pl-6">Forever</button>
-              </>
-            )}
-         </div>
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            zIndex: 50,
+            background: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-3)',
+            padding: '4px 0',
+            width: 208,
+            border: '1px solid var(--color-border)',
+            top: contextMenu.y,
+            left: contextMenu.x,
+          }}
+        >
+          <div style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderBottom: '1px solid var(--color-border)' }}>{contextMenu.contact.name}</div>
+
+          <button onClick={() => toggleArchive(contextMenu.contact.id, !contextMenu.contact.archived)} className="pg-menu-row">
+            <ArchiveBoxIcon className="w-4 h-4" />
+            <span>{contextMenu.contact.archived ? 'Разархивировать' : 'Архивировать'}</span>
+          </button>
+
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+
+          {contextMenu.contact.mutedUntil ? (
+            <button onClick={() => setMute(null)} className="pg-menu-row">Разблокировать уведомления</button>
+          ) : (
+            <>
+              <div style={{ padding: '4px 12px', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Заглушить уведомления</div>
+              <button onClick={() => setMute(3600 * 1000)} className="pg-menu-row" style={{ paddingLeft: 24 }}>На 1 час</button>
+              <button onClick={() => setMute(8 * 3600 * 1000)} className="pg-menu-row" style={{ paddingLeft: 24 }}>На 8 часов</button>
+              <button onClick={() => setMute('forever')} className="pg-menu-row" style={{ paddingLeft: 24 }}>Навсегда</button>
+            </>
+          )}
+        </div>
       )}
     </>
   );

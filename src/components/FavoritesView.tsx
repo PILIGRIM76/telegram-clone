@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 ﻿// v3.0 Phase 2C: FavoritesView - С‚РѕР»СЊРєРѕ verified РєРѕРЅС‚Р°РєС‚С‹.
 // Р­С‚Рѕ security-С„РёС‡Р°: СЃС‚РёРјСѓР»РёСЂСѓРµС‚ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ Verify (anti-MITM).
 // Verified РєРѕРЅС‚Р°РєС‚ = РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃСЂР°РІРЅРёР» fingerprint = Р·Р°С‰РёС‰С‘РЅ РѕС‚ MITM.
@@ -31,7 +32,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ contacts, onSelect
 
   return (
     <div data-testid="favorites-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-primary)' } as React.CSSProperties}>
-      <LeftAppBar title="РР·Р±СЂР°РЅРЅРѕРµ" onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))} onSearchClick={() => console.log('[PILIGRIM] Search (Phase 2E)')} />
+      <LeftAppBar title="РР·Р±СЂР°РЅРЅРѕРµ" onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))} onSearchClick={() => logger.info('[PILIGRIM] Search (Phase 2E)')} />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
         {favorites.length === 0 ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', gap: 12, padding: 24, textAlign: 'center' } as React.CSSProperties}>

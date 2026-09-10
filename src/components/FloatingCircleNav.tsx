@@ -6,8 +6,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { TabView } from './TabletTabBar';
 
-export type CircleView = 'chats' | 'contacts' | 'calls' | 'favorites';
+export type CircleView = TabView;
 
 interface FloatingCircleNavProps {
   activeView: CircleView;

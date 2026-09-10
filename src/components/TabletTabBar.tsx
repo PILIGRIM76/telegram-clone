@@ -8,7 +8,7 @@
 
 import React from 'react';
 
-export type TabView = 'chats' | 'contacts' | 'calls' | 'favorites';
+export type TabView = 'contacts' | 'chats' | 'settings' | 'calls' | 'channels' | 'favorites';
 
 interface TabletTabBarProps {
   activeView: TabView;
@@ -16,10 +16,9 @@ interface TabletTabBarProps {
 }
 
 interface TabConfig {
-  view: TabView;
+  id: TabView;
   icon: React.ReactNode;
   label: string;
-  testId: string;
 }
 
 const chatsIcon = React.createElement('svg', {
@@ -43,7 +42,7 @@ const callsIcon = React.createElement('svg', {
   React.createElement('path', { d: 'M19.07 4.93a10 10 0 0 1 0 14.14' })
 );
 
-const favoritesIcon = React.createElement('svg', {
+const settingsIcon = React.createElement('svg', {
   width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
 },
   React.createElement('path', { d: 'M12 2L2 7l10 5 10-5-10-5z' }),
@@ -51,11 +50,19 @@ const favoritesIcon = React.createElement('svg', {
   React.createElement('path', { d: 'M2 12l10 5 10-5' })
 );
 
+const channelsIcon = React.createElement('svg', {
+  width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+},
+  React.createElement('path', { d: 'M4 6h16M4 12h16M4 18h10' }),
+  React.createElement('circle', { cx: 19, cy: 18, r: 2 })
+);
+
 const TABS: TabConfig[] = [
-  { view: 'chats', icon: chatsIcon, label: 'Чаты', testId: 'tab-chats' },
-  { view: 'contacts', icon: contactsIcon, label: 'Контакты', testId: 'tab-contacts' },
-  { view: 'calls', icon: callsIcon, label: 'Звонки', testId: 'tab-calls' },
-  { view: 'favorites', icon: favoritesIcon, label: 'Избранное', testId: 'tab-favorites' },
+  { id: 'contacts', icon: contactsIcon, label: 'Контакты' },
+  { id: 'chats', icon: chatsIcon, label: 'Чаты' },
+  { id: 'channels', icon: channelsIcon, label: 'Каналы' },
+  { id: 'settings', icon: settingsIcon, label: 'Настройки' },
+  { id: 'calls', icon: callsIcon, label: 'Звонки' },
 ];
 
 const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -71,22 +78,28 @@ export const TabletTabBar: React.FC<TabletTabBarProps> = ({ activeView, onViewCh
     'data-testid': 'tablet-tab-bar',
     style: {
       height: 56,
-      background: 'rgba(255,255,255,0.85)',
+      background: 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      borderTop: '1px solid rgba(0,0,0,0.04)',
+      borderTop: '1px solid rgba(0,0,0,0.05)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-around',
       padding: '0 16px',
       flexShrink: 0,
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      boxSizing: 'border-box',
     } as React.CSSProperties,
   }, TABS.map((tab) => {
-    const isActive = activeView === tab.view;
+    const isActive = activeView === tab.id;
     return React.createElement('button', {
-      key: tab.view,
-      onClick: () => onViewChange(tab.view),
-      'data-testid': tab.testId,
+      key: tab.id,
+      onClick: () => onViewChange(tab.id),
+      'data-testid': tab.id,
       'aria-label': tab.label,
       'aria-pressed': isActive,
       style: {
@@ -121,13 +134,15 @@ export const TabletTabBar: React.FC<TabletTabBarProps> = ({ activeView, onViewCh
         } as React.CSSProperties,
       }, tab.label),
       isActive ? React.createElement('div', {
-        'data-testid': tab.testId + '-indicator',
         style: {
-          width: 6,
+          position: 'absolute',
+          bottom: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 24,
           height: 3,
-          borderRadius: 4,
+          borderRadius: 2,
           background: 'var(--color-accent)',
-          marginTop: -2,
         } as React.CSSProperties,
       }) : null
     );
