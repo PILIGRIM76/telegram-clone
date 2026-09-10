@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { resources, Language } from '../translations';
@@ -22,7 +23,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('cipherlink-lang', lang);
-    console.log(`[PILIGRIM] Language switched to: ${lang}`);
+    logger.info(`[PILIGRIM] Language switched to: ${lang}`);
   };
 
   const t = (key: keyof typeof resources['en']): string => {

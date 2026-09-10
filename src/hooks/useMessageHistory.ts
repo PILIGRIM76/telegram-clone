@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { sqliteStorage } from '../services/sqliteStorage';
 import type { Message } from '../types';
@@ -21,7 +22,7 @@ export function useMessageHistory(chatId: string, initialLimit: number = 50) {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Failed to load messages:', err);
+        logger.error('Failed to load messages:', err);
         setLoading(false);
       });
   }, [chatId, initialLimit]);
@@ -39,7 +40,7 @@ export function useMessageHistory(chatId: string, initialLimit: number = 50) {
       setMessages(prev => [...moreMessages, ...prev]); // Новые сообщения сверху
       setOffset(prev => prev + initialLimit);
     } catch (err) {
-      console.error('Failed to load more messages:', err);
+      logger.error('Failed to load more messages:', err);
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v1.5.2 Stage 5: WebSocket hook с авто-reconnect и offline-first fallback
 // Использует apiService (NaCl box для транспорта) + cryptoService (RSA-OAEP для at-rest).
 // Если backend недоступен — не падает, а работает в localStorage-only режиме.
@@ -64,7 +65,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     }
     // Оборачиваем колбэк чтобы можно было удалить
     const handler = (message: Message) => {
-      console.log('[PILIGRIM] useWebSocket: incoming message', message.id);
+      logger.info('[PILIGRIM] useWebSocket: incoming message', message.id);
       onMessageRef.current?.(message);
     };
     messageHandlerRef.current = handler;
@@ -77,7 +78,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
       return;
     }
     if (!myUid) {
-      console.warn('[PILIGRIM] useWebSocket: myUid is empty, cannot connect');
+      logger.warn('[PILIGRIM] useWebSocket: myUid is empty, cannot connect');
       updateStatus('closed');
       return;
     }
@@ -100,7 +101,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
         });
       }, 2000);
     } catch (e) {
-      console.error('[PILIGRIM] useWebSocket: connect failed', e);
+      logger.error('[PILIGRIM] useWebSocket: connect failed', e);
       updateStatus('error');
       scheduleReconnect();
     }
@@ -109,7 +110,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
   const scheduleReconnect = useCallback(() => {
     clearReconnect();
     reconnectTimerRef.current = window.setTimeout(() => {
-      console.log('[PILIGRIM] useWebSocket: attempting reconnect…');
+      logger.info('[PILIGRIM] useWebSocket: attempting reconnect…');
       connect();
     }, reconnectInterval);
   }, [connect, reconnectInterval, clearReconnect]);
@@ -118,12 +119,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
   useEffect(() => {
     if (!enabled) return;
     const handleClose = () => {
-      console.log('[PILIGRIM] useWebSocket: connection closed, scheduling reconnect');
+      logger.info('[PILIGRIM] useWebSocket: connection closed, scheduling reconnect');
       updateStatus('closed');
       scheduleReconnect();
     };
     const handleError = (err: unknown) => {
-      console.error('[PILIGRIM] useWebSocket: error', err);
+      logger.error('[PILIGRIM] useWebSocket: error', err);
       updateStatus('error');
       scheduleReconnect();
     };
@@ -148,7 +149,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
 
   const send = useCallback((to: string, content: string, recipientPublicKey?: string) => {
     if (status !== 'open') {
-      console.warn('[PILIGRIM] useWebSocket: send ignored, status =', status);
+      logger.warn('[PILIGRIM] useWebSocket: send ignored, status =', status);
       return;
     }
     if (recipientPublicKey) {

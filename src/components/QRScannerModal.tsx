@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0 Phase 4: QRScannerModal — сканирование QR-кода через getUserMedia + jsQR.
 // Закрывает QR-петлю: Drawer показывает QR -> AddContact сканирует -> контакт с publicKey.
 // Безопасность: camera tracks останавливаются на unmount (battery + privacy).
@@ -53,7 +54,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
       try {
         const parsed = JSON.parse(raw);
         if (parsed.v && parsed.v.startsWith('piligrim-') && parsed.uid) {
-          console.log('[PILIGRIM] QR decoded:', parsed.uid);
+          logger.info('[PILIGRIM] QR decoded:', parsed.uid);
           onScan({ uid: parsed.uid, publicKey: parsed.publicKey });
         } else {
           setError('Not a PILIGRIM QR code');
@@ -80,7 +81,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
           scanLoop();
         }
       } catch (err) {
-        console.error('[PILIGRIM] Camera error:', err);
+        logger.error('[PILIGRIM] Camera error:', err);
         setError('Camera unavailable. Use manual UID entry.');
       }
     };

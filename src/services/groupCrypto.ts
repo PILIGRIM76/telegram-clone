@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Phase 2: Шифрование списка участников группы.
 // Сервер хранит opaque blob — не знает, кто в группе.
 // Расшифровка только у участников группы (на клиенте).
@@ -55,7 +56,7 @@ export async function decryptGroupMembers(
       try {
         return await decryptAESGCM(encrypted, groupKey);
       } catch (e) {
-        console.warn('[groupCrypto] failed to decrypt member, skipping:', e);
+        logger.warn('[groupCrypto] failed to decrypt member, skipping:', e);
         return null;
       }
     }),

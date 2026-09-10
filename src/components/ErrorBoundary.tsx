@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0: ErrorBoundary для защиты UI от JS ошибок
 // Если компонент крашится - показывает fallback вместо белого экрана
 // Production safety net: catches render-time errors, логирует, предлагает reload
@@ -20,8 +21,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    console.error('[PILIGRIM] ErrorBoundary caught:', error?.message);
-    console.error('[PILIGRIM] ErrorBoundary stack:', info?.componentStack);
+    logger.error('[PILIGRIM] ErrorBoundary caught:', error?.message);
+    logger.error('[PILIGRIM] ErrorBoundary stack:', info?.componentStack);
   }
 
   render(): React.ReactNode {

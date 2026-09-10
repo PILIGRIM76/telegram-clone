@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v1.5.2 Stage 6: WebRTC React hook поверх browser-native webrtcService.
 // Сигналинг через apiService WebSocket (Этап 5).
 
@@ -26,12 +27,12 @@ export function useWebRTC(_currentUserId: string) {
 
   useEffect(() => {
     const handleOffer = (data: any) => {
-      console.log('[PILIGRIM] useWebRTC: incoming offer from', data.from);
+      logger.info('[PILIGRIM] useWebRTC: incoming offer from', data.from);
       setIncomingCall({ from: data.from, signal: { type: 'offer', sdp: data.signal } });
       lastCallInitiatorRef.current = data.from;
     };
     const handleAnswer = (data: any) => {
-      console.log('[PILIGRIM] useWebRTC: incoming answer from', data.from);
+      logger.info('[PILIGRIM] useWebRTC: incoming answer from', data.from);
       webrtcService.handleSignal({ type: 'answer', sdp: data.signal });
       setIsCalling(false);
       setIsInCall(true);
@@ -40,7 +41,7 @@ export function useWebRTC(_currentUserId: string) {
       webrtcService.handleSignal({ type: 'ice', candidate: data.signal });
     };
     const handleEnd = () => {
-      console.log('[PILIGRIM] useWebRTC: call ended by remote');
+      logger.info('[PILIGRIM] useWebRTC: call ended by remote');
       webrtcService.endCall();
       setIsInCall(false);
       setIsCalling(false);
@@ -74,7 +75,7 @@ export function useWebRTC(_currentUserId: string) {
         setLocalStream(null);
       },
       onError: (error) => {
-        console.error('[PILIGRIM] useWebRTC: call error', error);
+        logger.error('[PILIGRIM] useWebRTC: call error', error);
         setIsCalling(false);
         setIsInCall(false);
         alert(`Ошибка звонка: ${error.message}`);
@@ -101,7 +102,7 @@ export function useWebRTC(_currentUserId: string) {
         setLocalStream(null);
       },
       onError: (error) => {
-        console.error('[PILIGRIM] useWebRTC: answer error', error);
+        logger.error('[PILIGRIM] useWebRTC: answer error', error);
         setIncomingCall(null);
         alert(`Ошибка ответа: ${error.message}`);
       },

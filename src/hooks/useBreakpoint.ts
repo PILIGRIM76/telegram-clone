@@ -25,7 +25,9 @@ export function useBreakpoint(): Breakpoint {
 
 function getBreakpoint(): Breakpoint {
   const w = window.innerWidth;
-  if (w <= 640) return 'mobile';
+  // RT9 (800x1280): WebView innerWidth = 640 (system nav deducted).
+  // Mobile breakpoint lowered to 600 so 640 falls into tablet.
+  if (w <= 600) return 'mobile';
   if (w <= 1024) return 'tablet';
   return 'desktop';
 }

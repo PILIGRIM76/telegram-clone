@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import React, { useState, useEffect } from 'react';
 
 interface SeedPhraseModalProps {
@@ -13,14 +14,14 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
   onSkip,
   username
 }) => {
-  console.log('🎭 [PILIGRIM] SeedPhraseModal рендерится, props:', {
+  logger.info('🎭 [PILIGRIM] SeedPhraseModal рендерится, props:', {
     seedPhraseLength: seedPhrase?.length,
     wordCount: seedPhrase?.trim().split(/\s+/).length,
   });
 
   useEffect(() => {
-    console.log('🎭 [PILIGRIM] SeedPhraseModal mounted');
-    return () => console.log('🎭 [PILIGRIM] SeedPhraseModal unmounted');
+    logger.info('🎭 [PILIGRIM] SeedPhraseModal mounted');
+    return () => logger.info('🎭 [PILIGRIM] SeedPhraseModal unmounted');
   }, []);
 
   const [hasSaved, setHasSaved] = useState(false);
@@ -35,7 +36,7 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Не удалось скопировать:', err);
+      logger.error('Не удалось скопировать:', err);
     }
   };
 

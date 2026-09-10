@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v2.0 Stage 4: WebSocket URL builder с auto-register query params.
 // Передаёт uid + publicKey (base64url-encoded JWK) на этапе handshake,
 // чтобы сервер знал клиента ДО первого WS-сообщения.
@@ -9,7 +10,9 @@
 export interface AuthIdentityLike {
   uid: string;
   /** JWK-строка или объект (cryptoService возвращает строку) */
-  publicKey: string | { kty?: string; n?: string; e?: string };
+  publicKey?: string | { kty?: string; n?: string; e?: string };
+  /** Transport NaCl box public key (base64) — preferred for WS handshake */
+  transportPublicKey?: string;
 }
 
 /**
@@ -23,7 +26,7 @@ export function buildWsAuthUrl(
   identity: AuthIdentityLike | null
 ): string {
   if (!identity || !identity.uid) {
-    console.warn('[PILIGRIM WS] buildWsAuthUrl: no identity, connecting anonymously');
+    logger.warn('[PILIGRIM WS] buildWsAuthUrl: no identity, connecting anonymously');
     return baseUrl;
   }
 
@@ -31,13 +34,18 @@ export function buildWsAuthUrl(
     const url = new URL(baseUrl);
     url.searchParams.set('uid', identity.uid);
 
-    // publicKey может быть JWK-строкой (как генерирует cryptoService)
-    // или объектом (если распарсили из JSON)
-    let pkString: string;
-    if (typeof identity.publicKey === 'string') {
-      pkString = identity.publicKey;
-    } else {
-      pkString = JSON.stringify(identity.publicKey);
+    // Transport key (NaCl box base64) предпочтительнее identity publicKey.
+    let pkString: string | undefined = identity.transportPublicKey;
+    if (!pkString && identity.publicKey) {
+      if (typeof identity.publicKey === 'string') {
+        pkString = identity.publicKey;
+      } else {
+        pkString = JSON.stringify(identity.publicKey);
+      }
+    }
+    if (!pkString) {
+      logger.warn('[PILIGRIM WS] buildWsAuthUrl: no publicKey or transportPublicKey in identity');
+      return baseUrl;
     }
 
     // base64url encoding: URL-safe (без +, /, =)
@@ -52,7 +60,7 @@ export function buildWsAuthUrl(
 
     return url.toString();
   } catch (error) {
-    console.error('[PILIGRIM WS] buildWsAuthUrl: failed to build auth URL', error);
+    logger.error('[PILIGRIM WS] buildWsAuthUrl: failed to build auth URL', error);
     return baseUrl;
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import React, { useRef, useEffect, useState } from 'react';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useCallTimer } from '../hooks/useCallTimer';
@@ -49,14 +50,14 @@ export const CallModal: React.FC<CallModalProps> = ({
       const screenStream = webrtcService.getScreenStream();
       if (screenStream) {
         localVideoRef.current.srcObject = screenStream;
-        console.log('Local preview switched to screen');
+        logger.info('Local preview switched to screen');
       }
     } else {
       // Возвращаем камеру
       const camStream = webrtcService.getLocalStream();
       if (camStream) {
         localVideoRef.current.srcObject = camStream;
-        console.log('Local preview switched back to camera');
+        logger.info('Local preview switched back to camera');
       }
     }
   }, [isScreenSharing, localStream]);

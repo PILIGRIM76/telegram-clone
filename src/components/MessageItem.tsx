@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 
 import React, { useEffect, useState } from 'react';
 import type { Message, Identity } from '../types';
@@ -56,7 +57,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
             decryptAESGCM(encryptedPayload, getPrivateKey(currentIdentity))
                 .then(text => setDecryptedText(text))
                 .catch(error => {
-                    console.error('MessageItem: Ошибка расшифровки:', error);
+                    logger.error('MessageItem: Ошибка расшифровки:', error);
                     setDecryptedText('[Не удалось расшифровать]');
                 });
         } else {

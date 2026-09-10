@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Phase 2: Tor SOCKS5 proxy support (опциональный).
 // В WebView (Capacitor) нативный SOCKS5 не поддерживается.
 // Fallback: прямое соединение с предупреждением в логах.
@@ -42,15 +43,15 @@ export class TorProxy {
   enable(): void {
     this.config.enabled = true;
     this.checkCache = null;
-    console.log(`[TOR] Proxy enabled: socks5://${this.config.socksHost}:${this.config.socksPort}`);
-    console.warn('[TOR] ВНИМАНИЕ: В WebView (Capacitor) SOCKS5 не поддерживается нативно.');
-    console.warn('[TOR] Для реальной анонимизации нужен нативный HTTP proxy или Capacitor плагин.');
+    logger.info(`[TOR] Proxy enabled: socks5://${this.config.socksHost}:${this.config.socksPort}`);
+    logger.warn('[TOR] ВНИМАНИЕ: В WebView (Capacitor) SOCKS5 не поддерживается нативно.');
+    logger.warn('[TOR] Для реальной анонимизации нужен нативный HTTP proxy или Capacitor плагин.');
   }
 
   disable(): void {
     this.config.enabled = false;
     this.checkCache = null;
-    console.log('[TOR] Proxy disabled');
+    logger.info('[TOR] Proxy disabled');
   }
 
   isEnabled(): boolean {
@@ -75,20 +76,20 @@ export class TorProxy {
       const response = await fetch(TOR_CHECK_URL, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (!response.ok) {
-        console.warn(`[TOR] check.torproject.org returned ${response.status}`);
+        logger.warn(`[TOR] check.torproject.org returned ${response.status}`);
         return false;
       }
       const data: { IsTor?: boolean; IP?: string } = await response.json();
       const isTor = data.IsTor === true;
       this.checkCache = { isTor, checkedAt: Date.now() };
       if (isTor) {
-        console.log(`[TOR] Confirmed: traffic going through Tor. IP=${data.IP}`);
+        logger.info(`[TOR] Confirmed: traffic going through Tor. IP=${data.IP}`);
       } else {
-        console.warn(`[TOR] check.torproject.org says IsTor=false. IP=${data.IP}`);
+        logger.warn(`[TOR] check.torproject.org says IsTor=false. IP=${data.IP}`);
       }
       return isTor;
     } catch (e) {
-      console.warn('[TOR] checkAvailability failed:', e);
+      logger.warn('[TOR] checkAvailability failed:', e);
       return false;
     }
   }
@@ -100,8 +101,8 @@ export class TorProxy {
    */
   getWsUrl(directUrl: string): string {
     if (!this.config.enabled) return directUrl;
-    console.warn('[TOR] WebSocket через Tor не поддерживается в WebView.');
-    console.warn('[TOR] Используется прямое соединение. Включите Tor через VPN/proxy на уровне ОС.');
+    logger.warn('[TOR] WebSocket через Tor не поддерживается в WebView.');
+    logger.warn('[TOR] Используется прямое соединение. Включите Tor через VPN/proxy на уровне ОС.');
     return directUrl;
   }
 

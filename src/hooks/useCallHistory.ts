@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { prismaService } from '../services/prismaService';
 
@@ -44,7 +45,7 @@ export function useCallHistory(userId: string) {
       
       setHasMore(newCalls.length === 50);
     } catch (error) {
-      console.error('Failed to load call history:', error);
+      logger.error('Failed to load call history:', error);
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export function useMissedCalls(userId: string) {
       }));
       setMissedCalls(typedCalls);
     } catch (error) {
-      console.error('Failed to load missed calls:', error);
+      logger.error('Failed to load missed calls:', error);
     } finally {
       setLoading(false);
     }

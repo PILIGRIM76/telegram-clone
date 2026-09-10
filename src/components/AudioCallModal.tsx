@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import React, { useEffect } from 'react';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useCallTimer } from '../hooks/useCallTimer';
@@ -74,7 +75,7 @@ export const AudioCallModal: React.FC<AudioCallModalProps> = ({
 
   const handleToggleAudio = () => {
     toggleAudio();
-    console.log('Audio: toggled');
+    logger.info('Audio: toggled');
   };
 
   if (!isOpen && !incomingCall && !isInCall && !isCalling) {

@@ -1,3 +1,4 @@
+import { logger } from './logger';
 
 import type { Identity, LegacyIdentity, IdentityType } from '../types';
 import {
@@ -211,7 +212,7 @@ export const generateSeedPhrase = (): string => {
  * - Детерминированно: одни и те же 12 слов → одни и те же ключи
  */
 export const generateIdentity = async (): Promise<IdentityType> => {
-  console.log('[PILIGRIM] Phase 7: pure BIP39 + secp256k1 keygen');
+  logger.info('[PILIGRIM] Phase 7: pure BIP39 + secp256k1 keygen');
   
   const v7Identity = await generateBIP39IdentityV7();
   
@@ -252,7 +253,7 @@ export const encrypt = async (text: string, publicKeyStr: string): Promise<strin
         // Возвращаем в base64 для передачи
         return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
     } catch (e) {
-        console.error('Encryption failed', e);
+        logger.error('Encryption failed', e);
         throw new Error('Encryption failed');
     }
 };
@@ -283,19 +284,19 @@ export const decrypt = async (encryptedText: string, privateKeyStr: string): Pro
         const decoder = new TextDecoder();
         return decoder.decode(decrypted);
     } catch (e) {
-        console.error('Decryption failed', e);
+        logger.error('Decryption failed', e);
         throw new Error('Decryption failed');
     }
 };
 
 // Синхронные обёртки для обратной совместимости (используйте async версии)
 export const encryptSync = (text: string, _key: string): string => {
-    console.warn('encryptSync is deprecated. Use async encrypt() instead.');
+    logger.warn('encryptSync is deprecated. Use async encrypt() instead.');
     return text; // В продакшене должно выбрасывать ошибку
 };
 
 export const decryptSync = (encryptedText: string, _key: string): string => {
-    console.warn('decryptSync is deprecated. Use async decrypt() instead.');
+    logger.warn('decryptSync is deprecated. Use async decrypt() instead.');
     return encryptedText;
 };
 
@@ -316,7 +317,7 @@ export const restoreIdentityFromSeed = async (
     words: string[],
     encryptedKeyPair?: string
   ): Promise<IdentityType> => {
-  console.log('[PILIGRIM] Phase 7: restoreIdentityFromSeed');
+  logger.info('[PILIGRIM] Phase 7: restoreIdentityFromSeed');
 
   // Валидация: должно быть ровно 12 слов
   if (!Array.isArray(words) || words.length !== 12) {
@@ -335,19 +336,19 @@ export const restoreIdentityFromSeed = async (
 
   // Phase 7: чистая BIP39 схема
   if (isBIP39) {
-    console.log('[PILIGRIM] Phase 7: valid BIP39 mnemonic detected');
+    logger.info('[PILIGRIM] Phase 7: valid BIP39 mnemonic detected');
     try {
       const v7Identity = await restoreIdentityFromMnemonicV7(seedString);
-      console.log(`[PILIGRIM] Phase 7: restore SUCCESS (BIP39), uid=${v7Identity.uid}`);
+      logger.info(`[PILIGRIM] Phase 7: restore SUCCESS (BIP39), uid=${v7Identity.uid}`);
       return v7Identity as Identity;
     } catch (e) {
-      console.error('[PILIGRIM] Phase 7: BIP39 restore failed:', e);
+      logger.error('[PILIGRIM] Phase 7: BIP39 restore failed:', e);
       // Fallback на legacy
       return legacyRestoreFromSeed(cleanedWords);
     }
   }
 
-  console.warn('[PILIGRIM] Phase 7: Non-BIP39 mnemonic detected, using legacy PBKDF2 fallback');
+  logger.warn('[PILIGRIM] Phase 7: Non-BIP39 mnemonic detected, using legacy PBKDF2 fallback');
   return legacyRestoreFromSeed(cleanedWords);
 };
 
@@ -392,7 +393,7 @@ async function legacyRestoreFromSeed(cleanedWords: string[]): Promise<LegacyIden
 
     const keyFingerprint = await generateFingerprint(publicKeyStr);
 
-    console.log(`[PILIGRIM] legacyRestoreFromSeed SUCCESS, uid=${uid}, fingerprint=${keyFingerprint}`);
+    logger.info(`[PILIGRIM] legacyRestoreFromSeed SUCCESS, uid=${uid}, fingerprint=${keyFingerprint}`);
 
     return {
         uid,

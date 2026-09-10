@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0 Logout: очистка identity из localStorage + закрытие WebSocket.
 // Offline-first архитектура: logout = забыть личность на этом устройстве.
 // Identity можно восстановить через seed-phrase на любом другом устройстве.
@@ -13,13 +14,13 @@ export function useLogout(options: UseLogoutOptions = {}) {
   const { onLogout, clearData = false } = options;
 
   const logout = useCallback(() => {
-    console.log('[PILIGRIM] Logout initiated');
+    logger.info('[PILIGRIM] Logout initiated');
 
     // 1. Очистить identity (обязательно)
     try {
       localStorage.removeItem('piligrim-identity');
     } catch (e) {
-      console.error('[PILIGRIM] Failed to remove piligrim-identity:', e);
+      logger.error('[PILIGRIM] Failed to remove piligrim-identity:', e);
     }
 
     // 2. Опционально очистить данные (для "delete account")
@@ -28,9 +29,9 @@ export function useLogout(options: UseLogoutOptions = {}) {
         localStorage.removeItem('piligrim-contacts');
         localStorage.removeItem('piligrim-chats');
         localStorage.removeItem('piligrim-groups');
-        console.log('[PILIGRIM] All user data cleared');
+        logger.info('[PILIGRIM] All user data cleared');
       } catch (e) {
-        console.error('[PILIGRIM] Failed to clear data:', e);
+        logger.error('[PILIGRIM] Failed to clear data:', e);
       }
     }
 
@@ -45,7 +46,7 @@ export function useLogout(options: UseLogoutOptions = {}) {
       }
     }
 
-    console.log('[PILIGRIM] Logout complete, identity forgotten');
+    logger.info('[PILIGRIM] Logout complete, identity forgotten');
 
     // 4. Callback для сброса React state (если передан)
     onLogout?.();

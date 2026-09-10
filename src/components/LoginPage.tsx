@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LockIcon, EyeOffIcon, EyeIcon, WarningIcon, QRIcon } from './icons';
@@ -64,9 +65,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
           throw new Error(`Требуется ровно 12 слов, получено ${words.length}`);
         }
         if (mnemonicStatus.isBIP39) {
-          console.log('[PILIGRIM] BIP39 mnemonic detected — proceeding with deterministic recovery');
+          logger.info('[PILIGRIM] BIP39 mnemonic detected — proceeding with deterministic recovery');
         } else {
-          console.warn('[PILIGRIM] Non-BIP39 mnemonic — will use legacy PBKDF2 fallback');
+          logger.warn('[PILIGRIM] Non-BIP39 mnemonic — will use legacy PBKDF2 fallback');
         }
         // Сигнал для App.tsx: тип flow (BIP39 → детерминированный, legacy → fallback)
         onRestore({
@@ -80,7 +81,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRestore }) => {
       return;
     }
 
-    console.log('[PILIGRIM] Auth:', mode, { username, password, twoFACode });
+    logger.info('[PILIGRIM] Auth:', mode, { username, password, twoFACode });
     onLogin();
   };
 

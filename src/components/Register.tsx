@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // Register page with 2FA support
 import React, { useState } from 'react';
 import { authenticateWith2FA, setup2FA, verifyTOTP } from '../services/auth';
@@ -26,7 +27,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
       setBackupCodes(codes);
       setShow2FASetup(true);
     } catch (error) {
-      console.error('Failed to setup 2FA:', error);
+      logger.error('Failed to setup 2FA:', error);
     }
   };
 
@@ -39,7 +40,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
   };
 
   const handleRegister = async () => {
-    console.log('[PILIGRIM] Register button clicked. show2FASetup=', show2FASetup, 'email=', email);
+    logger.info('[PILIGRIM] Register button clicked. show2FASetup=', show2FASetup, 'email=', email);
     if (show2FASetup) {
       handleVerify2FA();
     } else {

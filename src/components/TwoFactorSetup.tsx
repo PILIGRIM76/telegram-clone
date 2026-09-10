@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // TwoFactorSetup Component for 2FA UI
 import React, { useState } from 'react';
 import { setup2FA } from '../services/auth';
@@ -28,7 +29,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
       setShowCodes(true);
       onEnable(setup.secret, codes);
     } catch (error) {
-      console.error('Failed to setup 2FA:', error);
+      logger.error('Failed to setup 2FA:', error);
     }
   };
 

@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0 Phase 1: Time-based theme hook — автопереключение темы по времени суток.
 // Каждую минуту проверяет час и применяет body.theme-{morning|day|evening|night}.
 
@@ -40,7 +41,7 @@ export function useTimeTheme(): TimeTheme {
     if (!body) return;
     body.classList.remove('theme-morning', 'theme-day', 'theme-evening', 'theme-night');
     body.classList.add(`theme-${theme}`);
-    console.log(`[PILIGRIM v3.0] theme switched to: ${theme}`);
+    logger.info(`[PILIGRIM v3.0] theme switched to: ${theme}`);
   }, [theme]);
 
   return theme;

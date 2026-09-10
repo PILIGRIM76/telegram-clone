@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Phase 2: Traffic padding — шумовые пакеты для защиты от traffic analysis.
 // Сервер не может отличить реальные сообщения от шумовых по частоте/времени.
 
@@ -25,7 +26,7 @@ export class TrafficPadder {
     this.enabled = enabled;
     if (enabled) {
       this.scheduleNext();
-      console.log('[TrafficPadder] enabled: noise packets every 30-60s');
+      logger.info('[TrafficPadder] enabled: noise packets every 30-60s');
     }
   }
 
@@ -67,7 +68,7 @@ export class TrafficPadder {
     try {
       this.ws.send(JSON.stringify(noise));
     } catch (e) {
-      console.warn('[TrafficPadder] failed to send noise:', e);
+      logger.warn('[TrafficPadder] failed to send noise:', e);
     }
   }
 }

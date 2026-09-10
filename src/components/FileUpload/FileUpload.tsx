@@ -1,3 +1,4 @@
+import { logger } from '../../services/logger';
 import React, { useState, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 
@@ -58,7 +59,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ to, recipientPublicKey }) => {
 
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
     } finally {
       setUploading(false);
     }

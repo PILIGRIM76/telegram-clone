@@ -1,3 +1,4 @@
+import { logger } from '../services/logger';
 // v3.0 Phase 5: useImagePicker - canvas compression для localStorage.
 // Aurora spec: max 1280px, JPEG quality 0.8.
 // localStorage ~5MB лимит -> обязательное сжатие!
@@ -74,7 +75,7 @@ export function useImagePicker() {
       }
     } catch (e) {
       setError('Failed to process image');
-      console.error('[PILIGRIM] Image pick error:', e);
+      logger.error('[PILIGRIM] Image pick error:', e);
     }
     if (inputRef.current) inputRef.current.value = '';
   }, []);

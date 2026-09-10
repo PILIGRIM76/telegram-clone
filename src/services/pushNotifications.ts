@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Phase 3: Push notifications — wake up offline recipients.
 // Использует Web Push API + Service Worker.
 // В production: требует VAPID ключ (Firebase Cloud Messaging или собственный).
@@ -40,19 +41,19 @@ export class PushNotificationService {
    */
   async init(): Promise<PushSubscription | null> {
     if (!this.isSupported()) {
-      console.warn('[Push] Web Push API not supported');
+      logger.warn('[Push] Web Push API not supported');
       return null;
     }
 
     if (Notification.permission === 'denied') {
-      console.warn('[Push] Notification permission denied');
+      logger.warn('[Push] Notification permission denied');
       return null;
     }
 
     if (Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        console.warn('[Push] Notification permission not granted');
+        logger.warn('[Push] Notification permission not granted');
         return null;
       }
     }
@@ -66,16 +67,16 @@ export class PushNotificationService {
           userVisibleOnly: true,
           applicationServerKey: this.urlBase64ToUint8Array(this.config.vapidPublicKey) as unknown as BufferSource,
         });
-        console.log('[Push] New subscription created');
+        logger.info('[Push] New subscription created');
       } else {
-        console.log('[Push] Using existing subscription');
+        logger.info('[Push] Using existing subscription');
       }
 
       this.subscription = subscription;
       this.token = JSON.stringify(subscription);
       return subscription;
     } catch (e) {
-      console.error('[Push] init failed:', e);
+      logger.error('[Push] init failed:', e);
       return null;
     }
   }
@@ -103,10 +104,10 @@ export class PushNotificationService {
       const result = await this.subscription.unsubscribe();
       this.subscription = null;
       this.token = null;
-      console.log('[Push] Unsubscribed:', result);
+      logger.info('[Push] Unsubscribed:', result);
       return result;
     } catch (e) {
-      console.error('[Push] Unsubscribe failed:', e);
+      logger.error('[Push] Unsubscribe failed:', e);
       return false;
     }
   }
@@ -117,7 +118,7 @@ export class PushNotificationService {
   async showLocalNotification(title: string, options?: NotificationOptions): Promise<void> {
     if (!this.isSupported()) return;
     if (Notification.permission !== 'granted') {
-      console.warn('[Push] Notification permission not granted');
+      logger.warn('[Push] Notification permission not granted');
       return;
     }
     const registration = await navigator.serviceWorker.ready;

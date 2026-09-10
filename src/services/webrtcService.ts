@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // v1.5.2 Stage 6: Native WebRTC через browser RTCPeerConnection API.
 // Без simple-peer (он использует Node.js APIs и не работает в Capacitor WebView).
 // Сигналинг через apiService WebSocket (Этап 5).
@@ -76,7 +77,7 @@ class WebRTCService {
     };
 
     pc.ontrack = (event) => {
-      console.log('[PILIGRIM] WebRTC: ontrack', event.track.kind);
+      logger.info('[PILIGRIM] WebRTC: ontrack', event.track.kind);
       if (!this.remoteStream) {
         this.remoteStream = new MediaStream();
       }
@@ -87,7 +88,7 @@ class WebRTCService {
     };
 
     pc.onconnectionstatechange = () => {
-      console.log('[PILIGRIM] WebRTC: connection state =', pc.connectionState);
+      logger.info('[PILIGRIM] WebRTC: connection state =', pc.connectionState);
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         this.events.onError?.(new Error(`WebRTC connection ${pc.connectionState}`));
       }
@@ -116,7 +117,7 @@ class WebRTCService {
     this.callStartTime = Date.now();
 
     try {
-      console.log('[PILIGRIM] WebRTC: init call to', to);
+      logger.info('[PILIGRIM] WebRTC: init call to', to);
       this.localStream = await this.setupLocalMedia(true, true);
       events.onLocalStream?.(this.localStream);
 
@@ -128,7 +129,7 @@ class WebRTCService {
       const signal: SignalPayload = { type: 'offer', sdp: offer };
       events.onSignal?.(signal, to);
     } catch (error) {
-      console.error('[PILIGRIM] WebRTC: initCall error', error);
+      logger.error('[PILIGRIM] WebRTC: initCall error', error);
       events.onError?.(error as Error);
       this.cleanup();
     }
@@ -144,7 +145,7 @@ class WebRTCService {
     this.receiverId = caller;
 
     try {
-      console.log('[PILIGRIM] WebRTC: answering call from', caller);
+      logger.info('[PILIGRIM] WebRTC: answering call from', caller);
       this.localStream = await this.setupLocalMedia(true, true);
       events.onLocalStream?.(this.localStream);
 
@@ -161,7 +162,7 @@ class WebRTCService {
         throw new Error('Первый сигнал должен быть offer');
       }
     } catch (error) {
-      console.error('[PILIGRIM] WebRTC: answerCall error', error);
+      logger.error('[PILIGRIM] WebRTC: answerCall error', error);
       events.onError?.(error as Error);
       this.cleanup();
     }
@@ -169,7 +170,7 @@ class WebRTCService {
 
   async handleSignal(signal: SignalPayload): Promise<void> {
     if (!this.peer) {
-      console.warn('[PILIGRIM] WebRTC: handleSignal called without active peer');
+      logger.warn('[PILIGRIM] WebRTC: handleSignal called without active peer');
       return;
     }
     try {
@@ -181,13 +182,13 @@ class WebRTCService {
         }
       }
     } catch (error) {
-      console.error('[PILIGRIM] WebRTC: handleSignal error', error);
+      logger.error('[PILIGRIM] WebRTC: handleSignal error', error);
       this.events.onError?.(error as Error);
     }
   }
 
   endCall(): void {
-    console.log('[PILIGRIM] WebRTC: endCall');
+    logger.info('[PILIGRIM] WebRTC: endCall');
     this.cleanup();
     if (this.events.onEndCall) {
       this.events.onEndCall();
@@ -210,15 +211,15 @@ class WebRTCService {
 
   async startScreenShare(): Promise<boolean> {
     if (!isScreenShareSupported()) {
-      console.warn('[PILIGRIM] Screen sharing не поддерживается на этом устройстве');
+      logger.warn('[PILIGRIM] Screen sharing не поддерживается на этом устройстве');
       return false;
     }
     if (!this.peer || !this.localStream) {
-      console.warn('[PILIGRIM] startScreenShare: нет активного звонка');
+      logger.warn('[PILIGRIM] startScreenShare: нет активного звонка');
       return false;
     }
     try {
-      console.log('[PILIGRIM] WebRTC: requesting screen share…');
+      logger.info('[PILIGRIM] WebRTC: requesting screen share…');
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: 'monitor' } as MediaTrackConstraints,
         audio: false
@@ -240,7 +241,7 @@ class WebRTCService {
 
       // Когда пользователь нажимает "Stop" в системном диалоге
       screenTrack.onended = () => {
-        console.log('[PILIGRIM] WebRTC: screen track ended by user');
+        logger.info('[PILIGRIM] WebRTC: screen track ended by user');
         this.stopScreenShare();
       };
 
@@ -250,10 +251,10 @@ class WebRTCService {
     } catch (error: any) {
       // Пользователь отменил диалог — не ошибка
       if (error.name === 'NotAllowedError') {
-        console.log('[PILIGRIM] Screen share cancelled by user');
+        logger.info('[PILIGRIM] Screen share cancelled by user');
         return false;
       }
-      console.error('[PILIGRIM] WebRTC: startScreenShare error', error);
+      logger.error('[PILIGRIM] WebRTC: startScreenShare error', error);
       this.events.onError?.(error);
       return false;
     }
@@ -264,7 +265,7 @@ class WebRTCService {
       this.isScreenSharing = false;
       return;
     }
-    console.log('[PILIGRIM] WebRTC: stopping screen share');
+    logger.info('[PILIGRIM] WebRTC: stopping screen share');
 
     if (this.screenStream) {
       this.screenStream.getTracks().forEach((track) => track.stop());
@@ -278,7 +279,7 @@ class WebRTCService {
         try {
           await sender.replaceTrack(this.originalVideoTrack);
         } catch (e) {
-          console.warn('[PILIGRIM] Не удалось восстановить video трек', e);
+          logger.warn('[PILIGRIM] Не удалось восстановить video трек', e);
         }
       }
     }

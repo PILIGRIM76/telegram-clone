@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Phase 3: Offline message queue — IndexedDB persistence.
 // Сервер НЕ хранит сообщения (Dumb Server principle).
 // Клиент сам хранит недоставленные сообщения в IndexedDB
@@ -47,7 +48,7 @@ export class OfflineQueue {
           }
         },
       });
-      console.log('[OfflineQueue] IndexedDB initialized:', DB_NAME);
+      logger.info('[OfflineQueue] IndexedDB initialized:', DB_NAME);
     })();
     return this.initPromise;
   }
@@ -59,7 +60,7 @@ export class OfflineQueue {
     await this.init();
     if (!this.db) throw new Error('[OfflineQueue] DB not initialized');
     await this.db.put(STORE_NAME, msg);
-    console.log(`[OfflineQueue] Enqueued: ${msg.id} → ${msg.recipientUid}`);
+    logger.info(`[OfflineQueue] Enqueued: ${msg.id} → ${msg.recipientUid}`);
   }
 
   /**
@@ -79,7 +80,7 @@ export class OfflineQueue {
     await this.init();
     if (!this.db) throw new Error('[OfflineQueue] DB not initialized');
     await this.db.delete(STORE_NAME, id);
-    console.log(`[OfflineQueue] Removed: ${id}`);
+    logger.info(`[OfflineQueue] Removed: ${id}`);
   }
 
   /**
@@ -89,7 +90,7 @@ export class OfflineQueue {
     await this.init();
     if (!this.db) throw new Error('[OfflineQueue] DB not initialized');
     await this.db.clear(STORE_NAME);
-    console.log('[OfflineQueue] Queue cleared');
+    logger.info('[OfflineQueue] Queue cleared');
   }
 
   /**
@@ -130,7 +131,7 @@ export class OfflineQueue {
       return { sent: 0, failed: 0, retried: 0 };
     }
 
-    console.log(`[OfflineQueue] Processing ${messages.length} queued messages`);
+    logger.info(`[OfflineQueue] Processing ${messages.length} queued messages`);
     let sent = 0;
     let failed = 0;
     let retried = 0;
@@ -140,23 +141,23 @@ export class OfflineQueue {
         await sendFn(msg.payload);
         await this.remove(msg.id);
         sent++;
-        console.log(`[OfflineQueue] Sent: ${msg.id}`);
+        logger.info(`[OfflineQueue] Sent: ${msg.id}`);
       } catch (e: any) {
         const errorMsg = e?.message || String(e);
         const newRetryCount = msg.retryCount + 1;
         if (newRetryCount >= MAX_RETRY_COUNT) {
           await this.remove(msg.id);
           failed++;
-          console.error(`[OfflineQueue] Failed after ${MAX_RETRY_COUNT} retries: ${msg.id}`, errorMsg);
+          logger.error(`[OfflineQueue] Failed after ${MAX_RETRY_COUNT} retries: ${msg.id}`, errorMsg);
         } else {
           await this.updateRetry(msg.id, newRetryCount, errorMsg);
           retried++;
-          console.warn(`[OfflineQueue] Retry ${newRetryCount}/${MAX_RETRY_COUNT} for ${msg.id}: ${errorMsg}`);
+          logger.warn(`[OfflineQueue] Retry ${newRetryCount}/${MAX_RETRY_COUNT} for ${msg.id}: ${errorMsg}`);
         }
       }
     }
 
-    console.log(`[OfflineQueue] Done: sent=${sent}, retried=${retried}, failed=${failed}`);
+    logger.info(`[OfflineQueue] Done: sent=${sent}, retried=${retried}, failed=${failed}`);
     return { sent, failed, retried };
   }
 
