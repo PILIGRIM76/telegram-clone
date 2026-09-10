@@ -1,3 +1,5 @@
+import { logger } from './services/logger';
+/* App.tsx updated for Telegram-style tablet layout */
 ﻿// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
 // Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
 import React, { useState, useEffect, useMemo } from 'react';
@@ -7,6 +9,8 @@ import ContactList from './components/ContactList';
 import ChatWindow from './components/ChatWindow';
 import VerifyModal from './components/VerifyModal';
 import Toasts from './components/Toast';
+// FIX 2026-09-10: 27 dead component imports removed (not rendered in JSX):
+// These components exist but are not wired into the current UI (Phase 10 backlog).
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
 import { generateIdentity, restoreIdentityFromSeed, getPublicKey } from './services/cryptoService';
@@ -18,6 +22,7 @@ import { ResponsiveShell } from './components/ResponsiveShell';
 import { LeftAppBar } from './components/LeftAppBar';
 import { RightAppBar } from './components/RightAppBar';
 import { TabletTabBar, type TabView } from './components/TabletTabBar';
+import { ChannelsView } from './components/ChannelsView';
 import { FloatingActionButton } from './components/FloatingActionButton';
 // v3.0 Phase 2G: mobile floating circle nav
 import { FloatingCircleNav } from './components/FloatingCircleNav';
@@ -31,7 +36,7 @@ import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
 import { SearchModal } from './components/SearchModal';
 import AccountPage from './components/AccountPage';
-import type { Contact, Group, Chat, Message, Identity, IdentityType, LegacyIdentity } from './types';
+import type { Contact, Group, Chat, Message, Identity, IdentityType } from './types';
 // Phase 2: Signal Protocol — PFS via Double Ratchet.
 // handleSendMessage использует apiService.sendMessageSecure (Signal preferred, NaCl fallback).
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
@@ -108,7 +113,21 @@ const App: React.FC = () => {
 
   // v1.5.2 Stage 2: Р·Р°РіСЂСѓР·РєР° РєРѕРЅС‚Р°РєС‚РѕРІ, РіСЂСѓРїРї Рё С‡Р°С‚РѕРІ РёР· localStorage РїРѕСЃР»Рµ РјРѕРЅС‚РёСЂРѕРІР°РЅРёСЏ
   useEffect(() => {
-    console.log('[PILIGRIM] App mounted (v1.5.2 Stage 2 вЂ” AddContact enabled)');
+  // Phase 1 fix: ensure transport keys exist for loaded/restored identity
+  {
+    if (identity && !identity.transportPublicKey) {
+      apiService.initKeys(identity.uid);
+      const updated = { ...identity, transportPublicKey: apiService.getTransportPublicKey() };
+      setIdentity(updated);
+      try {
+        localStorage.setItem('piligrim-identity', JSON.stringify(updated));
+      } catch (e) {
+        logger.warn('[PILIGRIM] Failed to update identity with transportPublicKey:', e);
+      }
+    }
+  }
+
+    logger.info('[PILIGRIM] App mounted (v1.5.2 Stage 2 вЂ” AddContact enabled)');
     try {
       const savedContacts = localStorage.getItem('piligrim-contacts');
       if (savedContacts) setContacts(JSON.parse(savedContacts));
@@ -128,7 +147,7 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('piligrim-contacts', JSON.stringify(contacts));
     } catch (e) {
-      console.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ contacts:', e);
+      logger.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ contacts:', e);
     }
   }, [contacts]);
 
@@ -137,7 +156,7 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('piligrim-groups', JSON.stringify(groups));
     } catch (e) {
-      console.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ groups:', e);
+      logger.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ groups:', e);
     }
   }, [groups]);
 
@@ -146,7 +165,7 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('piligrim-chats', JSON.stringify(chats));
     } catch (e) {
-      console.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ chats:', e);
+      logger.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ chats:', e);
     }
   }, [chats]);
 // Phase 2: после инициализации identity → генерируем Signal pre-keys
@@ -166,38 +185,42 @@ const App: React.FC = () => {
         const ok = await apiService.publishPreKeyBundle(identity.uid, myBundle);
         if (ok) {
           setPreKeysPublished(true);
-          console.log('[PILIGRIM] Pre-key bundle published to server');
+          logger.info('[PILIGRIM] Pre-key bundle published to server');
         } else {
-          console.warn('[PILIGRIM] Pre-key bundle publish returned not-ok');
+          logger.warn('[PILIGRIM] Pre-key bundle publish returned not-ok');
         }
       } catch (e) {
-        console.error('[PILIGRIM] Failed to publish pre-keys:', e);
+        logger.error('[PILIGRIM] Failed to publish pre-keys:', e);
       }
     })();
   }, [identity, preKeysPublished]);
 
   const handleCreateIdentity = async () => {
-    console.log('рџљЂ [PILIGRIM] START: handleCreateIdentity РІС‹Р·РІР°РЅ');
+    logger.info('рџљЂ [PILIGRIM] START: handleCreateIdentity РІС‹Р·РІР°РЅ');
     try {
-      console.log('рџ”‘ [PILIGRIM] РЁР°Рі 1: generateIdentity()...');
+      logger.info('рџ”‘ [PILIGRIM] РЁР°Рі 1: generateIdentity()...');
       const startTime = Date.now();
       const newIdentity = await generateIdentity();
-      console.log(`вњ… [PILIGRIM] generateIdentity() Р·Р°РІРµСЂС€РµРЅ Р·Р° ${Date.now() - startTime}ms`);
+      logger.info(`вњ… [PILIGRIM] generateIdentity() Р·Р°РІРµСЂС€РµРЅ Р·Р° ${Date.now() - startTime}ms`);
+
+      // Phase 1 fix: generate and persist transport NaCl box keys for E2EE
+      apiService.initKeys(newIdentity.uid);
+      newIdentity.transportPublicKey = apiService.getTransportPublicKey();
 
       setPendingIdentity(newIdentity);
       setShowSeedModal(true);
-      console.log('рџЋ­ [PILIGRIM] setShowSeedModal(true) РІС‹РїРѕР»РЅРµРЅ');
+      logger.info('рџЋ­ [PILIGRIM] setShowSeedModal(true) РІС‹РїРѕР»РЅРµРЅ');
 
-      apiService.register(newIdentity.uid, getPublicKey(newIdentity))
-        .then(() => console.log('вњ… [PILIGRIM] register success'))
-        .catch((err: any) => console.warn('вљ пёЏ [PILIGRIM] register failed (ignored):', err?.message || err));
+      apiService.register(newIdentity.uid, apiService.getTransportPublicKey())
+        .then(() => logger.info('вњ… [PILIGRIM] register success'))
+        .catch((err: any) => logger.warn('вљ пёЏ [PILIGRIM] register failed (ignored):', err?.message || err));
     } catch (error) {
-      console.error('вќЊ [PILIGRIM] РћС€РёР±РєР° РІ handleCreateIdentity:', error);
+      logger.error('вќЊ [PILIGRIM] РћС€РёР±РєР° РІ handleCreateIdentity:', error);
     }
   };
 
   const handleSeedConfirmed = () => {
-    console.log('вњ… [PILIGRIM] Seed phrase РїРѕРґС‚РІРµСЂР¶РґРµРЅР°, СЃРѕС…СЂР°РЅСЏРµРј Identity');
+    logger.info('вњ… [PILIGRIM] Seed phrase РїРѕРґС‚РІРµСЂР¶РґРµРЅР°, СЃРѕС…СЂР°РЅСЏРµРј Identity');
     if (pendingIdentity) {
       try {
         localStorage.setItem('piligrim-identity', JSON.stringify(pendingIdentity));
@@ -205,13 +228,13 @@ const App: React.FC = () => {
         setPendingIdentity(null);
         setShowSeedModal(false);
       } catch (e) {
-        console.error('вќЊ [PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ identity:', e);
+        logger.error('вќЊ [PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ identity:', e);
       }
     }
   };
 
   const handleSeedSkip = () => {
-    console.log('вЏ­пёЏ [PILIGRIM] Seed phrase РїСЂРѕРїСѓС‰РµРЅР°');
+    logger.info('вЏ­пёЏ [PILIGRIM] Seed phrase РїСЂРѕРїСѓС‰РµРЅР°');
     if (pendingIdentity) {
       try {
         localStorage.setItem('piligrim-identity', JSON.stringify(pendingIdentity));
@@ -224,11 +247,11 @@ const App: React.FC = () => {
 
   // v1.5.2 Stage 2: СЂРµР°Р»СЊРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє РґРѕР±Р°РІР»РµРЅРёСЏ РєРѕРЅС‚Р°РєС‚Р° (offline-first)
   const handleAddContact = async (name: string, uid: string, publicKey?: string) => {
-    console.log('вћ• [PILIGRIM] handleAddContact:', name, uid, publicKey ? '(with pubKey)' : '(no pubKey)');
+    logger.info('вћ• [PILIGRIM] handleAddContact:', name, uid, publicKey ? '(with pubKey)' : '(no pubKey)');
 
     // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёРєР°С‚РѕРІ: РµСЃР»Рё РєРѕРЅС‚Р°РєС‚ СЃ С‚Р°РєРёРј uid СѓР¶Рµ РµСЃС‚СЊ, РЅРµ РґРѕР±Р°РІР»СЏРµРј
     if (contacts.some(c => c.uid === uid)) {
-      console.warn('вљ пёЏ [PILIGRIM] РљРѕРЅС‚Р°РєС‚ СЃ uid', uid, 'СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚');
+      logger.warn('вљ пёЏ [PILIGRIM] РљРѕРЅС‚Р°РєС‚ СЃ uid', uid, 'СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚');
       alert(`РљРѕРЅС‚Р°РєС‚ "${name}" СѓР¶Рµ РґРѕР±Р°РІР»РµРЅ РІ РІР°С€ СЃРїРёСЃРѕРє.`);
       return;
     }
@@ -255,7 +278,7 @@ const App: React.FC = () => {
       },
     }));
 
-    console.log('вњ… [PILIGRIM] РљРѕРЅС‚Р°РєС‚ РґРѕР±Р°РІР»РµРЅ:', newContact);
+    logger.info('вњ… [PILIGRIM] РљРѕРЅС‚Р°РєС‚ РґРѕР±Р°РІР»РµРЅ:', newContact);
 // Phase 2: попытка инициализации Signal сессии в фоне.
     // Не блокируем UI — если упадёт, остаётся NaCl fallback.
     try {
@@ -268,17 +291,41 @@ const App: React.FC = () => {
         await signalManager.initialize();
         const deviceId = remoteBundle.deviceId ?? 1;
         await signalManager.createSession(uid, deviceId, remoteBundle);
-        console.log(`[PILIGRIM] Signal session initialized with ${uid} (deviceId=${deviceId})`);
+        logger.info(`[PILIGRIM] Signal session initialized with ${uid} (deviceId=${deviceId})`);
         pushToast(`🔒 Signal PFS активирован с ${name}`, 'success');
       } else {
-        console.log(`[PILIGRIM] No Signal bundle for ${uid}, will use NaCl fallback`);
+        logger.info(`[PILIGRIM] No Signal bundle for ${uid}, will use NaCl fallback`);
       }
     } catch (e) {
-      console.warn(`[PILIGRIM] Signal init failed for ${uid}, fallback to NaCl:`, e);
+      logger.warn(`[PILIGRIM] Signal init failed for ${uid}, fallback to NaCl:`, e);
     }
   };
-  const handleCreateGroup = (_name: string, _type: 'public' | 'private') => {
-    console.log('[PILIGRIM] handleCreateGroup stub');
+  const handleCreateGroup = async (name: string, type: 'public' | 'private') => {
+    if (!identity) {
+      logger.warn('[PILIGRIM] handleCreateGroup: no identity');
+      return;
+    }
+    try {
+      const result = await apiService.createGroup(name, identity.uid, type);
+      const newGroup: Group = {
+        id: result.id,
+        name,
+        members: [identity.uid],
+        ownerId: identity.uid,
+        type,
+        inviteToken: result.token,
+      };
+      setGroups((prev) => [...prev, newGroup]);
+      setChats((prev) => ({
+        ...prev,
+        [result.id]: { contactId: result.id, messages: [] },
+      }));
+      pushToast(`Группа "${name}" создана`, 'success');
+      logger.info('[PILIGRIM] Group created:', result.id);
+    } catch (err) {
+      logger.error('[PILIGRIM] handleCreateGroup failed:', err);
+      pushToast('Ошибка создания группы', 'error');
+    }
   };
   // v1.6 Batch 4: handleMuteChat вЂ” Р·Р°РіР»СѓС€РёС‚СЊ СѓРІРµРґРѕРјР»РµРЅРёСЏ С‡Р°С‚Р° РЅР° Р·Р°РґР°РЅРЅРѕРµ РІСЂРµРјСЏ
   // duration: number (РјСЃ РґРѕ РєРѕРЅС†Р°) | 'forever' | null (null = СЃРЅСЏС‚СЊ Р·Р°РіР»СѓС€РµРЅРёРµ)
@@ -306,7 +353,7 @@ const App: React.FC = () => {
       const hours = Math.round(duration / 3600000);
       pushToast(`Р§Р°С‚ Р·Р°РіР»СѓС€С‘РЅ РЅР° ${hours} С‡`, 'info');
     }
-    console.log(`рџ”‡ [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
+    logger.info(`рџ”‡ [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
   };
   // v1.6 Batch 4: handleArchiveChat вЂ” Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ/СЂР°Р·Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ С‡Р°С‚
   const handleArchiveChat = (chatId: string, archive: boolean) => {
@@ -317,11 +364,11 @@ const App: React.FC = () => {
       return updated;
     });
     pushToast(archive ? 'Р§Р°С‚ Р°СЂС…РёРІРёСЂРѕРІР°РЅ' : 'Р§Р°С‚ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ', 'success');
-    console.log(`рџ“Ѓ [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
+    logger.info(`рџ“Ѓ [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
   };
-  const handleOpenProfile = () => console.log('[PILIGRIM] handleOpenProfile stub');
-  const handleOpenStore = () => console.log('[PILIGRIM] handleOpenStore stub');
-  const handleOpenBoards = () => console.log('[PILIGRIM] handleOpenBoards stub');
+  const handleOpenProfile = () => logger.info('[PILIGRIM] handleOpenProfile stub');
+  const handleOpenStore = () => logger.info('[PILIGRIM] handleOpenStore stub');
+  const handleOpenBoards = () => logger.info('[PILIGRIM] handleOpenBoards stub');
 
   // v1.6 Batch 4: handleVerifyContact вЂ” РїРѕРјРµС‚РёС‚СЊ РєРѕРЅС‚Р°РєС‚ РєР°Рє verified
   const handleVerifyContact = (chatId: string) => {
@@ -335,7 +382,7 @@ const App: React.FC = () => {
     );
     setShowVerifyModal(false);
     pushToast('РљРѕРЅС‚Р°РєС‚ РїРѕРґС‚РІРµСЂР¶РґС‘РЅ вњ…', 'success');
-    console.log(`вњ… [PILIGRIM] handleVerifyContact: chatId=${chatId} marked as verified`);
+    logger.info(`вњ… [PILIGRIM] handleVerifyContact: chatId=${chatId} marked as verified`);
   };
 
   // v1.5.2 Stage 5: WebSocket real-time РґР»СЏ РІС…РѕРґСЏС‰РёС… СЃРѕРѕР±С‰РµРЅРёР№.
@@ -347,7 +394,7 @@ const App: React.FC = () => {
     onMessage: (incomingMessage) => {
       // incomingMessage РїСЂРёС…РѕРґРёС‚ РѕС‚ apiService СѓР¶Рµ СЃ СЂР°СЃС€РёС„СЂРѕРІР°РЅРЅС‹Рј С‚РµРєСЃС‚РѕРј
       // (РµСЃР»Рё NaCl box РєР»СЋС‡Рё Р±С‹Р»Рё РЅР°СЃС‚СЂРѕРµРЅС‹), РёРЅР°С‡Рµ СЃ raw text
-      console.log(`рџ“© [PILIGRIM] WS: incoming message from ${incomingMessage.senderId}, chatId=${incomingMessage.groupId ?? 'dm'}`);
+      logger.info(`рџ“© [PILIGRIM] WS: incoming message from ${incomingMessage.senderId}, chatId=${incomingMessage.groupId ?? 'dm'}`);
       const chatId = incomingMessage.groupId || incomingMessage.senderId;
       setChats((prev) => {
         const updated = { ...prev };
@@ -357,7 +404,7 @@ const App: React.FC = () => {
         // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёРєР°С‚РѕРІ (РЅР° СЃР»СѓС‡Р°Р№ re-connect)
         const exists = (updated[chatId].messages || []).some((m) => m.id === incomingMessage.id);
         if (exists) {
-          console.log(`[PILIGRIM] WS: duplicate message ${incomingMessage.id}, skipped`);
+          logger.info(`[PILIGRIM] WS: duplicate message ${incomingMessage.id}, skipped`);
           return prev;
         }
         updated[chatId] = {
@@ -368,7 +415,7 @@ const App: React.FC = () => {
       });
     },
     onStatusChange: (status) => {
-      console.log(`[PILIGRIM] WS status: ${status}`);
+      logger.info(`[PILIGRIM] WS status: ${status}`);
       setWsStatus(status);
     }
   });
@@ -379,7 +426,7 @@ const App: React.FC = () => {
   const theme = useTimeTheme();
 
   const handleSelectChat = (id: string) => {
-    console.log('[PILIGRIM] handleSelectChat:', id);
+    logger.info('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
   };
   // v1.5.2 Stage 4: handleSendMessage вЂ” С€РёС„СЂСѓРµС‚ СЃРѕРѕР±С‰РµРЅРёРµ РїСѓР±Р»РёС‡РЅС‹Рј РєР»СЋС‡РѕРј РєРѕРЅС‚Р°РєС‚Р°
@@ -389,7 +436,7 @@ const App: React.FC = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
-      console.warn('[PILIGRIM] handleSendMessage: identity РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РїСЂР°РІР»РµРЅРѕ');
+      logger.warn('[PILIGRIM] handleSendMessage: identity РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РїСЂР°РІР»РµРЅРѕ');
       return;
     }
 
@@ -419,22 +466,22 @@ const App: React.FC = () => {
         if (encryptionType) {
           encryptedPayload = '[secure:' + encryptionType + ']';
         }
-        console.log(`[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`);
+        logger.info(`[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`);
       } catch (error) {
-        console.error(`[PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
+        logger.error(`[PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
         // Fallback: отправляем в plaintext, но НЕ теряем сообщение
         if (contact?.publicKey && ws.isConnected) {
           try {
             apiService.sendMessage(contact.uid, trimmed, contact.publicKey);
           } catch (e) {
-            console.error('[PILIGRIM] plaintext fallback send failed', e);
+            logger.error('[PILIGRIM] plaintext fallback send failed', e);
           }
         }
       }
     } else if (!contact?.publicKey) {
-      console.warn(`[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`);
+      logger.warn(`[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`);
     } else if (!ws.isConnected) {
-      console.log(`[PILIGRIM] WS offline, message saved locally only (encryptionType deferred)`);
+      logger.info(`[PILIGRIM] WS offline, message saved locally only (encryptionType deferred)`);
     }
 
     // 3. РЎРѕР·РґР°С‘Рј Message (text вЂ” РґР»СЏ Р»РѕРєР°Р»СЊРЅРѕРіРѕ UI, encryptedPayload вЂ” РґР»СЏ С…СЂР°РЅРµРЅРёСЏ/РїРµСЂРµРґР°С‡Рё)
@@ -451,7 +498,7 @@ const App: React.FC = () => {
       attachments: attachments && attachments.length > 0 ? attachments : undefined,
       replyTo
     };
-    console.log(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
+    logger.info(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
     setChats((prev) => {
       const updated = { ...prev };
       if (!updated[chatId]) {
@@ -481,12 +528,12 @@ const App: React.FC = () => {
         };
         return updated;
       });
-      console.log(`[PILIGRIM] Chat ${chatId} encryptionType set to: ${encryptionType}`);
+      logger.info(`[PILIGRIM] Chat ${chatId} encryptionType set to: ${encryptionType}`);
     }
   };
   // v3.0 Phase 3: удаление сообщения из чата
   const handleDeleteMessage = (chatId: string, messageId: string) => {
-    console.log('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
+    logger.info('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
     setChats((prev) => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
@@ -499,7 +546,7 @@ const App: React.FC = () => {
   };
   // v3.0 Phase 3: редактирование сообщения (локальное изменение текста)
   const handleEditMessage = (chatId: string, messageId: string, newText: string) => {
-    console.log('[PILIGRIM] handleEditMessage:', { chatId, messageId });
+    logger.info('[PILIGRIM] handleEditMessage:', { chatId, messageId });
     setChats((prev) => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
@@ -549,7 +596,7 @@ const App: React.FC = () => {
     
   // v3.0 Phase 5: handleRestore через LoginPage (BIP39)
   const handleRestoreFromLoginPage = async (payload: { words: string[]; isBIP39: boolean }) => {
-    console.log('[PILIGRIM] LoginPage restore triggered, BIP39=', payload.isBIP39);
+    logger.info('[PILIGRIM] LoginPage restore triggered, BIP39=', payload.isBIP39);
     try {
       // Получаем encryptedKeyPair из localStorage (multi-device flow)
       let encryptedKeyPair: string | undefined;
@@ -566,17 +613,21 @@ const App: React.FC = () => {
       // Вызываем cryptoService.restoreIdentityFromSeed
       const restored = await restoreIdentityFromSeed(payload.words, encryptedKeyPair);
 
-      console.log(`[PILIGRIM] Restored identity: uid=${restored.uid}, isBIP39=${restored.isBIP39}`);
+      logger.info(`[PILIGRIM] Restored identity: uid=${restored.uid}, isBIP39=${restored.isBIP39}`);
+
+      // Phase 1 fix: ensure transport keys exist for restored identity
+      apiService.initKeys(restored.uid);
+      restored.transportPublicKey = apiService.getTransportPublicKey();
 
       // Сохраняем в localStorage и обновляем state
       try {
         localStorage.setItem('piligrim-identity', JSON.stringify(restored));
       } catch (e) {
-        console.error('[PILIGRIM] Failed to save restored identity:', e);
+        logger.error('[PILIGRIM] Failed to save restored identity:', e);
       }
       setIdentity(restored);
     } catch (err) {
-      console.error('[PILIGRIM] LoginPage restore failed:', err);
+      logger.error('[PILIGRIM] LoginPage restore failed:', err);
       // Error остаётся в state LoginPage через её own error handling
     }
   };
@@ -587,7 +638,7 @@ const App: React.FC = () => {
   // Restore → handleRestoreFromLoginPage (multi-device flow с encryptedKeyPair).
   // Login → handleCreateIdentity stub (гибридный режим, для существующих identity).
   if (!identity) {
-    console.log('[PILIGRIM] LoginPage rendered (Neuro-Minimalist UI)');
+    logger.info('[PILIGRIM] LoginPage rendered (Neuro-Minimalist UI)');
     return (
       <LoginPage
         onLogin={handleCreateIdentity}
@@ -622,9 +673,9 @@ const App: React.FC = () => {
           aria-label="Change language"
           style={{
             padding: '4px 12px',
-            backgroundColor: '#334155',
-            color: '#e2e8f0',
-            border: '1px solid #475569',
+            backgroundColor: 'var(--color-surface-2)',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             fontSize: '12px',
             fontWeight: 600,
@@ -647,10 +698,10 @@ const App: React.FC = () => {
           alignItems: 'center',
           gap: '6px',
           padding: '4px 10px',
-          backgroundColor: wsStatus === 'open' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          border: `1px solid ${wsStatus === 'open' ? '#22c55e' : '#ef4444'}`,
+          backgroundColor: wsStatus === 'open' ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
+          border: `1px solid ${wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)'}`,
           borderRadius: '12px',
-          color: wsStatus === 'open' ? '#22c55e' : '#ef4444',
+          color: wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)',
           fontSize: '11px',
           fontWeight: 600
         }}
@@ -660,7 +711,7 @@ const App: React.FC = () => {
             width: '8px',
             height: '8px',
             borderRadius: '50%',
-            backgroundColor: wsStatus === 'open' ? '#22c55e' : '#ef4444',
+            backgroundColor: wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)',
             animation: wsStatus === 'connecting' ? 'pulse 1.5s ease-in-out infinite' : undefined
           }}
         />
@@ -722,13 +773,13 @@ const App: React.FC = () => {
               onCallClick={() => {
                 const target = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
                 if (target && target.uid) {
-                  console.log(`[PILIGRIM] Stage 6: audio call to ${target.name} (${target.uid})`);
+                  logger.info(`[PILIGRIM] Stage 6: audio call to ${target.name} (${target.uid})`);
                   webrtcHook.startCall(target.uid);
                 } else {
                   alert('Contact not found or has no UID');
                 }
               }}
-              onVideoClick={() => console.log('[PILIGRIM] Video call (Phase 2F)')}
+              onVideoClick={() => logger.info('[PILIGRIM] Video call (Phase 2F)')}
               onMenuClick={() => setShowLogoutModal(true)}
               // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel
               onAvatarClick={() => setIsProfileOpen(true)}
@@ -753,7 +804,7 @@ const App: React.FC = () => {
                   onStartCall={() => {
                     const target = contacts.find((c) => c.id === selectedChatId);
                     if (target && target.uid) {
-                      console.log(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
+                      logger.info(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
                       webrtcHook.startCall(target.uid);
                     } else {
                       alert('Contact not found or has no UID');
@@ -783,10 +834,10 @@ const App: React.FC = () => {
                   padding: '24px'
                 }}>
                   <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
-                    Welcome to PILIGRIM
+                    Добро пожаловать в PILIGRIM
                   </p>
                   <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
-                    Select a contact on the left or add a new one with <strong>+</strong>
+                    Выберите контакт слева или добавьте новый с помощью <strong>+</strong>
                   </p>
                   <button
                     onClick={handleLogout}
@@ -794,8 +845,8 @@ const App: React.FC = () => {
                     style={{
                       marginTop: '1rem',
                       padding: '0.5rem 1rem',
-                      background: 'rgba(220, 38, 38, 0.8)',
-                      color: 'white',
+                      background: 'var(--color-danger)',
+                      color: 'var(--color-on-primary)',
                       borderRadius: '0.375rem',
                       fontSize: '0.875rem',
                       border: 'none',
@@ -813,7 +864,7 @@ const App: React.FC = () => {
           <TabletTabBar
             activeView={activeTab}
             onViewChange={(view) => {
-              console.log('[PILIGRIM] Tab changed to:', view);
+              logger.info('[PILIGRIM] Tab changed to:', view);
               setActiveTab(view);
             }}
           />
@@ -824,7 +875,7 @@ const App: React.FC = () => {
               // v3.0 Phase 2C: FAB открывает AddContactModal через кастомное событие,
               // которое слушает ContactList (он владеет модалкой внутри себя)
               window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              console.log('[PILIGRIM] FAB clicked: requested AddContactModal open');
+              logger.info('[PILIGRIM] FAB clicked: requested AddContactModal open');
             }}
           />
         }
@@ -835,7 +886,7 @@ const App: React.FC = () => {
             onViewChange={setActiveTab}
             onCompose={() => {
               window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              console.log('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
+              logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
             }}
           />
         }
@@ -846,7 +897,7 @@ const App: React.FC = () => {
             onViewChange={setActiveTab}
             onCompose={() => {
               window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              console.log('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
+              logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
             }}
           />
         }
@@ -861,8 +912,8 @@ const App: React.FC = () => {
                 contactName={partner.name}
                 contactUid={partner.uid}
                 isOnline={wsStatus === 'open'}
-                onCall={() => console.log('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
-                onVideo={() => console.log('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
+                onCall={() => logger.info('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
+                onVideo={() => logger.info('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
                 onSearch={() => setIsSearchOpen(true)}
                 onClose={() => setIsProfileOpen(false)}
               />
@@ -870,35 +921,6 @@ const App: React.FC = () => {
           })()
         }
       />
-      )}
-
-      {/* v3.0 Phase 2C: вкладка Контакты — полноэкранный ContactList */}
-      {activeTab === 'contacts' && (
-        <div data-testid="contacts-tab-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--color-bg-primary)' } as React.CSSProperties}>
-          <LeftAppBar
-            title="Контакты"
-            onMenuClick={() => console.log('[PILIGRIM] Drawer (Phase 2D)')}
-            onSearchClick={() => setIsSearchOpen(true)}
-          />
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 } as React.CSSProperties}>
-            <ContactList
-              identity={identity}
-              contacts={contacts}
-              groups={groups}
-              chats={chats}
-              selectedChatId={selectedChatId}
-              onSelectChat={(id) => { setActiveTab('chats'); handleSelectChat(id); }}
-              onAddContact={handleAddContact}
-              onCreateGroup={handleCreateGroup}
-              onMuteChat={handleMuteChat}
-              onArchiveChat={handleArchiveChat}
-              onOpenProfile={handleOpenProfile}
-              onOpenStore={handleOpenStore}
-              onOpenBoards={handleOpenBoards}
-            />
-          </div>
-          <TabletTabBar activeView={activeTab} onViewChange={setActiveTab} />
-        </div>
       )}
 
       {/* v3.0 Phase 2C: вкладка Звонки — CallsHistoryView с demo данными */}
@@ -916,6 +938,11 @@ const App: React.FC = () => {
           }}
           onViewChange={setActiveTab}
         />
+      )}
+
+      {/* Telegram-like: вкладка Каналы */}
+      {activeTab === 'channels' && (
+        <ChannelsView />
       )}
 
       {/* Batch 4: РјРѕРґР°Р»РєР° РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */}
