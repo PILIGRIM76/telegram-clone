@@ -1,5 +1,6 @@
 // v3.0 Phase 2B-1: useBreakpoint tests
-// 3 breakpoints: mobile (≤640), tablet (641–1024), desktop (>1024)
+// 3 breakpoints: mobile (≤600), tablet (601–1024), desktop (>1024)
+// NOTE: boundary lowered to 600 so RT9 WebView (innerWidth=640) falls into tablet.
 
 import { renderHook, act } from '@testing-library/react';
 import { useBreakpoint } from '../src/hooks/useBreakpoint';
@@ -16,19 +17,19 @@ describe('useBreakpoint', () => {
     });
   };
 
-  it('returns mobile for width ≤ 640', () => {
+  it('returns mobile for width ≤ 600', () => {
     setWidth(360);
     const { result } = renderHook(() => useBreakpoint());
     expect(result.current).toBe('mobile');
   });
 
-  it('returns mobile at boundary 640', () => {
-    setWidth(640);
+  it('returns mobile at boundary 600', () => {
+    setWidth(600);
     const { result } = renderHook(() => useBreakpoint());
     expect(result.current).toBe('mobile');
   });
 
-  it('returns tablet for 641–1024', () => {
+  it('returns tablet for 601–1024', () => {
     setWidth(800); // RT9 actual width
     const { result } = renderHook(() => useBreakpoint());
     expect(result.current).toBe('tablet');

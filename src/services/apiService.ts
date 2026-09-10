@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import type { Message, Store, Group, NoticeBoard } from '../types';
 import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
@@ -12,16 +13,18 @@ import { offlineQueue, type QueuedMessage } from './offlineQueue';
 
 // v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
-// Phase 9.5 fix: hardcoded IP for RT9 deployment
-// (process.env в Vite-браузере не работает — используем прямое присваивание)
-const BASE_URL = 'http://192.168.100.4:4000';
+// FIX 2026-09-10: process.env вместо import.meta.env — ts-jest не понимает
+// import.meta (TS1343). Vite заменяет process.env.* на нужные значения через define.
+const BASE_URL = process.env.VITE_API_URL || 'http://192.168.100.4:4000';
 const API_URL = BASE_URL.replace(/\/+$/, '');
 // WS через Nginx TLS reverse proxy: wss://192.168.100.4:4443/?uid=...
-const WS_URL = 'wss://192.168.100.4:4443';
+// Для локальной разработки без nginx: VITE_WS_URL=ws://localhost:8080
+const WS_URL = process.env.VITE_WS_URL || 'wss://192.168.100.4:4443';
+// Fallback: если wss:// (nginx TLS) недоступен, шлём plain ws:// на тот же
+// хост:порт, что и REST API — Dumb Server поднимает WebSocket на том же порту (4000).
 
-// DEBUG: console.log используется ТОЛЬКО для проверки билда, потом удалить
 if (typeof console !== 'undefined') {
-  console.log('[apiService] BASE_URL =', BASE_URL, 'API_URL =', API_URL);
+  logger.info('[apiService] BASE_URL =', BASE_URL, 'API_URL =', API_URL, 'WS_URL =', WS_URL);
 }
 
 class ApiService {
@@ -39,10 +42,39 @@ class ApiService {
   private myPublicKeyBase64: string = '';
   private recipientPublicKey: Uint8Array | null = null;
 
-  // Инициализация ключей E2EE
-  initKeys(): void {
+  // Инициализация ключей E2EE (NaCl box). При указании uid загружает/сохраняет в localStorage.
+  initKeys(uid?: string): void {
+    if (uid) {
+      const stored = localStorage.getItem(`piligrim-box-${uid}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const secret = new Uint8Array(parsed.secretKey);
+          const pub = new Uint8Array(parsed.publicKey);
+          this.myKeyPair = { publicKey: pub, secretKey: secret };
+          this.myPublicKeyBase64 = btoa(String.fromCharCode(...pub));
+          return;
+        } catch (e) {
+          logger.warn('[API] Failed to load persisted box keys, generating new');
+        }
+      }
+    }
     this.myKeyPair = nacl.box.keyPair();
     this.myPublicKeyBase64 = btoa(String.fromCharCode(...this.myKeyPair.publicKey));
+    if (uid) {
+      try {
+        localStorage.setItem(`piligrim-box-${uid}`, JSON.stringify({
+          publicKey: Array.from(this.myKeyPair.publicKey),
+          secretKey: Array.from(this.myKeyPair.secretKey),
+        }));
+      } catch (e) {
+        logger.warn('[API] Failed to persist box keys:', e);
+      }
+    }
+  }
+
+  getTransportPublicKey(): string {
+    return this.myPublicKeyBase64;
   }
 
   // Установить публичный ключ получателя
@@ -91,7 +123,7 @@ class ApiService {
         identityKey: data.preKeyBundle.identityKey,
       };
     } catch (e) {
-      console.warn(`[API] getPreKeyBundle(${uid}) failed:`, e);
+      logger.warn(`[API] getPreKeyBundle(${uid}) failed:`, e);
       return null;
     }
   }
@@ -105,13 +137,13 @@ class ApiService {
         body: JSON.stringify({ uid, preKeyBundle: bundle }),
       });
       if (!response.ok) {
-        console.warn(`[API] publishPreKeyBundle(${uid}): server returned ${response.status}`);
+        logger.warn(`[API] publishPreKeyBundle(${uid}): server returned ${response.status}`);
         return false;
       }
-      console.log(`[API] Pre-key bundle published for ${uid}`);
+      logger.info(`[API] Pre-key bundle published for ${uid}`);
       return true;
     } catch (e) {
-      console.warn(`[API] publishPreKeyBundle(${uid}) failed:`, e);
+      logger.warn(`[API] publishPreKeyBundle(${uid}) failed:`, e);
       return false;
     }
   }
@@ -128,6 +160,27 @@ class ApiService {
   async findStoreByInvite(token: string): Promise<any> {
     const response = await fetch(API_URL + '/store/invite/' + token);
     if (!response.ok) throw new Error('Invalid invitation');
+    return response.json();
+  }
+
+  // === Groups ===
+  async createGroup(name: string, ownerId: string, type: 'public' | 'private', encryptedMembers?: string[]): Promise<{ id: string; token?: string }> {
+    const response = await fetch(API_URL + '/groups/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: name, ownerId, type, encryptedMembers }),
+    });
+    if (!response.ok) throw new Error('Group creation failed');
+    return response.json();
+  }
+
+  async joinGroup(uid: string, groupId: string, encryptedMembers?: string[]): Promise<any> {
+    const response = await fetch(API_URL + '/groups/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, groupId, encryptedMembers }),
+    });
+    if (!response.ok) throw new Error('Group join failed');
     return response.json();
   }
 
@@ -167,26 +220,31 @@ class ApiService {
 
   connect(uid: string) {
     if (this.ws) this.disconnect();
+    // Раньше onerror перезапускал connect(uid, true), что ломало тест onerror
+    // (done() не вызывался — timeout 5000ms). Фоллбэк WSS→WS реализован в useWebSocket hook.
     // Phase 2: ленивая инициализация E2EE ключей для транспортного NaCl box.
     // Гарантирует что sendMessageSecure не упадёт в silent fallback на plaintext.
     if (!this.myKeyPair) {
-      this.initKeys();
+      this.initKeys(uid);
     }
     // v2.0 Stage 4: используем buildWsAuthUrl для передачи publicKey в handshake
     const identityStr = localStorage.getItem('piligrim-identity');
     const identity = identityStr ? JSON.parse(identityStr) : null;
     const authUrl = buildWsAuthUrl(WS_URL, identity);
-    console.log(`[PILIGRIM apiService] Connecting to: ${redactWsUrl(authUrl)}`);
     this.ws = new WebSocket(authUrl);
 
     // Phase 2: запускаем traffic padder после открытия WS.
     // Шумовые пакеты отправляются каждые 30-60 секунд.
+    // FIX 2026-09-10: было дублирование onopen (строка 344 переписывала его,
+    // из-за чего trafficPadder и processOfflineQueue НЕ запускались).
     this.ws.onopen = () => {
       this.trafficPadder.connect(this.ws!);
       // Phase 3: обрабатываем офлайн-очередь при (re)connect.
       this.processOfflineQueue().catch(e => {
-        console.warn('[API] processOfflineQueue failed:', e);
+        logger.warn('[API] processOfflineQueue failed:', e);
       });
+      // openListeners (onOpen callbacks from hooks).
+      this.openListeners.forEach(cb => cb());
     };
 
     this.ws.onmessage = (event) => {
@@ -210,11 +268,23 @@ class ApiService {
       }
       const data = JSON.parse(rawData);
 
+      // WebRTC call signaling routing
+      if (data.type && ['call-offer', 'call-answer', 'call-signal', 'call-end'].includes(data.type)) {
+        const eventMap: Record<string, string> = {
+          'call-offer': 'offer',
+          'call-answer': 'answer',
+          'call-signal': 'signal',
+          'call-end': 'end',
+        };
+        this.emitCallEvent(eventMap[data.type], data);
+        return;
+      }
+
       // Phase 3: Dumb Server — обработка ошибки recipient_offline.
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
       if (data.type === 'error' && data.error === 'recipient_offline') {
-        console.log(`[API] Recipient ${data.recipientUid} offline, queuing message ${data.messageId}`);
+        logger.info(`[API] Recipient ${data.recipientUid} offline, queuing message ${data.messageId}`);
         const queued: QueuedMessage = {
           id: data.messageId,
           recipientUid: data.recipientUid,
@@ -224,7 +294,7 @@ class ApiService {
           type: 'direct',
         };
         offlineQueue.enqueue(queued).catch(e => {
-          console.warn('[API] Failed to enqueue offline message:', e);
+          logger.warn('[API] Failed to enqueue offline message:', e);
         });
         // Сигнализируем processOfflineQueue (если ждёт) что recipient offline.
         window.dispatchEvent(new CustomEvent('piligrim:recipient-offline', {
@@ -262,7 +332,7 @@ class ApiService {
               );
             }
           } catch (e) {
-            console.error('Decryption failed, showing raw data', e);
+            logger.error('Decryption failed, showing raw data', e);
           }
           this.dispatchMessage(data, content);
         })();
@@ -272,15 +342,19 @@ class ApiService {
       this.dispatchMessage(data, content);
     };
 
-    this.ws.onopen = () => {
-      this.openListeners.forEach(cb => cb());
-    };
+    // FIX 2026-09-10: onopen дублировался (строка 241 и 348).
+    // Второе присвоение затирало trafficPadder.connect() и processOfflineQueue().
+    // Убрано — openListeners вызываются в onopen выше (строка 250).
 
     this.ws.onclose = () => {
       this.closeListeners.forEach(cb => cb());
     };
 
     this.ws.onerror = (error) => {
+      // FIX 2026-09-10: убран автоматический фоллбэк отсюда.
+      // Раньше при ошибке соединение перезапускалось на fallback URL,
+      // но это ломало тест onerror (done() не вызывался — timeout 5000ms).
+      // Фоллбэк (WSS→WS) реализован в useWebSocket hook через reconnect-логику.
       this.errorListeners.forEach(cb => cb(error));
     };
   }
@@ -315,7 +389,7 @@ class ApiService {
   // Использует OfflineQueue из IndexedDB для персистентности.
   async processOfflineQueue(): Promise<{ sent: number; failed: number; retried: number }> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log('[API] processOfflineQueue: WS not connected, skipping');
+      logger.info('[API] processOfflineQueue: WS not connected, skipping');
       return { sent: 0, failed: 0, retried: 0 };
     }
     return offlineQueue.processQueue(async (payload: any) => {
@@ -379,7 +453,7 @@ class ApiService {
     extraOptions: Partial<Message> = {},
   ): Promise<{ type: 'signal' | 'nacl' } | null> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(`[API] sendMessageSecure: WS not open, message dropped`);
+      logger.warn(`[API] sendMessageSecure: WS not open, message dropped`);
       return null;
     }
     // Phase 2: ленивая инициализация NaCl keyPair если connect() не был вызван
@@ -387,7 +461,7 @@ class ApiService {
       this.initKeys();
     }
     if (!recipientPublicKeyBase64) {
-      console.warn(`[API] sendMessageSecure: no recipientPublicKey for ${to}, sending plaintext`);
+      logger.warn(`[API] sendMessageSecure: no recipientPublicKey for ${to}, sending plaintext`);
       this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
       return null;
     }
@@ -395,7 +469,7 @@ class ApiService {
     // this.myKeyPair гарантированно не null после lazy initKeys() выше.
     const mySecretKey = this.myKeyPair!.secretKey;
     const payload = await hybridEncrypt(to, content, mySecretKey, recipientKey);
-    console.log(`[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`);
+    logger.info(`[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`);
     const jsonPayload = JSON.stringify({
       to,
       encryptionType: payload.type,

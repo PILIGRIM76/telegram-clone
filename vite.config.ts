@@ -83,6 +83,11 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        // FIX 2026-09-10: Vite инжектирует process.env.VITE_* из .env файлов.
+        // Раньше apiService.ts использовал import.meta.env (Vite-специфичный),
+        // что ломало ts-jest (TS1343). Теперь process.env — работает и в тестах, и в сборке.
+        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'http://192.168.100.4:4000'),
+        'process.env.VITE_WS_URL': JSON.stringify(env.VITE_WS_URL || 'wss://192.168.100.4:4443'),
         // Phase 9.5 fix: simple-peer ожидает `global` (Node.js) и `require` (CommonJS).
         // В браузере/Capacitor WebView их нет, поэтому перенаправляем на globalThis.
         global: 'globalThis',
