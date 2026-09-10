@@ -62,6 +62,8 @@ export interface Identity {
   version?: 'v7';
   /** Always true for new identities */
   isBIP39?: boolean;
+  /** Transport NaCl box public key (base64) for E2EE message encryption */
+  transportPublicKey?: string;
 }
 
 /**
@@ -85,6 +87,8 @@ export interface LegacyIdentity {
   encryptedKeyPair?: string;
   /** false/undefined = legacy PBKDF2 identity */
   isBIP39?: boolean;
+  /** Transport NaCl box public key (base64) for E2EE message encryption */
+  transportPublicKey?: string;
 }
 
 /**
@@ -227,4 +231,89 @@ export interface NoticeBoard {
     pricePerAd?: number;
     ownerWallet?: string;
     contractAddress?: string;
+}
+
+// ============================================================
+// Telegram-like features (v3.x): Channels, Gifts, Rewards, Creator Management
+// ============================================================
+
+/** Роль участника в канале/группе/магазине. */
+export type MemberRole = 'owner' | 'admin' | 'moderator' | 'member';
+
+/**
+ * Канал (Telegram-style broadcast).
+ * Только владелец и назначенные админы могут публиковать посты.
+ * Подписчики (subscribers) нужны серверу только для маршрутизации (Dumb Server).
+ */
+export interface Channel {
+    id: string;
+    title: string;
+    description?: string;
+    ownerId: string;            // создатель (creator)
+    admins: string[];           // UID администраторов (включая owner)
+    moderators: string[];       // UID модераторов
+    subscribers: string[];      // UID подписчиков (для маршрутизации)
+    avatar?: string;            // base64 data URL
+    verified?: boolean;
+    createdAt: number;
+    postCount: number;
+    inviteToken?: string;
+}
+
+/** Пост в канале. */
+export interface ChannelPost {
+    id: string;
+    channelId: string;
+    authorId: string;           // UID автора (owner/admin)
+    text: string;
+    attachments?: { id: string; dataUrl: string; name: string }[];
+    timestamp: string;
+    encryptedPayload?: string;  // опционально E2EE
+    views: number;
+}
+
+/**
+ * Отправка подарка (Telegram-style gifts).
+ * `giftId` ссылается на каталог Gift.
+ */
+export interface GiftSend {
+    id: string;
+    giftId: string;
+    fromUid: string;
+    toUid: string;
+    channelId?: string;         // если отправлено в канал (публично)
+    message?: string;
+    sentAt: number;
+}
+
+/**
+ * Награда / достижение пользователя (achievements, levels, полученные подарки).
+ */
+export interface Reward {
+    id: string;
+    uid: string;                // получатель
+    type: 'achievement' | 'gift' | 'level' | 'creator';
+    label: string;
+    description?: string;
+    icon?: string;              // emoji или asset
+    earnedAt: number;
+}
+
+/** Расширенная группа с ролями создателя/админов (надстройка над legacy Group). */
+export interface ManagedGroup extends Group {
+    admins: string[];
+    moderators: string[];
+}
+
+/** Публичная карточка канала (без раскрытия списка подписчиков). */
+export interface PublicChannel {
+    id: string;
+    title: string;
+    description?: string;
+    ownerId: string;
+    avatar?: string;
+    verified?: boolean;
+    subscriberCount: number;
+    postCount: number;
+    inviteToken?: string;
 }
