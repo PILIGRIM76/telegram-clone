@@ -1,3 +1,4 @@
+import { logger } from '../../services/logger';
 // SignalMessageLayer: hybrid encrypt/decrypt for the WS layer.
 // Phase 1: Signal (Double Ratchet) when session exists, NaCl fallback.
 import { ProtocolAddress, SessionCipher } from 'libsignal';
@@ -61,7 +62,7 @@ export async function hybridEncrypt(
     try {
       return await encryptWithSignal(remoteUid, plaintext, deviceId);
     } catch (e) {
-      console.warn('[SignalMessageLayer] Signal encrypt failed, falling back to NaCl', e);
+      logger.warn('[SignalMessageLayer] Signal encrypt failed, falling back to NaCl', e);
     }
   }
   const enc = naclEncrypt(plaintext, recipientPublicKey, mySecretKey);

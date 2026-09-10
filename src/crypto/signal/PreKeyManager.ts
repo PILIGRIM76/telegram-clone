@@ -1,3 +1,4 @@
+import { logger } from '../../services/logger';
 // PreKeyManager: generates and stores 100 pre-keys + 1 signed pre-key.
 // Phase 1: Perfect Forward Secrecy via Signal Protocol Double Ratchet.
 //
@@ -65,7 +66,7 @@ export class PreKeyManager {
       }, Buffer.from(sig));
     }
     await this.storage.warmCacheFromStorage();
-    console.log(`[SIGNAL] PreKeyManager: ${preKeysAdded} new pre-keys + signed pre-key ready`);
+    logger.info(`[SIGNAL] PreKeyManager: ${preKeysAdded} new pre-keys + signed pre-key ready`);
     return { preKeysAdded, signedPreKeyId: this.SIGNED_PRE_KEY_ID };
   }
 
