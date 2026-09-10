@@ -42,7 +42,8 @@ import type { Contact, Group, Chat, Message, Identity, IdentityType } from './ty
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
 import { SignalProtocolManager } from './crypto/signal/SignalProtocolManager';
 import { PreKeyManager } from './crypto/signal/PreKeyManager';
-import { bundleToPreKeyBundle } from './crypto/signal/SignalMessageLayer';
+// FIX 2026-09-10: bundleToPreKeyBundle удалён — не используется в App.tsx
+// (он нужен только в SignalMessageLayer.ts для внутреннего conversion).
 
 const App: React.FC = () => {
   const [identity, setIdentity] = useState<IdentityType | null>(() => {
