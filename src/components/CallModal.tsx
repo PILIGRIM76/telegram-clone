@@ -1,39 +1,45 @@
 import { logger } from '../services/logger';
-import React, { useRef, useEffect, useState } from 'react';
-import { useWebRTC } from '../hooks/useWebRTC';
-import { useCallTimer } from '../hooks/useCallTimer';
-import { webrtcService } from '../services/webrtcService'; // Phase 8.3: геттеры screenStream/localStream
+import React, { useRef, useEffect } from 'react';
+import { webrtcService } from '../services/webrtcService';
 import { playRingtone, stopRingtone, playConnectSound, playEndCallSound } from '../utils/callSounds';
 
 interface CallModalProps {
-  currentUserId: string;
-  partnerId: string;
+  callState: 'idle' | 'calling' | 'in-call' | 'incoming';
   partnerName: string;
+  partnerUid: string;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  onAccept: () => void;
+  onDecline: () => void;
+  onEnd: () => void;
   onStartCall: () => void;
+  onToggleMute: () => void;
+  onToggleVideo: () => void;
+  onStartScreenShare: () => void;
+  isMuted: boolean;
+  isVideoEnabled: boolean;
+  isScreenSharing: boolean;
+  callDuration: number;
 }
 
-export const CallModal: React.FC<CallModalProps> = ({ 
-  currentUserId, 
-  partnerId, 
+export const CallModal: React.FC<CallModalProps> = ({
+  callState,
   partnerName,
-  onStartCall 
+  partnerUid,
+  localStream,
+  remoteStream,
+  onAccept,
+  onDecline,
+  onEnd,
+  onStartCall,
+  onToggleMute,
+  onToggleVideo,
+  onStartScreenShare,
+  isMuted,
+  isVideoEnabled,
+  isScreenSharing,
+  callDuration
 }) => {
-  const {
-    isInCall,
-    isCalling,
-    incomingCall,
-    localStream,
-    remoteStream,
-    isScreenSharing,    // Phase 8.2
-    startCall,
-    answerCall,
-    rejectCall,
-    endCall,
-    toggleAudio,
-    toggleVideo,
-    toggleScreenShare   // Phase 8.2
-  } = useWebRTC(currentUserId);
-
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -43,24 +49,17 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   }, [localStream]);
 
-  // Phase 8.3: переключаем локальное превью на экран при screen sharing
   useEffect(() => {
     if (!localVideoRef.current) return;
-    if (isScreenSharing) {
-      const screenStream = webrtcService.getScreenStream();
-      if (screenStream) {
-        localVideoRef.current.srcObject = screenStream;
-        logger.info('Local preview switched to screen');
-      }
-    } else {
-      // Возвращаем камеру
-      const camStream = webrtcService.getLocalStream();
-      if (camStream) {
-        localVideoRef.current.srcObject = camStream;
-        logger.info('Local preview switched back to camera');
-      }
+    const screenStream = webrtcService.getScreenStream();
+    if (screenStream) {
+      localVideoRef.current.srcObject = screenStream;
+      logger.info('Local preview switched to screen');
+    } else if (localStream) {
+      localVideoRef.current.srcObject = localStream;
+      logger.info('Local preview switched back to camera');
     }
-  }, [isScreenSharing, localStream]);
+  }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -68,8 +67,6 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   }, [remoteStream]);
 
-  // Таймер звонка
-  const [callDuration, setCallDuration] = useState(0);
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -77,104 +74,61 @@ export const CallModal: React.FC<CallModalProps> = ({
   };
 
   useEffect(() => {
-    let interval: number | undefined;
-    if (isInCall || isCalling) {
-      interval = window.setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isInCall, isCalling]);
-
-  // Звук при входящем звонке
-  useEffect(() => {
-    if (incomingCall) {
+    if (callState === 'incoming') {
       playRingtone();
       return () => stopRingtone();
     }
-  }, [incomingCall]);
+  }, [callState]);
 
-  const handleStartCall = () => {
-    playConnectSound();
-    startCall(partnerId);
-    onStartCall();
-  };
-
-  // Входящий звонок
-  if (incomingCall) {
+  // Incoming call UI
+  if (callState === 'incoming') {
     return (
       <div style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        inset: 0,
         background: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(20px)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999
+        zIndex: 1000,
       }}>
-        <div style={{
-          background: 'white',
-          padding: '40px',
-          borderRadius: '16px',
-          textAlign: 'center',
-          minWidth: '300px'
-        }}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#1f2937' }}>
-            📞 Входящий звонок
-          </h2>
-          <p style={{ fontSize: '18px', color: '#6b7280', margin: '0 0 30px 0' }}>
-            {partnerName}
-          </p>
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-            <button
-              onClick={() => {
-                stopRingtone();
-                playConnectSound();
-                answerCall();
-              }}
-              style={{
-                padding: '12px 32px',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                cursor: 'pointer'
-              }}
-            >
-              ✓ Принять
-            </button>
-            <button
-              onClick={() => {
-                stopRingtone();
-                playEndCallSound();
-                rejectCall();
-              }}
-              style={{
-                padding: '12px 32px',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                cursor: 'pointer'
-              }}
-            >
-              ✗ Отклонить
-            </button>
-          </div>
+        <h2 style={{ color: '#FCF9F7', fontSize: 24, marginTop: 16 }}>
+          {partnerName}
+        </h2>
+        <p style={{ color: 'rgba(252,249,247,0.6)', fontSize: 14 }}>
+          Входящий звонок...
+        </p>
+        <div style={{ display: 'flex', gap: 32, marginTop: 32 }}>
+          <button
+            onClick={onDecline}
+            style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: '#EF4444', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: 24 }}>✕</span>
+          </button>
+          <button
+            onClick={onAccept}
+            style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: '#38A169', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'pulse 1.5s infinite',
+            }}
+          >
+            <span style={{ fontSize: 24 }}>📞</span>
+          </button>
         </div>
       </div>
     );
   }
 
   // Активный звонок
-  if (isInCall) {
+  if (callState === 'in-call') {
     return (
       <div style={{
         position: 'fixed',
@@ -303,44 +257,43 @@ export const CallModal: React.FC<CallModalProps> = ({
           gap: '20px'
         }}>
           <button
-            onClick={toggleAudio}
+            onClick={onToggleMute}
             style={{
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              background: '#6b7280',
+              background: isMuted ? '#ef4444' : '#6b7280',
               color: 'white',
               border: 'none',
               fontSize: '24px',
               cursor: 'pointer'
             }}
           >
-            🎤
+            {isMuted ? '🔇' : '🎤'}
           </button>
           <button
-            onClick={toggleVideo}
+            onClick={onToggleVideo}
             style={{
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              background: '#6b7280',
+              background: isVideoEnabled ? '#6b7280' : '#ef4444',
               color: 'white',
               border: 'none',
               fontSize: '24px',
               cursor: 'pointer'
             }}
           >
-            📹
+            {isVideoEnabled ? '📹' : '🚫'}
           </button>
-          {/* Phase 8.2: Кнопка демонстрации экрана */}
           <button
-            onClick={toggleScreenShare}
+            onClick={onStartScreenShare}
             title={isScreenSharing ? 'Остановить демонстрацию' : 'Поделиться экраном'}
             style={{
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              background: isScreenSharing ? '#f97316' : '#6b7280', // orange when active, gray when inactive
+              background: isScreenSharing ? '#f97316' : '#6b7280',
               color: 'white',
               border: isScreenSharing ? '2px solid #fbbf24' : 'none',
               fontSize: '24px',
@@ -353,10 +306,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             {isScreenSharing ? '🛑' : '🖥️'}
           </button>
           <button
-            onClick={() => {
-              playEndCallSound();
-              endCall();
-            }}
+            onClick={onEnd}
             style={{
               width: '60px',
               height: '60px',
@@ -375,7 +325,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   }
 
   // Исходящий звонок (ожидание ответа)
-  if (isCalling) {
+  if (callState === 'calling') {
     return (
       <div style={{
         position: 'fixed',
@@ -405,7 +355,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             onClick={() => {
               stopRingtone();
               playEndCallSound();
-              endCall();
+              onEnd();
             }}
             style={{
               marginTop: '20px',
@@ -428,7 +378,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   // Кнопка "Позвонить" (когда нет активного звонка)
   return (
     <button
-      onClick={handleStartCall}
+      onClick={onStartCall}
       style={{
         padding: '8px 16px',
         background: '#10b981',

@@ -21,6 +21,7 @@ import { useTimeTheme } from './hooks/useTimeTheme';
 import { ResponsiveShell } from './components/ResponsiveShell';
 import { LeftAppBar } from './components/LeftAppBar';
 import { RightAppBar } from './components/RightAppBar';
+import { CallModal } from './components/CallModal';
 import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { ChannelsView } from './components/ChannelsView';
 import { FloatingActionButton } from './components/FloatingActionButton';
@@ -1054,6 +1055,44 @@ const App: React.FC = () => {
         {theme === 'evening' && '🌆 Вечер'}
         {theme === 'night' && '🌙 Ночь'}
       </div>
+
+      {/* WebRTC CallModal: рендерится при callState !== 'idle' */}
+      {webrtcHook.isInCall || webrtcHook.isCalling || webrtcHook.incomingCall ? (
+        <CallModal
+          callState={
+            webrtcHook.isInCall
+              ? 'in-call'
+              : webrtcHook.isCalling
+                ? 'calling'
+              : webrtcHook.incomingCall
+                ? 'incoming'
+              : 'idle'
+          }
+          partnerName={(() => {
+            const target = contacts.find((c) => c.uid === webrtcHook.currentCallUid);
+            return target?.name || 'Контакт';
+          })()}
+          partnerUid={webrtcHook.currentCallUid || ''}
+          localStream={webrtcHook.localStream}
+          remoteStream={webrtcHook.remoteStream}
+          onAccept={webrtcHook.answerCall}
+          onDecline={webrtcHook.rejectCall}
+          onEnd={webrtcHook.endCall}
+          onStartCall={() => {
+            const target = contacts.find((c) => c.uid === webrtcHook.currentCallUid);
+            if (target && target.uid) {
+              webrtcHook.startCall(target.uid);
+            }
+          }}
+          onToggleMute={webrtcHook.toggleAudio}
+          onToggleVideo={webrtcHook.toggleVideo}
+          onStartScreenShare={webrtcHook.toggleScreenShare}
+          isMuted={!webrtcHook.isAudioEnabled()}
+          isVideoEnabled={webrtcHook.isVideoEnabled()}
+          isScreenSharing={webrtcHook.isScreenSharing}
+          callDuration={webrtcHook.callDuration}
+        />
+      ) : null}
     </div>
   );
 };

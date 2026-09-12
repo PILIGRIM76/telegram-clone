@@ -19,7 +19,24 @@ export function useWebRTC(_currentUserId: string) {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [canShareScreen, setCanShareScreen] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [currentCallUid, setCurrentCallUid] = useState<string>('');
   const lastCallInitiatorRef = useRef<string>('');
+
+  // callDuration timer
+  useEffect(() => {
+    let interval: number | undefined;
+    if (isInCall || isCalling) {
+      interval = window.setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isInCall, isCalling]);
 
   useEffect(() => {
     setCanShareScreen(webrtcService.canShareScreen());
@@ -30,6 +47,7 @@ export function useWebRTC(_currentUserId: string) {
       logger.info('[PILIGRIM] useWebRTC: incoming offer from', data.from);
       setIncomingCall({ from: data.from, signal: { type: 'offer', sdp: data.signal } });
       lastCallInitiatorRef.current = data.from;
+      setCurrentCallUid(data.from);
     };
     const handleAnswer = (data: any) => {
       logger.info('[PILIGRIM] useWebRTC: incoming answer from', data.from);
@@ -49,6 +67,7 @@ export function useWebRTC(_currentUserId: string) {
       setRemoteStream(null);
       setLocalStream(null);
       setIsScreenSharing(false);
+      setCurrentCallUid('');
     };
 
     apiService.onCallEvent('offer', handleOffer);
@@ -59,6 +78,7 @@ export function useWebRTC(_currentUserId: string) {
 
   const startCall = useCallback(async (to: string) => {
     setIsCalling(true);
+    setCurrentCallUid(to);
     lastCallInitiatorRef.current = to;
     await webrtcService.initCall(to, {
       onLocalStream: (stream) => setLocalStream(stream),
@@ -73,11 +93,13 @@ export function useWebRTC(_currentUserId: string) {
         setIsCalling(false);
         setRemoteStream(null);
         setLocalStream(null);
+        setCurrentCallUid('');
       },
       onError: (error) => {
         logger.error('[PILIGRIM] useWebRTC: call error', error);
         setIsCalling(false);
         setIsInCall(false);
+        setCurrentCallUid('');
         alert(`Ошибка звонка: ${error.message}`);
       },
       onScreenShareStarted: () => setIsScreenSharing(true),
@@ -100,10 +122,12 @@ export function useWebRTC(_currentUserId: string) {
         setIncomingCall(null);
         setRemoteStream(null);
         setLocalStream(null);
+        setCurrentCallUid('');
       },
       onError: (error) => {
         logger.error('[PILIGRIM] useWebRTC: answer error', error);
         setIncomingCall(null);
+        setCurrentCallUid('');
         alert(`Ошибка ответа: ${error.message}`);
       },
       onScreenShareStarted: () => setIsScreenSharing(true),
@@ -115,6 +139,7 @@ export function useWebRTC(_currentUserId: string) {
     if (incomingCall) {
       apiService.sendCallEnd(incomingCall.from);
       setIncomingCall(null);
+      setCurrentCallUid('');
     }
   }, [incomingCall]);
 
@@ -130,6 +155,7 @@ export function useWebRTC(_currentUserId: string) {
     setRemoteStream(null);
     setLocalStream(null);
     setIsScreenSharing(false);
+    setCurrentCallUid('');
   }, []);
 
   const toggleAudio = useCallback((): boolean => webrtcService.toggleAudio(), []);
@@ -159,6 +185,8 @@ export function useWebRTC(_currentUserId: string) {
     remoteStream,
     isScreenSharing,
     canShareScreen,
+    callDuration,
+    currentCallUid,
     startCall,
     answerCall,
     rejectCall,
