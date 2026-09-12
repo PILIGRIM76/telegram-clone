@@ -2,7 +2,8 @@ import { logger } from '../services/logger';
 
 import React, { useEffect, useState } from 'react';
 import type { Message, Identity } from '../types';
-import { decryptAESGCM, getPrivateKey } from '../services/cryptoService';
+import { decryptAESGCM, getPrivateKey, decryptFile } from '../services/cryptoService';
+import type { EncryptedAttachment } from '../types';
 import { ClockIcon } from './icons/ClockIcon';
 import { GiftIcon } from './icons/GiftIcon';
 
@@ -23,6 +24,7 @@ const statusText = {
 const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onDelete, disappearTimer }) => {
     const [visible, setVisible] = useState(true);
     const [decryptedText, setDecryptedText] = useState<string>('');
+    const [decryptedBlobs, setDecryptedBlobs] = useState<{ [key: string]: Blob }>({});
     const sentByMe = message.senderId === currentIdentity.uid;
     const isSystem = message.type === 'system';
 
@@ -65,6 +67,26 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
             setDecryptedText(message.text);
         }
     }, [message, currentIdentity, isSystem]);
+
+    // Расшифровка E2EE файловых вложений
+    useEffect(() => {
+        if (!message.encryptedAttachments || message.encryptedAttachments.length === 0) return;
+        const decrypt = async () => {
+            const privateKey = getPrivateKey(currentIdentity);
+            if (!privateKey) return;
+            const blobs: { [key: string]: Blob } = {};
+            for (const att of message.encryptedAttachments!) {
+                try {
+                    const blob = await decryptFile(att.ciphertext, att.iv, att.key, privateKey, att.type, att.size);
+                    blobs[att.id] = blob;
+                } catch (e) {
+                    logger.error('[PILIGRIM] Failed to decrypt attachment:', att.name, e);
+                }
+            }
+            setDecryptedBlobs(blobs);
+        };
+        decrypt();
+    }, [message.encryptedAttachments, currentIdentity]);
 
     // Phase 7.6.6: Логика исчезающих сообщений с защитой от утечек памяти
     // Поддерживает 2 источника таймера:
@@ -191,6 +213,26 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
                 )}
 
                 {message.text && <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{decryptedText}</p>}
+
+                {/* E2EE Зашифрованные вложения */}
+                {message.encryptedAttachments && message.encryptedAttachments.map((att) => {
+                    const blob = decryptedBlobs[att.id];
+                    return (
+                        <div key={att.id} className="mb-2">
+                            {blob ? (
+                                att.type.startsWith('image/') ? (
+                                    <img src={URL.createObjectURL(blob)} alt={att.name} style={{ maxWidth: 200, maxHeight: 200, borderRadius: 12 }} />
+                                ) : (
+                                    <a href={URL.createObjectURL(blob)} download={att.name} style={{ color: 'var(--color-accent)', display: 'block', padding: 8 }}>
+                                        📄 {att.name} ({(att.size / 1024).toFixed(1)} KB)
+                                    </a>
+                                )
+                            ) : (
+                                <div style={{ color: '#EF4444', padding: 8, fontSize: 13 }}>❌ Не удалось расшифровать: {att.name}</div>
+                            )}
+                        </div>
+                    );
+                })}
 
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
                     {/* Phase 7.6.3: UX индикаторы E2EE и статуса доставки */}

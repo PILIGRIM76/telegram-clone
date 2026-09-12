@@ -13,7 +13,7 @@ import Toasts from './components/Toast';
 // These components exist but are not wired into the current UI (Phase 10 backlog).
 import { useTranslation } from './contexts/LanguageContext';
 import { useToasts } from './hooks/useToasts';
-import { generateIdentity, restoreIdentityFromSeed, getPublicKey } from './services/cryptoService';
+import { generateIdentity, restoreIdentityFromSeed, getPublicKey, encryptFile, getPrivateKey } from './services/cryptoService';
 import { apiService } from './services/apiService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWebRTC } from './hooks/useWebRTC';
@@ -37,7 +37,7 @@ import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
 import { SearchModal } from './components/SearchModal';
 import AccountPage from './components/AccountPage';
-import type { Contact, Group, Chat, Message, Identity, IdentityType } from './types';
+import type { Contact, Group, Chat, Message, Identity, IdentityType, EncryptedAttachment } from './types';
 // Phase 2: Signal Protocol — PFS via Double Ratchet.
 // handleSendMessage использует apiService.sendMessageSecure (Signal preferred, NaCl fallback).
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
@@ -434,7 +434,7 @@ const App: React.FC = () => {
   // v1.5.2 Stage 4: handleSendMessage вЂ” С€РёС„СЂСѓРµС‚ СЃРѕРѕР±С‰РµРЅРёРµ РїСѓР±Р»РёС‡РЅС‹Рј РєР»СЋС‡РѕРј РєРѕРЅС‚Р°РєС‚Р°
   // (RSA-OAEP) РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј РІ localStorage. Р•СЃР»Рё publicKey РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ вЂ”
   // РѕС‚РїСЂР°РІР»СЏРµРј РІ plaintext СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј (graceful fallback РґР»СЏ UX).
-  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string) => {
+  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string, encryptedAttachments?: EncryptedAttachment[]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
@@ -498,6 +498,7 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
                   status: 'sent',
       attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined,
       replyTo
     };
     logger.info(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);

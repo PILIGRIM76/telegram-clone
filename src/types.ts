@@ -167,7 +167,40 @@ export interface Message {
   replyTo?: string;
 
   /** v3.0 Phase 4: E2EE status of individual message */
+  /** v3.0 Phase 4: E2EE status of individual message */
   e2eeStatus?: E2EEStatus;
+
+  // ============================================================
+  // E2EE File Attachments (Phase: File Sharing)
+  // ============================================================
+  /** Зашифрованные файловые вложения с E2EE метаданными */
+  encryptedAttachments?: EncryptedAttachment[];
+}
+
+/**
+ * Зашифрованное файловое вложение с E2EE
+ * - ciphertext: зашифрованные данные файла (ArrayBuffer base64)
+ * - iv: вектор инициализации AES-GCM
+ * - key: симметричный ключ, зашифрованный публичным ключом получателя
+ * - name: оригинальное имя файла
+ * - type: MIME-тип файла
+ * - size: оригинальный размер файла
+ */
+export interface EncryptedAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  ciphertext: string; // base64 encoded ArrayBuffer
+  iv: string; // base64 encoded Uint8Array
+  key: string; // base64 encoded encrypted symmetric key
+}
+
+/** Original attachment type (for backward compatibility) */
+export interface Attachment {
+  id: string;
+  dataUrl: string;
+  name: string;
 }
 
 export interface Chat {

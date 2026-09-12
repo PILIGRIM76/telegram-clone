@@ -405,3 +405,143 @@ async function legacyRestoreFromSeed(cleanedWords: string[]): Promise<LegacyIden
     };
 }
 
+// ============================================================
+// E2EE File Encryption (Phase: File Sharing)
+// ============================================================
+
+/**
+ * Шифрует файл с использованием AES-GCM (симметричный ключ) +
+ * обертка ключа через encryptAESGCM (asymmetric, публичный ключ получателя).
+ * 
+ * Алгоритм:
+ * 1. Генерируется случайный AES-256-GCM ключ для файла
+ * 2. Файл шифруется симметричным ключом
+ * 3. Симметричный ключ шифруется приватным ключом отправителя (E2EE)
+ * 
+ * @param file - File объект для шифрования
+ * @param privateKeyHex - Приватный ключ шифрования (hex string)
+ * @returns Объект с ciphertext, iv и зашифрованным ключом
+ */
+export async function encryptFile(
+  file: File,
+  privateKeyHex: string
+): Promise<{ ciphertext: string; iv: string; key: string; name: string; type: string; size: number }> {
+  // 1. Генерируем симметричный AES-GCM ключ для файла
+  const fileKey = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  // 2. Читаем файл в ArrayBuffer
+  const fileBuffer = await file.arrayBuffer();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // 3. Шифруем файл симметричным ключом
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    fileKey,
+    fileBuffer
+  );
+
+  // 4. Экспортируем симметричный ключ и шифруем его
+  const exportedKey = await crypto.subtle.exportKey('raw', fileKey);
+  const exportedKeyBase64 = arrayBufferToBase64(exportedKey);
+  const encryptedKey = await encryptAESGCM(exportedKeyBase64, privateKeyHex);
+
+  logger.info('[PILIGRIM] File encrypted:', { name: file.name, size: file.size, ivLength: iv.length });
+
+  return {
+    ciphertext: arrayBufferToBase64(ciphertext),
+    iv: arrayBufferToBase64(iv.buffer),
+    key: encryptedKey,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  };
+}
+
+/**
+ * Расшифровывает файл, зашифрованный через encryptFile.
+ * 
+ * @param ciphertext - base64 зашифрованных данных файла
+ * @param iv - base64 вектор инициализации
+ * @param encryptedKey - base64 зашифрованный симметричный ключ
+ * @param privateKeyHex - Приватный ключ расшифровки (hex string)
+ * @param fileType - MIME-тип файла (для создания Blob)
+ * @param fileSize - Оригинальный размер файла (для создания Blob)
+ * @returns Расшифрованный Blob
+ */
+export async function decryptFile(
+  ciphertext: string,
+  iv: string,
+  encryptedKey: string,
+  privateKeyHex: string,
+  fileType: string,
+  fileSize: number
+): Promise<Blob> {
+  // 1. Дешифруем симметричный ключ
+  const decryptedKeyBase64 = await decryptAESGCM(encryptedKey, privateKeyHex);
+  const keyBytes = base64ToByteArray(decryptedKeyBase64);
+  const keyBuffer = (keyBytes.buffer.slice(keyBytes.byteOffset, keyBytes.byteOffset + keyBytes.byteLength)) as ArrayBuffer;
+  
+  // 2. Импортируем симметричный ключ
+  const fileKey = await crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+
+  // 3. Дешифровываем файл
+  const ciphertextBuffer = base64ToArrayBuffer(ciphertext);
+  const ivBuffer = base64ToArrayBuffer(iv);
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(ivBuffer) },
+    fileKey,
+    ciphertextBuffer
+  );
+
+  logger.info('[PILIGRIM] File decrypted:', { size: decrypted.byteLength, type: fileType });
+
+  return new Blob([decrypted], { type: fileType });
+}
+
+/**
+ * Вспомогательная функция: ArrayBuffer → Base64 string
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Вспомогательная функция: Base64 string → Uint8Array
+ */
+function base64ToByteArray(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Вспомогательная функция: Base64 string → ArrayBuffer
+ */
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
