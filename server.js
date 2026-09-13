@@ -6,7 +6,21 @@ const crypto = require('crypto');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const url = require('url');
 const { db, STORAGE_TYPE } = require('./db/index.js');
+
+// Phase 2: SQLite persistence + JWT Auth
+const sqlDb = require('./server/databaseService.js');
+const authService = require('./server/authService.js');
+
+// In-memory maps for WS routing only (data persisted in SQLite)
+const wsUsers = new Map(); // uid -> ws reference
+
+// Initialize on startup
+function initStorage() {
+  console.log('[STORAGE] SQLite-based storage initialized');
+}
+initStorage();
 
 const app = express();
 app.use(express.json({ limit: '10mb' })); // Увеличен лимит для изображений
@@ -182,15 +196,83 @@ app.post('/api/admin/broadcast', adminAuth, (req, res) => {
 // --- ПУБЛИЧНЫЕ API ЭНДПОИНТЫ ---
 
 // 1. ПОЛЬЗОВАТЕЛИ
-app.post('/register', (req, res) => {
-  const { uid, publicKey } = req.body;
-  if (!uid || !publicKey) return res.status(400).json({ ошибка: 'Данные неполны' });
-  if (пользователи.has(uid)) return res.status(409).json({ ошибка: 'UID занят' });
-
-  пользователи.set(uid, { публичныйКлюч: publicKey, ws: null, доски: [] });
-  console.log(`[РЕГИСТРАЦИЯ] ${uid}`);
-  res.status(201).json({ ок: true });
+// Aliases with /api/ prefix for frontend authClient.ts
+app.post('/api/register', (req, res) => {
+  req.url = '/register';
+  app.handle(req, res);
 });
+
+app.post('/api/login', (req, res) => {
+  req.url = '/login';
+  app.handle(req, res);
+});
+
+app.post('/register', async (req, res) => {
+  const { username, password, uid, publicKey } = req.body;
+  if (!username || !password || !uid || !publicKey) {
+    return res.status(400).json({ ошибка: 'username, password, uid и publicKey обязательны' });
+  }
+  try {
+    // Check if user exists
+    const existing = sqlDb.getUserByUsername(username);
+    if (existing) return res.status(409).json({ ошибка: 'Пользователь уже существует' });
+
+    // Register via authService - argon2 hash, SQLite insert, JWT tokens
+    const result = await authService.register(username, password, uid, publicKey);
+
+    // Store WS routing info
+    wsUsers.set(uid, null);
+
+    res.status(201).json({
+      uid: result.uid,
+      username: result.username,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (err) {
+    console.error('[REGISTER] Error:', err.message);
+    if (err.message === 'Username already exists') {
+      return res.status(409).json({ ошибка: 'Username already exists' });
+    }
+    res.status(500).json({ ошибка: 'Internal server error' });
+  }
+});
+
+// 2. ЛОГИН
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const result = await authService.login(username, password);
+    if (!result) return res.status(401).json({ ошибка: 'Неверный логин или пароль' });
+
+    res.json({
+      uid: result.uid,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (e) {
+    console.error('Ошибка входа:', e);
+    res.status(500).json({ ошибка: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// 3. REFRESH: обновление access-токена через refresh-токен
+app.post('/api/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'refreshToken required' });
+    const result = await authService.refresh(refreshToken);
+    res.json({
+      uid: result.uid,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (e) {
+    console.error('[REFRESH] Error:', e.message);
+    res.status(401).json({ error: 'Invalid refresh token' });
+  }
+});
+
 
 app.get('/key/:uid', (req, res) => {
   const { uid } = req.params;
@@ -595,286 +677,114 @@ app.get('/rewards/:uid', (req, res) => {
   res.json({ rewards: награды.get(req.params.uid) || [] });
 });
 
-// --- WEBSOCKET ЛОГИКА ---
+// --- WEBSOCKET LOGIK ---
 
-серверВебсокетов.on('connection', async (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const uid = url.searchParams.get('uid');
-  const pkBase64url = url.searchParams.get('pk');
-  const protocolVersion = url.searchParams.get('v') || '1.0';
-  const clientType = url.searchParams.get('client') || 'unknown';
+серверВебсокетов.on('connection', (ws, req) => {
+  const queryObject = url.parse(req.url, true).query;
+  const token = queryObject.token;
 
-  // v2.0 Stage 5.1: Trust-on-first-use — если пользователь НЕ зарегистрирован,
-  // но передал валидный pk — создаём user record на лету.
-  // Это устраняет необходимость в предварительном POST /register.
-  if (!uid) {
-    console.warn('[WS] connection rejected: missing uid');
-    ws.close(4001, 'Missing uid');
+  if (!token) {
+    ws.close(1008, 'Token required');
     return;
   }
 
-  // base64url decode → JWK string
-  let publicKey = null;
-  if (pkBase64url) {
-    try {
-      const padded = pkBase64url.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
-      publicKey = Buffer.from(padded + padding, 'base64').toString('utf-8');
-    } catch (e) {
-      console.warn(`[WS] invalid pk encoding for ${uid}:`, e.message);
-    }
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    ws.close(1008, 'Invalid or expired token');
+    return;
   }
 
-  let юзер = пользователи.get(uid);
-
-  // Trust-on-first-use: создаём user record если его нет
-  if (!юзер) {
-    if (!publicKey) {
-      console.warn(`[WS] connection rejected: uid=${uid} not registered and no pk provided`);
-      ws.close(4002, 'Unknown uid and no publicKey for trust-on-first-use');
-      return;
-    }
-    // Phase 2: генерируем случайный session ID вместо логирования IP.
-    // Сервер НЕ знает IP клиента — только анонимный session ID для отладки.
-    const sessionId = crypto.randomBytes(8).toString('hex');
-    юзер = {
-      публичныйКлюч: publicKey,
-      ws: null,
-      доски: [],
-      sessionId,
-      connectedAt: new Date().toISOString(),
-      зарегистрированВ: new Date().toISOString(),
-      clientType,
-      protocolVersion,
-    };
-    пользователи.set(uid, юзер);
-    console.log(`[WS] trust-on-first-use: auto-registered ${uid} (session=${sessionId}, client=${clientType}, v=${protocolVersion})`);
-  } else if (publicKey && юзер.публичныйКлюч !== publicKey) {
-    // PublicKey mismatch — потенциальная MITM-атака или key rotation
-    console.warn(`[WS] publicKey mismatch for ${uid}: stored vs new`);
-    // В production тут можно закрывать соединение. Для dev — пропускаем warning.
-  }
-
-  // Phase 2: обновляем session ID при каждом подключении (rotation).
-  // IP клиента НЕ логируется и НЕ сохраняется.
-  юзер.ws = ws;
-  юзер.sessionId = crypto.randomBytes(8).toString('hex');
-  юзер.последнийПодключенВ = new Date().toISOString();
+  const uid = payload.uid;
   ws.uid = uid;
-  ws.sessionId = юзер.sessionId;
-  console.log(`[WS] client connected: uid=${uid} (session=${юзер.sessionId}, client=${clientType})`);
+  wsUsers.set(uid, ws);
+  console.log('[WS] client connected: uid=' + uid);
 
-  // 1. Phase 3: Dumb Server — сервер НЕ хранит офлайн-сообщения.
-  // Клиент сам хранит очередь в IndexedDB (см. src/services/offlineQueue.ts).
-
-  // 2. Проверка сроков аренды досок и отправка системных уведомлений
-  if (юзер.доски) {
-      юзер.доски.forEach(д => {
-          if (д.expiresAt && д.expiresAt - Date.now() < 3600000 * 24 && д.expiresAt > Date.now()) {
-             // Меньше суток осталось
-             ws.send(JSON.stringify({
-                 from: 'system',
-                 type: 'system',
-                 content: `Внимание! Срок аренды доски "${д.title}" истекает через 24 часа. Продлите аренду.`,
-                 timestamp: new Date().toISOString()
-             }));
-          } else if (д.expiresAt && д.expiresAt < Date.now()) {
-              ws.send(JSON.stringify({
-                 from: 'system',
-                 type: 'system',
-                 content: `Срок аренды доски "${д.title}" истек. Она скрыта из поиска.`,
-                 timestamp: new Date().toISOString()
-             }));
-          }
-      });
-  }
+  const offlineMsgs = sqlDb.takeOfflineMessages(uid);
+  offlineMsgs.forEach(msg => {
+    ws.send(JSON.stringify(msg));
+  });
 
   ws.on('message', (данные) => {
     try {
       const msg = JSON.parse(данные);
-
-      // Phase 2: traffic padding — игнорируем шумовые пакеты.
-      if (msg.type === 'noise') {
-        return;  // Сервер НЕ обрабатывает шум.
-      }
-
-      // v2.0 Stage 5.4: Read receipt — клиент сообщает, что прочитал сообщение.
-      // Сервер пересылает это оригинальному отправителю.
-      // Формат: {type: 'read', messageId: '...', from: '<sender_uid>'}
+      if (msg.type === 'noise') return;
       if (msg.type === 'read' && msg.messageId) {
-          // Broadcast всем users, которые могут быть отправителями.
-          // В нашей модели — всем users (простая версия).
-          // TODO: хранить mapping messageId → sender для точной маршрутизации.
-          for (const [otherUid, otherUser] of пользователи) {
-              if (otherUid === uid) continue;
-              if (otherUser.ws && otherUser.ws.readyState === WebSocket.OPEN) {
-                  otherUser.ws.send(JSON.stringify({
-                      type: 'receipt',
-                      receipt: 'read',
-                      messageId: msg.messageId,
-                      from: uid,
-                      timestamp: new Date().toISOString()
-                  }));
-              }
+        for (const [otherUid, otherUser] of wsUsers) {
+          if (otherUid === uid) continue;
+          if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+            otherUser.send(JSON.stringify({ type: 'receipt', receipt: 'read', messageId: msg.messageId, from: uid, timestamp: new Date().toISOString() }));
           }
-          return;
+        }
+        return;
       }
-
-      // v2.0 Stage 5.5: Typing indicator — клиент сообщает, что печатает.
-      // Сервер пересылает это получателю. Не персистируется.
-      if (msg.type === 'typing' && (msg.to || msg.groupId)) {
-          if (msg.to) {
-              отправить(msg.to, {
-                  type: 'typing',
-                  from: uid,
-                  chatId: msg.to,
-                  timestamp: new Date().toISOString()
-              });
-          } else if (msg.groupId) {
-              const группа = группы.get(msg.groupId);
-              if (группа) {
-                  группа.участники.forEach(участникUid => {
-                      if (участникUid === uid) return;
-                      отправить(участникUid, {
-                          type: 'typing',
-                          from: uid,
-                          chatId: msg.groupId,
-                          timestamp: new Date().toISOString()
-                      });
-                  });
-              }
-          }
-          return;
+      if (msg.type === 'typing' && msg.to) {
+        отправить(msg.to, { type: 'typing', from: uid, chatId: msg.to, timestamp: new Date().toISOString() });
+        return;
       }
-
-      const { to, content, groupId, type, payload, disappearIn, timerSetAt, channelId, encryptedContent, nonce, senderPublicKey, encryptionType, id, signal } = msg;
-
-      const исходящее = {
-          from: uid,
-          content: content || '',
-          encryptedContent,
-          nonce,
-          senderPublicKey,
-          encryptionType,
-          signal,
-          timestamp: new Date().toISOString(),
-          groupId,
-          type,
-          payload,
-          disappearIn,
-          timerSetAt,
-          channelId
-      };
-
-      // Telegram-like: пост в канал (broadcast подписчикам)
-      if (msg.channelId) {
-          const канал = каналы.get(msg.channelId);
+      if (msg.type === 'message' || msg.type === 'text') {
+        const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
+        const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
+        sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
+        if (channelId) {
+          const канал = каналы.get(channelId);
           if (канал) {
-              const пост = {
-                  id: `post_${Date.now()}`,
-                  channelId: канал.id,
-                  authorId: uid,
-                  text: content || '',
-                  timestamp: new Date().toISOString(),
-                  views: 0,
-              };
-              канал.posts = канал.posts || [];
-              канал.posts.push(пост);
-              канал.postCount = канал.posts.length;
-              канал.subscribers.forEach(subUid => {
-                  if (subUid === uid) return;
-                  отправить(subUid, { ...исходящее, type: 'channel_post', post, channelId: канал.id });
-              });
+            const пост = { id: 'post_' + Date.now(), channelId: канал.id, authorId: uid, text: content || '', timestamp: new Date().toISOString(), views: 0 };
+            канал.posts = канал.posts || [];
+            канал.posts.push(пост);
+            канал.postCount = (канал.posts || []).length;
+            канал.subscribers.forEach(subUid => {
+              if (subUid === uid) return;
+              const subWs = wsUsers.get(subUid);
+              if (subWs && subWs.readyState === WebSocket.OPEN) {
+                subWs.send(JSON.stringify({ ...исходящее, type: 'channel_post', post, channelId: канал.id }));
+              }
+            });
           }
-      } else if (groupId) {
-          // Рассылка по группе
+        } else if (groupId) {
           const группа = группы.get(groupId);
           if (группа) {
-              if (группа.encryptedMembers && !группа.isLegacy) {
-                  // Phase 2: новая группа с encryptedMembers.
-                  // Сервер НЕ знает участников — broadcast всем активным клиентам.
-                  // Клиент сам решает, принадлежит ли ему это сообщение
-                  // (расшифрует groupKey и проверит, есть ли он в списке).
-                  for (const [otherUid, otherUser] of пользователи) {
-                      if (otherUid === uid) continue;
-                      if (otherUser.ws && otherUser.ws.readyState === WebSocket.OPEN) {
-                          otherUser.ws.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
-                      }
-                  }
-              } else if (группа.участники) {
-                  // Legacy группа — broadcast старым способом (backward compat).
-                  группа.участники.forEach(участникUid => {
-                      if (участникUid === uid) return;
-                      отправить(участникUid, { ...исходящее, groupId: группа.id });
-                  });
+            for (const [otherUid, otherUser] of wsUsers) {
+              if (otherUid === uid) continue;
+              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+                otherUser.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
               }
+            }
           }
-      } else {
-          // Личное сообщение
+        } else {
           отправить(to, исходящее);
+        }
+        if (id) {
+          const recWs = wsUsers.get(to);
+          const delivered = recWs && recWs.readyState === WebSocket.OPEN;
+          отправить(uid, { type: 'receipt', receipt: delivered ? 'delivered' : 'queued', messageId: id, to: to, timestamp: new Date().toISOString(), queued: !delivered });
+        }
       }
-
-      // v2.0 Stage 5.3: Delivery receipt — подтверждаем отправителю,
-      // что сообщение доставлено адресату (или поставлено в очередь offline).
-      if (id) {
-          // Phase 3: Dumb Server — receipt "delivered" ТОЛЬКО если получатель онлайн.
-          // Если офлайн — receipt "queued" (на стороне клиента).
-          const получательЮзер = пользователи.get(to);
-          const доставленоСразу = получательЮзер && получательЮзер.ws && получательЮзер.ws.readyState === WebSocket.OPEN;
-          if (доставленоСразу) {
-              отправить(uid, {
-                  type: 'receipt',
-                  receipt: 'delivered',
-                  messageId: id,
-                  to: to,
-                  timestamp: new Date().toISOString(),
-                  queued: false
-              });
-          } else {
-              // Сервер не хранит офлайн — клиент получит 'recipient_offline' через
-              // функцию отправить() выше и сам сохранит в IndexedDB.
-              отправить(uid, {
-                  type: 'receipt',
-                  receipt: 'queued',
-                  messageId: id,
-                  to: to,
-                  timestamp: new Date().toISOString(),
-                  queued: true
-              });
-          }
-      }
-
     } catch (e) { console.error(e); }
   });
 
   ws.on('close', () => {
-     if (юзер) юзер.ws = null;
+    wsUsers.delete(uid);
+    console.log('[WS] client disconnected: uid=' + uid);
   });
 });
 
 function отправить(uidПолучателя, данные) {
-    const юзер = пользователи.get(uidПолучателя);
-    if (юзер && юзер.ws && юзер.ws.readyState === WebSocket.OPEN) {
-        юзер.ws.send(JSON.stringify(данные));
-    } else {
-        // Phase 3: Dumb Server — НЕ сохраняем на сервере.
-        // Отправляем 'recipient_offline' error обратно отправителю.
-        // Отправитель сам хранит сообщение в IndexedDB и ретраит при reconnect.
-        const senderUid = данные.from;
-        if (senderUid) {
-            const senderUser = пользователи.get(senderUid);
-            if (senderUser && senderUser.ws && senderUser.ws.readyState === WebSocket.OPEN) {
-                senderUser.ws.send(JSON.stringify({
-                    type: 'error',
-                    error: 'recipient_offline',
-                    messageId: данные.id,
-                    recipientUid: uidПолучателя,
-                    originalPayload: данные,
-                }));
-            }
-        }
-        console.log(`[OFFLINE] recipient ${uidПолучателя} not connected, sender ${senderUid || 'unknown'} notified`);
+  const ws = wsUsers.get(uidПолучателя);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(данные));
+  } else {
+    const senderUid = данных.from;
+    if (senderUid) {
+      const senderWs = wsUsers.get(senderUid);
+      if (senderWs && senderWs.readyState === WebSocket.OPEN) {
+        senderWs.send(JSON.stringify({ type: 'error', error: 'recipient_offline', messageId: данные.id, recipientUid: uidПолучателя, originalPayload: данные }));
+      }
     }
+    sqlDb.saveOfflineMessage({ senderUid: данные.from, receiverUid: uidПолучателя, content: typeof данные.content === 'string' ? данные.content : JSON.stringify(данные), encryptedAttachments: данные.encryptedAttachments || [] });
+    console.log('[OFFLINE] recipient ' + uidПолучателя + ' not connected, queued in SQLite');
+  }
 }
 
 // Раздача статики (включая index.html и admin.html)
