@@ -8,13 +8,15 @@ import FileUpload from './FileUpload';
 import GiftSelectorModal from './GiftSelectorModal';
 import type { Gift } from '../types';
 import type { EncryptedAttachment } from '../types';
+import { getPrivateKey } from '../services/cryptoService';
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string, encryptedAttachments?: EncryptedAttachment[]) => void;
   onTyping?: (isTyping: boolean) => void;
+  identity: import('../types').IdentityType | null;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, identity }) => {
   const [text, setText] = useState('');
   const [mediaFile, setMediaFile] = useState<{base64: string, type: 'image' | 'video'} | null>(null);
   const [fileError, setFileError] = useState('');
@@ -167,7 +169,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping }) 
       )}
 
       {/* FileUpload модалка */}
-      {showFilePicker && (
+      {showFilePicker && identity && (
           <FileUpload
             onFilesSelected={(encAttachments: EncryptedAttachment[]) => {
               setEncryptedAttachments(prev => [...prev, ...encAttachments]);
@@ -177,7 +179,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping }) 
             maxFiles={5}
             maxSizeMB={10}
             accept="image/*,application/pdf,.doc,.docx,.txt,video/*"
-            privateKeyHex={undefined}
+            privateKeyHex={getPrivateKey(identity)}
           />
       )}
     </div>
