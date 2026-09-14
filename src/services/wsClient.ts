@@ -4,6 +4,10 @@
 
 import { authClient } from './authClient';
 
+const WS_URL = (typeof process !== 'undefined' && process.env && process.env.VITE_WS_URL)
+  ? process.env.VITE_WS_URL
+  : 'wss://192.168.100.4:4443';
+
 let ws: WebSocket | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT = 5;
@@ -11,13 +15,10 @@ let reconnectTimeout: NodeJS.Timeout | null = null;
 let currentOnMessage: (data: any) => void = () => {};
 
 export function connectWebSocket(onMessage: (data: any) => void): void {
-  // Clear any pending reconnect
   if (reconnectTimeout) {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
-  }
-
-  currentOnMessage = onMessage;
+  }  currentOnMessage = onMessage;
 
   const token = authClient.getAccessToken();
   if (!token) {
@@ -26,9 +27,9 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     return;
   }
 
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = window.location.host;
-  const wsUrl = `${protocol}://${host}/ws?token=${token}`;
+  const wsUrl = WS_URL.startsWith('ws://') || WS_URL.startsWith('wss://')
+    ? `${WS_URL}/?token=${encodeURIComponent(token)}`
+    : `${WS_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/?token=${encodeURIComponent(token)}`;
 
   ws = new WebSocket(wsUrl);
 
@@ -49,14 +50,13 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
   ws.onclose = (event) => {
     console.log('[WS] Closed:', event.code);
     if (event.code === 1008) {
-      // Unauthorized - try token refresh
       authClient.refresh()
         .then(() => {
           reconnectAttempts = 0;
           connectWebSocket(currentOnMessage);
         })
         .catch(() => {
-          authClient.clearTokens();
+          authClient.logout();
           window.location.href = '/login';
         });
     } else if (reconnectAttempts < MAX_RECONNECT) {
@@ -64,8 +64,6 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
       const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
       console.log('[WS] Reconnecting in', delay, 'ms (attempt', reconnectAttempts, ')');
       reconnectTimeout = setTimeout(() => connectWebSocket(currentOnMessage), delay);
-    } else {
-      console.error('[WS] Max reconnect attempts reached');
     }
   };
 
@@ -92,3 +90,4 @@ export function sendWebSocketMessage(type: string, payload: any): void {
     console.error('[WS] Not connected');
   }
 }
+

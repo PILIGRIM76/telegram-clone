@@ -209,8 +209,8 @@ app.post('/api/login', (req, res) => {
 
 app.post('/register', async (req, res) => {
   const { username, password, uid, publicKey } = req.body;
-  if (!username || !password || !uid || !publicKey) {
-    return res.status(400).json({ ошибка: 'username, password, uid и publicKey обязательны' });
+  if (!username || !password || !publicKey) {
+    return res.status(400).json({ ошибка: 'username, password и publicKey обязательны' });
   }
   try {
     // Check if user exists
