@@ -461,7 +461,7 @@ const App: React.FC = () => {
           contact.uid,
           trimmed,
           contact.publicKey,
-          { id: msgId }
+          { id: msgId, encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined }
         );
         encryptionType = secureResult?.type;
         isEncrypted = !!encryptionType;
@@ -474,7 +474,12 @@ const App: React.FC = () => {
         // Fallback: отправляем в plaintext, но НЕ теряем сообщение
         if (contact?.publicKey && ws.isConnected) {
           try {
-            apiService.sendMessage(contact.uid, trimmed, contact.publicKey);
+            apiService.sendMessage(
+              contact.uid,
+              trimmed,
+              contact.publicKey,
+              { encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined }
+            );
           } catch (e) {
             logger.error('[PILIGRIM] plaintext fallback send failed', e);
           }
