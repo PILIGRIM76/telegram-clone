@@ -1,6 +1,6 @@
 // server/databaseService.js
 // SQLite persistence layer for CipherLink
-// Tables: users, identities, sessions, messages, offline_messages
+// Tables: users, identities, sessions, messages, offline_messages, user_profiles
 
 const Database = require('better-sqlite3');
 const path = require('path');
@@ -57,6 +57,19 @@ db.exec(`
     timestamp TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  -- v3.5: User profile persistence (public key, pre-key bundle, store, boards)
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    uid TEXT PRIMARY KEY,
+    public_key TEXT,
+    pre_key_bundle TEXT,  -- JSON string
+    store_data TEXT,      -- JSON string
+    boards_data TEXT,     -- JSON string
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_user_profiles_uid ON user_profiles(uid);
 `);
 
 // Insert a new user (uid, username, password_hash)
@@ -173,6 +186,84 @@ function createSession(uid, refreshToken, sessionId, expiresAt) {
   return stmt.run(sessionId, uid, refreshToken, expiresAt, now);
 }
 
+// --- v3.5: User Profile Persistence ---
+
+// Get full user profile (public_key, pre_key_bundle, store_data, boards_data)
+function getUserProfile(uid) {
+  const row = db.prepare('SELECT uid, public_key, pre_key_bundle, store_data, boards_data, updated_at FROM user_profiles WHERE uid = ?').get(uid);
+  if (!row) return null;
+  return {
+    uid: row.uid,
+    publicKey: row.public_key,
+    preKeyBundle: row.pre_key_bundle ? JSON.parse(row.pre_key_bundle) : null,
+    store: row.store_data ? JSON.parse(row.store_data) : null,
+    boards: row.boards_data ? JSON.parse(row.boards_data) : [],
+    updatedAt: row.updated_at,
+  };
+}
+
+// Save/update public key
+function savePublicKey(uid, publicKey) {
+  const stmt = db.prepare(`
+    INSERT INTO user_profiles (uid, public_key, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET public_key = excluded.public_key, updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  stmt.run(uid, publicKey, now);
+}
+
+// Save/update pre-key bundle
+function savePreKeyBundle(uid, preKeyBundle) {
+  const stmt = db.prepare(`
+    INSERT INTO user_profiles (uid, pre_key_bundle, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET pre_key_bundle = excluded.pre_key_bundle, updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  stmt.run(uid, JSON.stringify(preKeyBundle), now);
+}
+
+// Save/update store data
+function saveStoreData(uid, storeData) {
+  const stmt = db.prepare(`
+    INSERT INTO user_profiles (uid, store_data, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET store_data = excluded.store_data, updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  stmt.run(uid, JSON.stringify(storeData), now);
+}
+
+// Save/update boards data
+function saveBoardsData(uid, boardsData) {
+  const stmt = db.prepare(`
+    INSERT INTO user_profiles (uid, boards_data, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET boards_data = excluded.boards_data, updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  stmt.run(uid, JSON.stringify(boardsData), now);
+}
+
+// Save full profile (batch update)
+function saveUserProfile(uid, { publicKey, preKeyBundle, store, boards }) {
+  const stmt = db.prepare(`
+    INSERT INTO user_profiles (uid, public_key, pre_key_bundle, store_data, boards_data, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET 
+      public_key = COALESCE(excluded.public_key, public_key),
+      pre_key_bundle = COALESCE(excluded.pre_key_bundle, pre_key_bundle),
+      store_data = COALESCE(excluded.store_data, store_data),
+      boards_data = COALESCE(excluded.boards_data, boards_data),
+      updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  stmt.run(
+    uid,
+    publicKey || null,
+    preKeyBundle ? JSON.stringify(preKeyBundle) : null,
+    store ? JSON.stringify(store) : null,
+    boards ? JSON.stringify(boards) : null,
+    now
+  );
+}
+
 module.exports = {
   db,
   createUser,
@@ -187,4 +278,11 @@ module.exports = {
   getSessionByRefreshToken,
   deleteSession,
   createSession,
+  // v3.5: User profile
+  getUserProfile,
+  savePublicKey,
+  savePreKeyBundle,
+  saveStoreData,
+  saveBoardsData,
+  saveUserProfile,
 };
