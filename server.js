@@ -849,6 +849,25 @@ app.get('/rewards/:uid', (req, res) => {
           отправить(uid, { type: 'receipt', receipt: delivered ? 'delivered' : 'queued', messageId: id, to: to, timestamp: new Date().toISOString(), queued: !delivered });
         }
       }
+      if (msg.type === 'reaction') {
+        const { messageId, emoji, action, to, groupId } = msg;
+        sqlDb.addReaction(messageId, uid, emoji);
+        const reactionMsg = { type: 'reaction', messageId, userUid: uid, emoji, action };
+        if (to) {
+          отправить(to, reactionMsg);
+        }
+        if (groupId) {
+          const группа = группы.get(groupId);
+          if (группа) {
+            for (const [otherUid, otherUser] of wsUsers) {
+              if (otherUid === uid) continue;
+              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+                otherUser.send(JSON.stringify({ ...reactionMsg, groupId: группа.id }));
+              }
+            }
+          }
+        }
+      }
     } catch (e) { console.error(e); }
   });
 

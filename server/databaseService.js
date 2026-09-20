@@ -58,6 +58,18 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  -- v3.6: Message reactions
+  CREATE TABLE IF NOT EXISTS reactions (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    user_uid TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch()),
+    UNIQUE(message_id, user_uid, emoji),
+    FOREIGN KEY (message_id) REFERENCES messages(id),
+    FOREIGN KEY (user_uid) REFERENCES users(uid)
+  );
+
   -- v3.5: User profile persistence (public key, pre-key bundle, store, boards)
   CREATE TABLE IF NOT EXISTS user_profiles (
     uid TEXT PRIMARY KEY,
@@ -264,6 +276,54 @@ function saveUserProfile(uid, { publicKey, preKeyBundle, store, boards }) {
   );
 }
 
+// --- v3.6: Message Reactions ---
+
+// Add a reaction to a message
+function addReaction(messageId, userUid, emoji) {
+  const crypto = require('crypto');
+  const id = crypto.randomBytes(16).toString('hex');
+  const stmt = db.prepare(
+    'INSERT OR IGNORE INTO reactions (id, message_id, user_uid, emoji, created_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  const createdAt = Math.floor(Date.now() / 1000);
+  stmt.run(id, messageId, userUid, emoji, createdAt);
+  return { id, message_id: messageId, user_uid: userUid, emoji, created_at: createdAt };
+}
+
+// Remove a reaction from a message
+function removeReaction(messageId, userUid, emoji) {
+  const stmt = db.prepare(
+    'DELETE FROM reactions WHERE message_id = ? AND user_uid = ? AND emoji = ?'
+  );
+  return stmt.run(messageId, userUid, emoji).changes > 0;
+}
+
+// Get all reactions for a message
+function getReactionsForMessage(messageId) {
+  return db.prepare(
+    'SELECT id, message_id, user_uid, emoji, created_at FROM reactions WHERE message_id = ? ORDER BY created_at'
+  ).all(messageId);
+}
+
+// Get reaction counts per emoji for a message
+function getReactionCountsForMessage(messageId) {
+  const rows = db.prepare(
+    'SELECT emoji, COUNT(*) as count, GROUP_CONCAT(user_uid) as users FROM reactions WHERE message_id = ? GROUP BY emoji'
+  ).all(messageId);
+  return rows.map(r => ({
+    emoji: r.emoji,
+    count: r.count,
+    users: r.users ? r.users.split(',') : []
+  }));
+}
+
+// Check if user has reacted with specific emoji
+function hasUserReacted(messageId, userUid, emoji) {
+  return db.prepare(
+    'SELECT 1 FROM reactions WHERE message_id = ? AND user_uid = ? AND emoji = ?'
+  ).get(messageId, userUid, emoji) !== undefined;
+}
+
 module.exports = {
   db,
   createUser,
@@ -285,4 +345,10 @@ module.exports = {
   saveStoreData,
   saveBoardsData,
   saveUserProfile,
+  // v3.6: Message reactions
+  addReaction,
+  removeReaction,
+  getReactionsForMessage,
+  getReactionCountsForMessage,
+  hasUserReacted,
 };
