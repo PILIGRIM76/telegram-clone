@@ -1,158 +1,159 @@
-// v3.0 Phase 2E: SearchModal - command palette (Linear/VS Code inspired).
-// Keyboard-first: Ctrl+K toggle, Esc close, arrows navigate, Enter select.
-// Fuzzy: substring + subsequence (case-insensitive).
-// Searches: contact names, last messages, UIDs.
-
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AnimatedAvatar } from './AnimatedAvatar';
-
-interface SearchableContact {
-  uid: string;
-  name: string;
-  lastMessage?: string;
-}
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { searchService } from '../services/searchService';
+import type { SearchResult } from '../types';
 
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  contacts: SearchableContact[];
-  onSelect: (uid: string) => void;
+  contacts?: { uid: string; name: string }[];
+  onContactSelect?: (uid: string) => void;
+  currentContactUid?: string;
+  onMessageSelect?: (messageId: string, contactUid: string) => void;
 }
 
-function fuzzyMatch(query: string, target: string): boolean {
-  const q = query.toLowerCase().trim();
-  const t = target.toLowerCase();
-  if (!q) return true;
-  if (t.includes(q)) return true;
-  let qi = 0;
-  for (let i = 0; i < t.length && qi < q.length; i++) {
-    if (t[i] === q[qi]) qi++;
-  }
-  return qi === q.length;
-}
-
-export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, contacts, onSelect }) => {
+export const SearchModal: React.FC<SearchModalProps> = ({
+  isOpen,
+  onClose,
+  onMessageSelect,
+  currentContactUid,
+}) => {
   const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
-  const results = useMemo(() => {
-    if (!query.trim()) return contacts.slice(0, 8);
-    return contacts.filter((c) => fuzzyMatch(query, c.name) || fuzzyMatch(query, c.lastMessage || '') || fuzzyMatch(query, c.uid)).slice(0, 12);
-  }, [query, contacts]);
+  // Debounced search
+  const debouncedSearch = useCallback(
+    debounce((searchQuery: string) => {
+      setIsSearching(true);
+      const searchResults = searchService.search({
+        query: searchQuery,
+        contactUid: currentContactUid,
+      });
+      setResults(searchResults);
+      setIsSearching(false);
+    }, 300),
+    [currentContactUid]
+  );
 
   useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-      setActiveIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+    if (query.length >= 2) {
+      debouncedSearch(query);
+    } else {
+      setResults([]);
+    }
+  }, [query, debouncedSearch]);
+
+  // Focus input on open
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
     }
   }, [isOpen]);
 
+  // Escape to close
   useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setActiveIndex((i) => Math.min(i + 1, results.length - 1));
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setActiveIndex((i) => Math.max(i - 1, 0));
-      }
-      if (e.key === 'Enter' && results[activeIndex]) {
-        onSelect(results[activeIndex].uid);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
         onClose();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, results, activeIndex, onSelect, onClose]);
-
-  useEffect(() => {
-    const el = listRef.current?.children[activeIndex] as HTMLElement;
-    el?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key="search-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        onClick={onClose}
-        data-testid="search-modal"
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 105, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '15vh 24px 24px' } as React.CSSProperties}
-      >
-        <motion.div
-          key="search-panel"
-          initial={{ opacity: 0, scale: 0.96, y: -12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Search"
-          style={{ width: '100%', maxWidth: 560, background: 'var(--color-surface)', borderRadius: 20, boxShadow: 'var(--shadow-floating)', border: '0.5px solid rgba(255,255,255,0.3)', overflow: 'hidden' } as React.CSSProperties}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px', height: 56, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center gap-2">
             <input
               ref={inputRef}
+              type="text"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
-              placeholder="Search contacts and chats..."
-              data-testid="search-input"
-              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: 'var(--color-text-primary)', fontFamily: 'inherit' } as React.CSSProperties}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск сообщений (минимум 2 символа)..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
             />
-            <kbd style={{ fontSize: 11, color: 'var(--color-text-secondary)', background: 'rgba(0,0,0,0.05)', padding: '4px 8px', borderRadius: 6, fontFamily: 'monospace' } as React.CSSProperties}>ESC</kbd>
+            <button
+              onClick={onClose}
+              className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Закрыть (Esc)"
+            >
+              ✕
+            </button>
           </div>
+        </div>
 
-          <div ref={listRef} data-testid="search-results" style={{ maxHeight: 380, overflowY: 'auto', padding: 8 }}>
-            {results.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 14 } as React.CSSProperties}>
-                Nothing found for "{query}"
+        {/* Results */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {isSearching && (
+            <div className="text-center text-gray-500 py-8">
+              Поиск...
+            </div>
+          )}
+
+          {!isSearching && results.length === 0 && query.length >= 2 && (
+            <div className="text-center text-gray-500 py-8">
+              Ничего не найдено для "{query}"
+            </div>
+          )}
+
+          {!isSearching && query.length < 2 && (
+            <div className="text-center text-gray-500 py-8">
+              Введите минимум 2 символа для поиска
+            </div>
+          )}
+
+          {!isSearching && results.map((result) => (
+            <div
+              key={result.message.id}
+              onClick={() => {
+                onMessageSelect?.(result.message.id, result.contactUid);
+                onClose();
+              }}
+              className="p-4 hover:bg-blue-50 rounded-lg cursor-pointer border-b"
+            >
+              <div className="font-semibold text-sm text-gray-700 mb-1">
+                {result.contactName}
               </div>
-            ) : (
-              results.map((contact, i) => (
-                <div
-                  key={contact.uid}
-                  data-testid={'search-result-' + contact.uid}
-                  onClick={() => { onSelect(contact.uid); onClose(); }}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: i === activeIndex ? 'rgba(0,0,0,0.05)' : 'transparent', transition: 'background 100ms ease-out' } as React.CSSProperties}
-                >
-                  <AnimatedAvatar name={contact.name} size={36} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as React.CSSProperties}>{contact.name}</div>
-                    {contact.lastMessage && (
-                      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as React.CSSProperties}>{contact.lastMessage}</div>
-                    )}
-                  </div>
-                  {i === activeIndex && <kbd style={{ fontSize: 10, color: 'var(--color-text-secondary)', fontFamily: 'monospace' } as React.CSSProperties}>Enter</kbd>}
-                </div>
-              ))
-            )}
-          </div>
+              <div className="text-sm text-gray-600">
+                {result.snippet}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {new Date(result.message.timestamp).toLocaleString()}
+              </div>
+            </div>
+          ))}
 
-          <div style={{ padding: '8px 20px', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: 16, fontSize: 11, color: 'var(--color-text-secondary)' } as React.CSSProperties}>
-            <span>up/down navigate</span>
-            <span>enter open chat</span>
-            <span>esc close</span>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          {results.length > 0 && (
+            <div className="text-xs text-gray-400 mt-4 text-center">
+              Найдено: {results.length} результат(ов)
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
+
+// Утилита debounce
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}

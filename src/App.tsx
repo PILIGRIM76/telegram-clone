@@ -1018,7 +1018,7 @@ const App: React.FC = () => {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         contacts={searchableContacts}
-        onSelect={(uid) => {
+        onContactSelect={(uid: string) => {
           setIsSearchOpen(false);
           setActiveTab('chats');
           setSelectedChatId(uid);

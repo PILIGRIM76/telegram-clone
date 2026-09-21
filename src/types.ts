@@ -350,3 +350,54 @@ export interface PublicChannel {
     postCount: number;
     inviteToken?: string;
 }
+
+// ============================================================
+// v3.7 Message Search (client-side, E2EE-safe)
+// ============================================================
+
+/**
+ * Результат поиска по сообщениям.
+ * Поиск выполняется на клиенте — сервер не имеет доступа к содержимому.
+ */
+export interface SearchResult {
+  message: Message;
+  contactUid: string;
+  contactName: string;
+  snippet: string; // фрагмент текста с подсветкой
+  matchPositions: Array<{ start: number; end: number }>; // позиции совпадений
+}
+
+/**
+ * Опции для поиска.
+ */
+export interface SearchOptions {
+  query: string;
+  contactUid?: string; // если ищем в конкретном чате
+  limit?: number; // максимальное количество результатов (default: 50)
+}
+
+// Voice Messages types (v3.9)
+
+// Status of voice recording
+export type RecordingStatus = 'idle' | 'recording' | 'processing' | 'error';
+
+// Metadata for voice messages
+export interface VoiceMessageMetadata {
+  duration: number; // duration in seconds
+  mimeType: string; // audio format (e.g., 'audio/webm')
+  size: number; // size in bytes
+}
+
+// Decrypted voice message for playback
+export interface DecryptedVoiceMessage {
+  blob: Blob; // decrypted audio blob
+  url: string; // object URL for playback
+  duration: number;
+}
+
+// Recording state update event
+export interface RecordingStateUpdate {
+  status: RecordingStatus;
+  elapsedSeconds: number;
+  error?: string;
+}

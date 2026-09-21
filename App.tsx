@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { Личность, Контакт, Чат, Сообщение, Группа, Магазин, ДоскаОбъявлений } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import CreateIdentity from './components/CreateIdentity';
@@ -14,6 +14,8 @@ import BoardManagementModal from './components/BoardManagementModal';
 import CreateBoardModal from './components/CreateBoardModal';
 import VerificationModal from './components/VerificationModal';
 import QRScanningModal from './components/QRScanningModal';
+import { SearchModal } from './components/SearchModal';
+import { searchService } from './services/searchService';
 
 const App: React.FC = () => {
   const [личность, установитьЛичность] = useLocalStorage<Личность | null>('cipherlink-identity', null);
@@ -36,10 +38,61 @@ const App: React.FC = () => {
   const [модалВерификацииОткрыт, установитьМодалВерификацииОткрыт] = useState(false);
   const [модалСканированияОткрыт, установитьМодалСканированияОткрыт] = useState(false);
 
+  // v3.7 Message Search
+  const [isSearchOpen, установитьIsSearchOpen] = useState(false);
+  const [highlightedMessageId, установитьHighlightedMessageId] = useState<string | null>(null);
+  const highlightedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Применение темы
   useEffect(() => {
     document.documentElement.className = тема;
   }, [тема]);
+
+  // v3.7: Индексировать сообщения при загрузке истории чатов
+  useEffect(() => {
+    // Индексируем сообщения каждого чата по UID контакта
+    const entries = Object.entries(чаты);
+    for (const [chatId, chat] of entries) {
+      const contact = контакты.find((c) => c.id === chatId);
+      if (contact && chat?.сообщения) {
+        searchService.indexMessages(contact.uid, chat.сообщения);
+      }
+    }
+  }, [чаты, контакты]);
+
+  // v3.7: Обработчик выбора результата поиска
+  const handleSearchSelect = useCallback(
+    (messageId: string, contactUid: string) => {
+      // Найти чат по UID контакта
+      const contact = контакты.find((c) => c.uid === contactUid);
+      if (contact) {
+        установитьВыбранныйЧатId(contact.id);
+      }
+
+      // Подсветить сообщение
+      установитьHighlightedMessageId(messageId);
+      if (highlightedTimerRef.current) {
+        clearTimeout(highlightedTimerRef.current);
+      }
+      highlightedTimerRef.current = setTimeout(() => {
+        установитьHighlightedMessageId(null);
+      }, 3000);
+
+      // Прокрутить к сообщению после рендера чата
+      setTimeout(() => {
+        const element = document.getElementById(`message-${messageId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Добавить временную подсветку для анимации
+          element.classList.add('bg-yellow-100', 'animate-pulse');
+          setTimeout(() => {
+            element.classList.remove('bg-yellow-100', 'animate-pulse');
+          }, 3000);
+        }
+      }, 150);
+    },
+    [контакты]
+  );
 
   // Инициализация системного чата
   useEffect(() => {
@@ -314,7 +367,7 @@ const App: React.FC = () => {
       </div>
 
       <main className={`flex-1 flex flex-col bg-slate-800 ${!выбранныйЧатId ? 'hidden md:flex' : 'flex'}`}>
-        {выбранныйОбъект && выбранныйЧат ? (
+                {выбранныйОбъект && выбранныйЧат ? (
             <ChatWindow
                 key={выбранныйОбъект.id}
                 собеседник={выбранныйОбъект}
@@ -325,6 +378,8 @@ const App: React.FC = () => {
                 приУстановкеТаймера={обработатьУстановкуТаймера}
                 приУдаленииСообщения={обработатьУдалениеСообщения}
                 приВерификации={обработатьВерификацию}
+                highlightedMessageId={highlightedMessageId}
+                onSearchClick={() => установитьIsSearchOpen(true)}
             />
         ) : (
             <WelcomePlaceholder />
@@ -380,6 +435,13 @@ const App: React.FC = () => {
              }}
           />
       )}
+
+      {/* Модальное окно поиска v3.7 */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => установитьIsSearchOpen(false)}
+        onMessageSelect={handleSearchSelect}
+      />
 
       {/* Модальные окна верификации */}
       {модалВерификацииОткрыт && (
