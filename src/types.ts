@@ -179,6 +179,16 @@ export interface Message {
   // v3.9: Voice Messages
   /** Метаданные голосового сообщения */
   voiceMetadata?: VoiceMessageMetadata;
+
+  // v3.12: Message Editing & Deletion
+  /** Timestamp последнего редактирования */
+  editedAt?: number;
+  /** Timestamp удаления */
+  deletedAt?: number;
+  /** Флаг: сообщение было отредактировано */
+  isEdited?: boolean;
+  /** Флаг: сообщение удалено (для текущего пользователя) */
+  isDeleted?: boolean;
 }
 
 /**
@@ -404,4 +414,12 @@ export interface RecordingStateUpdate {
   status: RecordingStatus;
   elapsedSeconds: number;
   error?: string;
+}
+
+// v3.12: Message Editing & Deletion
+export interface MessageEdit {
+  id: string;
+  messageId: string;
+  oldContent: string;
+  editedAt: number;
 }

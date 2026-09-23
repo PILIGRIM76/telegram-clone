@@ -868,6 +868,72 @@ app.get('/rewards/:uid', (req, res) => {
           }
         }
       }
+
+      // --- v3.12: Message Editing ---
+      if (msg.type === 'message_edit') {
+        const { messageId, newContent } = msg;
+
+        // Verify the user owns the message
+        const message = sqlDb.getMessage(messageId);
+        if (!message || message.sender_uid !== uid) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на редактирование' }));
+          return;
+        }
+
+        // Save old version and update
+        sqlDb.editMessage(messageId, newContent);
+
+        // Broadcast to chat participants
+        const editedAt = Date.now();
+        const broadcastMsg = {
+          type: 'message_edited',
+          messageId,
+          newContent,
+          editedAt
+        };
+
+        if (message.receiver_uid) {
+          отправить(message.receiver_uid, broadcastMsg);
+        }
+        // Also send back to sender for confirmation
+        ws.send(broadcastMsg);
+      }
+
+      // --- v3.12: Message Deletion ---
+      if (msg.type === 'message_delete') {
+        const { messageId, deleteForAll } = msg;
+
+        const message = sqlDb.getMessage(messageId);
+        if (!message) return;
+
+        // Check permissions: owner or group admin
+        const isOwner = message.sender_uid === uid;
+        let isAdmin = false;
+
+        // For group messages, check if user is admin
+        // Note: This would need groupId to be passed in the message or derived from context
+        // For now, only owner can delete
+
+        if (!isOwner && !isAdmin) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на удаление' }));
+          return;
+        }
+
+        sqlDb.deleteMessage(messageId, deleteForAll, uid);
+
+        // Broadcast deletion event
+        const broadcastMsg = {
+          type: 'message_deleted',
+          messageId,
+          deleteForAll
+        };
+
+        if (message.receiver_uid) {
+          отправить(message.receiver_uid, broadcastMsg);
+        }
+        // Also send back to sender for confirmation
+        ws.send(broadcastMsg);
+      }
     } catch (e) { console.error(e); }
   });
 

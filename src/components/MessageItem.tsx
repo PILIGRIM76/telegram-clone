@@ -8,12 +8,17 @@ import { ClockIcon } from './icons/ClockIcon';
 import { GiftIcon } from './icons/GiftIcon';
 import { VoicePlayer } from './VoicePlayer';
 import { VoiceMessageMetadata } from '../types';
+import { ContextMenu } from './ContextMenu';
+import type { MenuItem } from './ContextMenu';
 
 interface MessageItemProps {
     message: Message;
     currentIdentity: Identity;
     onDelete?: (messageId: string) => void;
     disappearTimer?: number;
+    currentUserUid?: string;
+    isAdmin?: boolean;
+    onEdit?: (messageId: string, newText: string) => void;
 }
 
 const statusText = {
@@ -23,12 +28,60 @@ const statusText = {
   'received': '⬇',
 };
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onDelete, disappearTimer }) => {
+// Helper component for message status icons to avoid IIFE in main component
+const MessageStatusIcons: React.FC<{ message: Message; sentByMe: boolean }> = ({ message, sentByMe }) => {
+  const incomingPayload = message.payload as any;
+  const hasEncryptedPayload = !!incomingPayload?.encryptedPayload;
+  const isPlaintextFallback = incomingPayload?.encryptedPayload?.startsWith?.('PLAINTEXT_FALLBACK:');
+  const isDecrypted = !hasEncryptedPayload || !isPlaintextFallback;
+
+  return (
+    <>
+      {hasEncryptedPayload && isPlaintextFallback && (
+        <span title="Не зашифровано (fallback)" className="text-[10px] opacity-60" aria-label="not-encrypted">
+          🔓⚠
+        </span>
+      )}
+      {hasEncryptedPayload && isDecrypted && !isPlaintextFallback && (
+        <span title="E2EE: расшифровано" className="text-[10px] opacity-60" aria-label="decrypted">
+          🔓
+        </span>
+      )}
+      {hasEncryptedPayload && !isDecrypted && (
+        <span title="E2EE: зашифровано" className="text-[10px] opacity-60" aria-label="encrypted">
+          🔒
+        </span>
+      )}
+      {message.status === 'received' && (
+        <span title="Получено" className="text-[10px] opacity-70" aria-label="received">
+          ⬇
+        </span>
+      )}
+      {(message.disappearIn || (message as any).disappearTimer) && (
+        <span title={(message as any).disappearTimer ? `Исчезнет через ${(message as any).disappearTimer} сек` : 'Исчезающее сообщение'}>
+          <ClockIcon className="w-3 h-3 opacity-70 text-yellow-300" />
+        </span>
+      )}
+      <span className="text-[10px] opacity-70">
+        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+      {sentByMe && message.status && (
+        <span className={`text-[10px] ${message.status === 'read' ? 'text-cyan-200' : 'opacity-70'}`}>
+          {statusText[message.status as keyof typeof statusText]}
+        </span>
+      )}
+    </>
+  );
+};
+
+const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onDelete, disappearTimer, currentUserUid, isAdmin = false, onEdit }) => {
     const [visible, setVisible] = useState(true);
     const [decryptedText, setDecryptedText] = useState<string>('');
     const [decryptedBlobs, setDecryptedBlobs] = useState<{ [key: string]: Blob }>({});
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string } | null>(null);
     const sentByMe = message.senderId === currentIdentity.uid;
     const isSystem = message.type === 'system';
+    const currentUid = currentUserUid || currentIdentity.uid;
 
     useEffect(() => {
         if (isSystem) {
@@ -111,8 +164,88 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
 
     const privateKey = getPrivateKey(currentIdentity);
 
+    // Context menu handlers
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, messageId: message.id });
+    };
+
+    const handleCloseContextMenu = () => {
+        setContextMenu(null);
+    };
+
+    const handleEdit = () => {
+        if (onEdit) {
+            onEdit(message.id, decryptedText);
+        }
+        handleCloseContextMenu();
+    };
+
+    const handleDeleteForMe = () => {
+        if (onDelete) {
+            onDelete(message.id);
+        }
+        handleCloseContextMenu();
+    };
+
+    const handleDeleteForAll = () => {
+        // For now, use the same delete function but the server will handle deleteForAll
+        if (onDelete) {
+            onDelete(message.id);
+        }
+        handleCloseContextMenu();
+    };
+
+    const handleCopy = () => {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(decryptedText).catch((err: unknown) =>
+                logger.warn('[PILIGRIM] Clipboard write failed:', err)
+            );
+        }
+        handleCloseContextMenu();
+    };
+
+    const handleReply = () => {
+        // Reply is handled by parent ChatWindow
+        handleCloseContextMenu();
+    };
+
+    const isOwn = message.senderId === currentUid;
+    const canEdit = isOwn && message.type === 'user' && !message.isDeleted;
+    const canDelete = isOwn || isAdmin;
+
+    const contextMenuItems: MenuItem[] = [
+        { id: 'reply', icon: '↩️', label: 'Ответить', onClick: handleReply },
+        { id: 'copy', icon: '📋', label: 'Копировать', onClick: handleCopy },
+    ];
+
+    if (canEdit) {
+        contextMenuItems.splice(1, 0, { id: 'edit', icon: '✏️', label: 'Редактировать', onClick: handleEdit });
+    }
+
+    if (canDelete) {
+        contextMenuItems.push({ id: 'delete_me', icon: '🗑️', label: 'Удалить для себя', dangerous: true, onClick: handleDeleteForMe });
+        if (isOwn) {
+            contextMenuItems.push({ id: 'delete_all', icon: '🗑️', label: 'Удалить для всех', dangerous: true, onClick: handleDeleteForAll });
+        }
+    }
+
+    // Render context menu
+    const contextMenuContent = contextMenu ? (
+        <ContextMenu
+            isOpen={true}
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={contextMenuItems}
+            onClose={handleCloseContextMenu}
+        />
+    ) : null;
+
     return (
-        <div className={`message ${sentByMe ? 'sent' : 'received'} animate-fade-in ${(message as any).highlighted ? 'bg-yellow-100 animate-pulse' : ''}`}>
+        <div
+            className={`message ${sentByMe ? 'sent' : 'received'} animate-fade-in ${(message as any).highlighted ? 'bg-yellow-100 animate-pulse' : ''}`}
+            onContextMenu={handleContextMenu}
+        >
             <div className={`message-bubble ${sentByMe ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100'}`}>
                 {message.type === 'voice' && message.encryptedAttachments && message.encryptedAttachments.length > 0 && message.voiceMetadata && (
                     <VoicePlayer
@@ -124,58 +257,24 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
                 )}
 
                 {decryptedText && (
-                    <div className="message-text whitespace-pre-wrap break-words">
-                        {decryptedText}
-                    </div>
+                    <>
+                      <div className="message-text whitespace-pre-wrap break-words">
+                          {decryptedText}
+                      </div>
+                      {message.isEdited && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">изменено</span>
+                      )}
+                    </>
+                )}
+
+                {message.isDeleted && (
+                  <div className="italic text-gray-400 dark:text-gray-500 text-sm">Сообщение удалено</div>
                 )}
 
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
-                    {(() => {
-                        const incomingPayload = message.payload as any;
-                        const hasEncryptedPayload = !!incomingPayload?.encryptedPayload;
-                        const isPlaintextFallback = incomingPayload?.encryptedPayload?.startsWith?.('PLAINTEXT_FALLBACK:');
-                        const isDecrypted = !hasEncryptedPayload || !isPlaintextFallback;
-
-                        return (
-                            <>
-                                {hasEncryptedPayload && isPlaintextFallback && (
-                                    <span title="Не зашифровано (fallback)" className="text-[10px] opacity-60" aria-label="not-encrypted">
-                                        🔓⚠
-                                    </span>
-                                )}
-                                {hasEncryptedPayload && isDecrypted && !isPlaintextFallback && (
-                                    <span title="E2EE: расшифровано" className="text-[10px] opacity-60" aria-label="decrypted">
-                                        🔓
-                                    </span>
-                                )}
-                                {hasEncryptedPayload && !isDecrypted && (
-                                    <span title="E2EE: зашифровано" className="text-[10px] opacity-60" aria-label="encrypted">
-                                        🔒
-                                    </span>
-                                )}
-                                {message.status === 'received' && (
-                                    <span title="Получено" className="text-[10px] opacity-70" aria-label="received">
-                                        ⬇
-                                    </span>
-                                )}
-                            </>
-                        );
-                    })()}
-
-                    {(message.disappearIn || disappearTimer) && (
-                         <span title={disappearTimer ? `Исчезнет через ${disappearTimer} сек` : 'Исчезающее сообщение'}>
-                            <ClockIcon className="w-3 h-3 opacity-70 text-yellow-300" />
-                         </span>
-                    )}
-                    <span className="text-[10px] opacity-70">
-                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {sentByMe && message.status && (
-                        <span className={`text-[10px] ${message.status === 'read' ? 'text-cyan-200' : 'opacity-70'}`}>
-                             {statusText[message.status]}
-                        </span>
-                    )}
+                    <MessageStatusIcons message={message} sentByMe={sentByMe} />
                 </div>
+            {contextMenuContent}
             </div>
         </div>
     );

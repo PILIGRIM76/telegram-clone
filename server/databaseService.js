@@ -45,7 +45,11 @@ db.exec(`
     content TEXT NOT NULL,
     encrypted_attachments TEXT,
     timestamp TEXT NOT NULL,
-    delivered INTEGER DEFAULT 0
+    delivered INTEGER DEFAULT 0,
+    -- v3.12: Message editing and deletion
+    edited_at INTEGER,
+    deleted_at INTEGER,
+    deleted_for TEXT  -- JSON array of uids for whom message is deleted
   );
 
   CREATE TABLE IF NOT EXISTS offline_messages (
@@ -69,6 +73,17 @@ db.exec(`
     FOREIGN KEY (message_id) REFERENCES messages(id),
     FOREIGN KEY (user_uid) REFERENCES users(uid)
   );
+
+  -- v3.12: Message edit history
+  CREATE TABLE IF NOT EXISTS message_edits (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    old_content TEXT NOT NULL,
+    edited_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (message_id) REFERENCES messages(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_message_edits_message_id ON message_edits(message_id);
 
   -- v3.5: User profile persistence (public key, pre-key bundle, store, boards)
   CREATE TABLE IF NOT EXISTS user_profiles (
@@ -324,6 +339,92 @@ function hasUserReacted(messageId, userUid, emoji) {
   ).get(messageId, userUid, emoji) !== undefined;
 }
 
+// --- v3.12: Message Editing & Deletion ---
+
+// Get a message by ID
+function getMessage(messageId) {
+  return db.prepare(
+    'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, edited_at, deleted_at, deleted_for FROM messages WHERE id = ?'
+  ).get(messageId);
+}
+
+// Edit a message (save old version to history, update content)
+function editMessage(messageId, newContent) {
+  const crypto = require('crypto');
+  const editId = crypto.randomBytes(16).toString('hex');
+  const editedAt = Math.floor(Date.now() / 1000);
+
+  // Save old version to history
+  const message = getMessage(messageId);
+  if (message) {
+    const historyStmt = db.prepare(
+      'INSERT INTO message_edits (id, message_id, old_content, edited_at) VALUES (?, ?, ?, ?)'
+    );
+    historyStmt.run(editId, messageId, message.content, editedAt);
+  }
+
+  // Update message content and edited_at
+  const stmt = db.prepare(
+    'UPDATE messages SET content = ?, edited_at = ? WHERE id = ?'
+  );
+  const result = stmt.run(newContent, editedAt, messageId);
+  return result.changes > 0;
+}
+
+// Delete message for all (hard delete) or for specific users (soft delete via deleted_for)
+function deleteMessage(messageId, deleteForAll, uid) {
+  const deletedAt = Math.floor(Date.now() / 1000);
+
+  if (deleteForAll) {
+    // Hard delete for all - actually remove from database
+    const stmt = db.prepare('DELETE FROM messages WHERE id = ?');
+    return stmt.run(messageId).changes > 0;
+  } else {
+    // Soft delete for specific user - add to deleted_for array
+    const message = getMessage(messageId);
+    if (!message) return false;
+
+    let deletedFor = [];
+    if (message.deleted_for) {
+      try {
+        deletedFor = JSON.parse(message.deleted_for);
+      } catch {
+        deletedFor = [];
+      }
+    }
+
+    if (!deletedFor.includes(uid)) {
+      deletedFor.push(uid);
+    }
+
+    const stmt = db.prepare(
+      'UPDATE messages SET deleted_at = ?, deleted_for = ? WHERE id = ?'
+    );
+    const result = stmt.run(deletedAt, JSON.stringify(deletedFor), messageId);
+    return result.changes > 0;
+  }
+}
+
+// Get message edit history
+function getMessageHistory(messageId) {
+  return db.prepare(
+    'SELECT id, message_id, old_content, edited_at FROM message_edits WHERE message_id = ? ORDER BY edited_at'
+  ).all(messageId);
+}
+
+// Check if message is deleted for a specific user
+function isMessageDeletedForUser(messageId, uid) {
+  const message = getMessage(messageId);
+  if (!message || !message.deleted_for) return false;
+
+  try {
+    const deletedFor = JSON.parse(message.deleted_for);
+    return deletedFor.includes(uid);
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   db,
   createUser,
@@ -351,4 +452,10 @@ module.exports = {
   getReactionsForMessage,
   getReactionCountsForMessage,
   hasUserReacted,
+  // v3.12: Message editing & deletion
+  getMessage,
+  editMessage,
+  deleteMessage,
+  getMessageHistory,
+  isMessageDeletedForUser,
 };

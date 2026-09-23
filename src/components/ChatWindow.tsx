@@ -12,6 +12,8 @@ import { EncryptionBadge, type EncryptionType } from './EncryptionBadge';
 import { logger } from '../services/logger';
 import { List, ListImperativeAPI } from 'react-window';
 import { AutoSizer } from 'react-virtualized-auto-sizer';
+import MessageItem from './MessageItem';
+import { MessageEditModal } from './MessageEditModal';
 
 interface ChatWindowProps {
   chatId: string;
@@ -55,6 +57,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [ctx, setCtx] = useState<{ x: number; y: number; messageId: string } | null>(null);
+  const [editModalMessage, setEditModalMessage] = useState<Message | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<ListImperativeAPI>(null);
   const { inputRef: fileInputRef, pendingImages, openPicker, handleFiles, removeImage, clearImages } = useImagePicker();
@@ -93,6 +96,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const partnerName = partner?.name ?? 'Чат';
   const initial = partnerName.charAt(0).toUpperCase();
 
+const handleEditMessage = useCallback((messageId: string, newText: string) => {
+    if (onEditMessage) {
+      onEditMessage(messageId, newText);
+    }
+  }, [onEditMessage]);
+
+  const handleDeleteMessage = useCallback((messageId: string) => {
+    if (onDeleteMessage) {
+      onDeleteMessage(messageId);
+    }
+  }, [onDeleteMessage]);
+
+  const handleOpenEditModal = useCallback((message: Message) => {
+    setEditModalMessage(message);
+  }, []);
+
+  const handleCloseEditModal = useCallback(() => {
+    setEditModalMessage(null);
+  }, []);
+
+  const handleSaveEdit = useCallback((newContent: string) => {
+    if (editModalMessage && onEditMessage) {
+      onEditMessage(editModalMessage.id, newContent);
+    }
+    setEditModalMessage(null);
+  }, [editModalMessage, onEditMessage]);
   const MessageRow = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const message = messages[index];
     
@@ -399,6 +428,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           onClose={() => setCtx(null)}
         />
       )}
+
+      {editModalMessage && (
+        <MessageEditModal
+          message={editModalMessage}
+          onSave={handleSaveEdit}
+          onCancel={handleCloseEditModal}
+        />
+      )}
     </div>
   );
 };
@@ -406,16 +443,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 // Wrapper component for MessageItem to avoid circular imports
 const MessageItemWrapper: React.FC<{ message: Message; currentUserUid?: string }> = ({ message, currentUserUid }) => {
   return (
-    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-      <div style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>
-        {message.senderId === currentUserUid ? 'Вы' : message.senderId}
-      </div>
-      <div style={{ color: 'var(--color-text-secondary)' }}>{message.text}</div>
-      <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>
-        {new Date(message.timestamp).toLocaleTimeString()}
-      </div>
-    </div>
+    <MessageItem
+      message={message}
+      currentIdentity={{ uid: currentUserUid || '', publicKeyHex: '', privateKeyHex: '' }}
+      currentUserUid={currentUserUid}
+      onEdit={undefined}
+      onDelete={undefined}
+    />
   );
-};
 
+};
 export default ChatWindow;
