@@ -142,7 +142,7 @@ export interface Message {
   timestamp: string;
   status?: MessageStatus;
   groupId?: string; // Если сообщение в группе
-  type?: 'user' | 'system' | 'read';
+  type?: 'user' | 'system' | 'read' | 'voice';
 
   // Медиа файлы
   media?: string; // Base64 строка (legacy single media)
@@ -175,6 +175,10 @@ export interface Message {
   // ============================================================
   /** Зашифрованные файловые вложения с E2EE метаданными */
   encryptedAttachments?: EncryptedAttachment[];
+
+  // v3.9: Voice Messages
+  /** Метаданные голосового сообщения */
+  voiceMetadata?: VoiceMessageMetadata;
 }
 
 /**

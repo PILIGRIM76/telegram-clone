@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PaperAirplaneIcon } from './icons/PaperAirplaneIcon';
 import { PaperClipIcon } from './icons/PaperClipIcon';
@@ -6,9 +5,11 @@ import { XMarkIcon } from './icons/XMarkIcon';
 import { GiftIcon } from './icons/GiftIcon';
 import FileUpload from './FileUpload';
 import GiftSelectorModal from './GiftSelectorModal';
+import { VoiceRecorder } from './VoiceRecorder';
 import type { Gift } from '../types';
 import type { EncryptedAttachment } from '../types';
 import { getPrivateKey } from '../services/cryptoService';
+import { VoiceMessageMetadata } from '../types';
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string, encryptedAttachments?: EncryptedAttachment[]) => void;
@@ -23,10 +24,30 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [encryptedAttachments, setEncryptedAttachments] = useState<EncryptedAttachment[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
-  
+  const [isRecordingMode, setIsRecordingMode] = useState(false);
+
   const typingTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleVoiceRecorded = async (
+    encryptedBlob: Blob,
+    metadata: VoiceMessageMetadata
+  ) => {
+    try {
+      const voiceAttachment = {
+        id: `voice-${Date.now()}`,
+        ciphertext: encryptedBlob,
+        name: `voice-${metadata.duration}s.${metadata.mimeType.split('/')[1] || 'webm'}`,
+        type: metadata.mimeType,
+        size: metadata.size,
+      };
+      onSendMessage('', [], undefined, [voiceAttachment as unknown as EncryptedAttachment]);
+      setIsRecordingMode(false);
+    } catch (error) {
+      console.error('Failed to send voice message:', error);
+    }
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -106,7 +127,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
 
   return (
     <div className="p-4 bg-slate-900 border-t border-slate-700 flex-shrink-0 flex flex-col">
-      {/* Превью файла (старый формат base64) */}
+      {/* Preview file (old base64 format) */}
       {mediaFile && (
           <div className="mb-2 relative inline-block self-start">
               {mediaFile.type === 'image' ? (
@@ -119,10 +140,12 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
               </button>
           </div>
       )}
+
+      {/* Encrypted attachments preview */}
       {encryptedAttachments.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, padding: 8, overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)', marginBottom: 8 }}>
+          <div className="mb-2 flex flex-wrap gap-2">
               {encryptedAttachments.map((enc, idx) => (
-                  <div key={idx} style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+                  <div key={enc.id} className="relative w-24 h-24 rounded-lg border border-slate-600 overflow-hidden flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
                       {enc.type.startsWith('image/') ? (
                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🖼️</div>
                       ) : (
@@ -136,30 +159,49 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
       )}
       {fileError && <p className="text-red-400 text-xs mb-2">{fileError}</p>}
 
-      <div className="flex items-end space-x-2 bg-slate-700 border border-slate-600 rounded-2xl p-2">
-        <button onClick={() => setShowFilePicker(true)} title="Прикрепить файл" style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📎</button>
-        <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-cyan-400 transition-colors mb-0.5" title="Attach photo/video">
-            <PaperClipIcon className="w-5 h-5" />
-        </button>
-        <button onClick={() => setIsGiftModalOpen(true)} className="p-2 text-slate-400 hover:text-pink-400 transition-colors mb-0.5" title="Send Gift">
-            <GiftIcon className="w-5 h-5" />
-        </button>
+      {isRecordingMode ? (
+        <div className="flex-1">
+          <VoiceRecorder
+            onVoiceRecorded={handleVoiceRecorded}
+            onCancel={() => setIsRecordingMode(false)}
+            privateKeyHex={identity ? getPrivateKey(identity) : ''}
+            maxDuration={300}
+          />
+        </div>
+      ) : (
+        <div className="flex items-end space-x-2 bg-slate-700 border border-slate-600 rounded-2xl p-2">
+          <button
+            onClick={() => setIsRecordingMode(true)}
+            title="Record voice message"
+            style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}
+          >
+            🎙️
+          </button>
+          <button onClick={() => setShowFilePicker(true)} title="Attach file" style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📎</button>
+          <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-cyan-400 transition-colors mb-0.5" title="Attach photo/video">
+              <PaperClipIcon className="w-5 h-5" />
+          </button>
+          <button onClick={() => setIsGiftModalOpen(true)} className="p-2 text-slate-400 hover:text-pink-400 transition-colors mb-0.5" title="Send Gift">
+              <GiftIcon className="w-5 h-5" />
+          </button>
 
-        <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*" />
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*" />
 
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={encryptedAttachments.length > 0 ? encryptedAttachments.length + ' encrypted file(s) attached' : mediaFile ? "Add caption..." : "Type a message..."}
-          className="flex-1 w-full bg-transparent border-none focus:ring-0 resize-none text-slate-200 placeholder-slate-400 max-h-32 min-h-[24px] py-1 px-2 custom-scrollbar"
-          rows={1}
-        />
-        <button onClick={send} className="p-2 bg-cyan-600 text-white rounded-full hover:bg-cyan-700 disabled:bg-slate-600 disabled:text-slate-400 transition-colors mb-0.5" disabled={!text.trim() && !mediaFile && encryptedAttachments.length === 0} aria-label="Send">
-          <PaperAirplaneIcon className="w-5 h-5 transform rotate-90" />
-        </button>
-      </div>
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={encryptedAttachments.length > 0 ? encryptedAttachments.length + ' encrypted file(s) attached' : mediaFile ? "Add caption..." : "Type a message..."}
+            className="flex-1 w-full bg-transparent border-none focus:ring-0 resize-none text-slate-200 placeholder-slate-400 max-h-32 min-h-[24px] py-1 px-2 custom-scrollbar"
+            rows={1}
+          />
+          <button onClick={send} className="p-2 bg-cyan-600 text-white rounded-full hover:bg-cyan-700 disabled:bg-slate-600 disabled:text-slate-400 transition-colors mb-0.5" disabled={!text.trim() && !mediaFile && encryptedAttachments.length === 0} aria-label="Send">
+            <PaperAirplaneIcon className="w-5 h-5 transform rotate-90" />
+          </button>
+        </div>
+      )}
+
       <div className="text-[10px] text-slate-500 mt-1 text-center hidden md:block">
         Enter — send, Shift+Enter — new line
       </div>
@@ -168,7 +210,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
           <GiftSelectorModal onClose={() => setIsGiftModalOpen(false)} onSelect={sendGift} />
       )}
 
-      {/* FileUpload модалка */}
+      {/* FileUpload modal */}
       {showFilePicker && identity && (
           <FileUpload
             onFilesSelected={(encAttachments: EncryptedAttachment[]) => {
