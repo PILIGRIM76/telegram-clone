@@ -19,7 +19,10 @@ db.exec(`
     uid TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    -- v3.11: Presence tracking
+    last_seen INTEGER DEFAULT (unixepoch()),
+    is_online INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS identities (
@@ -46,6 +49,8 @@ db.exec(`
     encrypted_attachments TEXT,
     timestamp TEXT NOT NULL,
     delivered INTEGER DEFAULT 0,
+    -- v3.11: Read receipts - JSON array of {uid, timestamp} objects
+    read_by TEXT DEFAULT '[]',
     -- v3.12: Message editing and deletion
     edited_at INTEGER,
     deleted_at INTEGER,
@@ -494,6 +499,54 @@ function updatePushTokenActivity(token) {
   stmt.run(now, token);
 }
 
+// ===== v3.11: Read Receipts & Typing Indicators =====
+
+// Update user presence (online/offline + last_seen timestamp)
+function updateUserPresence(uid, isOnline) {
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare('UPDATE users SET is_online = ?, last_seen = ? WHERE uid = ?');
+  stmt.run(isOnline ? 1 : 0, now, uid);
+  return true;
+}
+
+// Mark a message as read by a specific user
+function markMessageAsRead(messageId, readerUid) {
+  const message = getMessage(messageId);
+  if (!message) return false;
+
+  let readBy = [];
+  if (message.read_by) {
+    try {
+      readBy = JSON.parse(message.read_by);
+    } catch {
+      readBy = [];
+    }
+  }
+
+  // Check if already read by this user
+  if (readBy.some(r => r.uid === readerUid)) {
+    return true; // Already read
+  }
+
+  readBy.push({ uid: readerUid, timestamp: Math.floor(Date.now() / 1000) });
+
+  const stmt = db.prepare('UPDATE messages SET read_by = ? WHERE id = ?');
+  const result = stmt.run(JSON.stringify(readBy), messageId);
+  return result.changes > 0;
+}
+
+// Get read status for a message
+function getReadStatus(messageId) {
+  const message = getMessage(messageId);
+  if (!message || !message.read_by) return [];
+  
+  try {
+    return JSON.parse(message.read_by);
+  } catch {
+    return [];
+  }
+}
+
 module.exports = {
   db,
   createUser,
@@ -534,4 +587,8 @@ module.exports = {
   removeAllPushTokens,
   cleanupExpiredTokens,
   updatePushTokenActivity,
+  // v3.11: Read Receipts & Typing Indicators
+  updateUserPresence,
+  markMessageAsRead,
+  getReadStatus,
 };

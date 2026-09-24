@@ -819,6 +819,12 @@ app.get('/rewards/:uid', (req, res) => {
   ws.uid = uid;
   wsUsers.set(uid, ws);
   
+  // v3.11: Update presence - user is now online
+  sqlDb.updateUserPresence(uid, true);
+  
+  // Broadcast user online status to their contacts
+  broadcastPresenceUpdate(uid, true);
+  
   // Load user profile from SQLite into cache
   const profile = sqlDb.getUserProfile(uid);
   if (profile) {
@@ -840,7 +846,37 @@ app.get('/rewards/:uid', (req, res) => {
     try {
       const msg = JSON.parse(данные);
       if (msg.type === 'noise') return;
+      
+      // --- v3.11: Typing Indicators ---
+      if (msg.type === 'typing_start' || msg.type === 'typing_stop') {
+        const { chatId } = msg;
+        // Broadcast to chat participants (except sender)
+        broadcastTypingUpdate(chatId, uid, msg.type === 'typing_start');
+        return;
+      }
+      
+      // --- v3.11: Read Receipts ---
+      if (msg.type === 'message_read') {
+        const { messageId } = msg;
+        const readerUid = uid;
+        
+        sqlDb.markMessageAsRead(messageId, readerUid);
+        
+        // Notify sender that message was read
+        const message = sqlDb.getMessage(messageId);
+        if (message) {
+          отправить(message.sender_uid, {
+            type: 'receipt_update',
+            messageId,
+            readerUid,
+            timestamp: Date.now()
+          });
+        }
+        return;
+      }
+      
       if (msg.type === 'read' && msg.messageId) {
+        // Legacy read receipt handler - keep for backward compatibility
         for (const [otherUid, otherUser] of wsUsers) {
           if (otherUid === uid) continue;
           if (otherUser && otherUser.readyState === WebSocket.OPEN) {
@@ -850,6 +886,7 @@ app.get('/rewards/:uid', (req, res) => {
         return;
       }
       if (msg.type === 'typing' && msg.to) {
+        // Legacy typing handler - keep for backward compatibility
         отправить(msg.to, { type: 'typing', from: uid, chatId: msg.to, timestamp: new Date().toISOString() });
         return;
       }
@@ -986,6 +1023,12 @@ app.get('/rewards/:uid', (req, res) => {
   ws.on('close', () => {
     wsUsers.delete(uid);
     console.log('[WS] client disconnected: uid=' + uid);
+    
+    // v3.11: Update presence - user is now offline
+    sqlDb.updateUserPresence(uid, false);
+    
+    // Broadcast user offline status to their contacts
+    broadcastPresenceUpdate(uid, false);
   });
 });
 
@@ -1017,6 +1060,43 @@ function отправить(uidПолучателя, данные) {
       
       // Send push notification (non-blocking, fire-and-forget)
       pushService.sendPushNotification(uidПолучателя, senderName, chatId, messageId);
+    }
+  }
+}
+
+// v3.11: Broadcast typing update to all participants in a chat (except sender)
+function broadcastTypingUpdate(chatId, senderUid, isTyping) {
+  // For direct messages, chatId is the recipient's UID
+  // For group/channel messages, we'd need to track group membership
+  // For now, handle direct messages
+  const recipientUid = chatId;
+  const ws = wsUsers.get(recipientUid);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'typing_update',
+      uid: senderUid,
+      chatId,
+      isTyping
+    }));
+  }
+}
+
+// v3.11: Broadcast presence update to relevant users
+function broadcastPresenceUpdate(uid, isOnline) {
+  // Get user's contacts and notify them of presence change
+  // For simplicity, broadcast to all online users
+  // In production, you'd track contact relationships
+  const presenceMsg = {
+    type: 'presence_update',
+    uid,
+    isOnline,
+    lastSeen: isOnline ? null : Math.floor(Date.now() / 1000)
+  };
+  
+  for (const [otherUid, otherUser] of wsUsers) {
+    if (otherUid === uid) continue;
+    if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+      otherUser.send(JSON.stringify(presenceMsg));
     }
   }
 }

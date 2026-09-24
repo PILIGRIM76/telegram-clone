@@ -1,6 +1,6 @@
 import { logger } from '../services/logger';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { Message, Identity } from '../types';
 import { decryptAESGCM, getPrivateKey, decryptFile } from '../services/cryptoService';
 import type { EncryptedAttachment } from '../types';
@@ -10,6 +10,8 @@ import { VoicePlayer } from './VoicePlayer';
 import { VoiceMessageMetadata } from '../types';
 import { ContextMenu } from './ContextMenu';
 import type { MenuItem } from './ContextMenu';
+import { apiService } from '../services/apiService';
+import { MessageStatus } from './MessageStatus';
 
 interface MessageItemProps {
     message: Message;
@@ -82,6 +84,39 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
     const sentByMe = message.senderId === currentIdentity.uid;
     const isSystem = message.type === 'system';
     const currentUid = currentUserUid || currentIdentity.uid;
+    
+    // v3.11: IntersectionObserver for read receipts
+    const messageRef = useRef<HTMLDivElement>(null);
+    const readReceiptSentRef = useRef<Set<string>>(new Set());
+
+    const handleIntersection = useCallback((entries: IntersectionObserverEntry[]) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !sentByMe && message.id) {
+          // Message is visible and it's an incoming message
+          const receiptKey = message.id;
+          if (!readReceiptSentRef.current.has(receiptKey)) {
+            readReceiptSentRef.current.add(receiptKey);
+            apiService.sendMessageRead(message.id);
+          }
+        }
+      });
+    }, [message.id, sentByMe]);
+
+    useEffect(() => {
+      const observer = new IntersectionObserver(handleIntersection, {
+        root: null, // viewport
+        rootMargin: '50px', // Trigger slightly before message is fully visible
+        threshold: 0.1 // Trigger when 10% visible
+      });
+
+      if (messageRef.current) {
+        observer.observe(messageRef.current);
+      }
+
+      return () => {
+        observer.disconnect();
+      };
+    }, [handleIntersection]);
 
     useEffect(() => {
         if (isSystem) {
@@ -243,6 +278,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
 
     return (
         <div
+            ref={messageRef}
             className={`message ${sentByMe ? 'sent' : 'received'} animate-fade-in ${(message as any).highlighted ? 'bg-yellow-100 animate-pulse' : ''}`}
             onContextMenu={handleContextMenu}
         >
@@ -272,7 +308,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, currentIdentity, onD
                 )}
 
                 <div className="flex items-center justify-end space-x-1 mt-1 select-none">
-                    <MessageStatusIcons message={message} sentByMe={sentByMe} />
+                    <MessageStatus message={message} sentByMe={sentByMe} currentUserUid={currentUid} />
                 </div>
             {contextMenuContent}
             </div>

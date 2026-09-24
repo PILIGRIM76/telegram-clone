@@ -111,10 +111,10 @@ export interface Contact {
   archived?: boolean;
   /** v3.0 Phase 4: E2EE status of contact */
   e2eeStatus?: E2EEStatus;
-  /** Online status */
-  online?: boolean;
-  /** Last seen timestamp */
-  lastSeen?: string;
+  /** v3.11: Online status (true if connected via WebSocket) */
+  isOnline?: boolean;
+  /** v3.11: Last seen timestamp (unix seconds) */
+  lastSeen?: number;
 }
 
 export interface Group {
@@ -189,6 +189,10 @@ export interface Message {
   isEdited?: boolean;
   /** Флаг: сообщение удалено (для текущего пользователя) */
   isDeleted?: boolean;
+
+  // v3.11: Read Receipts
+  /** Массив объектов {uid, timestamp} для отслеживания кто прочитал */
+  readBy?: { uid: string; timestamp: number }[];
 }
 
 /**

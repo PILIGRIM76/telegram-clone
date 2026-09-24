@@ -1,4 +1,4 @@
-import { logger } from './logger';
+﻿import { logger } from './logger';
 import type { Message, Store, Group, NoticeBoard } from '../types';
 import { encryptMessage, decryptMessage } from '../crypto/encryption';
 import * as nacl from 'tweetnacl';
@@ -34,6 +34,9 @@ class ApiService {
   private closeListeners: (() => void)[] = [];
   private errorListeners: ((error: any) => void)[] = [];
   private typingListeners: ((chatId: string) => void)[] = [];
+  private typingUpdateListeners: ((data: { uid: string; chatId: string; isTyping: boolean }) => void)[] = [];
+  private presenceUpdateListeners: ((data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void)[] = [];
+  private receiptUpdateListeners: ((data: { messageId: string; readerUid: string; timestamp: number }) => void)[] = [];
   // Phase 2: TrafficPadder для отправки шумовых пакетов каждые 30-60 секунд.
   private trafficPadder: TrafficPadder = new TrafficPadder();
 
@@ -280,6 +283,24 @@ class ApiService {
         return;
       }
 
+      // v3.11: Handle typing indicator updates
+      if (data.type === 'typing_update') {
+        this.typingUpdateListeners.forEach(cb => cb(data));
+        return;
+      }
+
+      // v3.11: Handle presence updates
+      if (data.type === 'presence_update') {
+        this.presenceUpdateListeners.forEach(cb => cb(data));
+        return;
+      }
+
+      // v3.11: Handle receipt updates (read receipts)
+      if (data.type === 'receipt_update') {
+        this.receiptUpdateListeners.forEach(cb => cb(data));
+        return;
+      }
+
       // Phase 3: Dumb Server — обработка ошибки recipient_offline.
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
@@ -493,17 +514,76 @@ class ApiService {
   onClose(cb: () => void) { this.closeListeners.push(cb); }
   onError(cb: (error: any) => void) { this.errorListeners.push(cb); }
 
-  // Подписка на события "печитает"
+  // Get current user UID
+  getCurrentUid(): string | undefined {
+    return localStorage.getItem('piligrim-uid') || localStorage.getItem('cipherlink-uid') || undefined;
+  }
+
+  // Подписка на события "печитает" (legacy - chatId only)
   onTypingEvent(callback: (chatId: string) => void): void {
     this.typingListeners.push(callback);
   }
 
-  // Отправка события "печитает"
-  sendTypingEvent(chatId: string): void {
+  // v3.11: Подписка на обновления статуса печати (новый формат)
+  onTypingUpdate(callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void): void {
+    this.typingUpdateListeners.push(callback);
+  }
+
+  offTypingUpdate(callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void): void {
+    this.typingUpdateListeners = this.typingUpdateListeners.filter(l => l !== callback);
+  }
+
+  // v3.11: Отправка события "начал печать"
+  sendTypingStart(chatId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({
-        type: 'typing',
+        type: 'typing_start',
         chatId,
+        timestamp: Date.now()
+      }));
+    }
+  }
+
+  // v3.11: Отправка события "перестал печатать"
+  sendTypingStop(chatId: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'typing_stop',
+        chatId,
+        timestamp: Date.now()
+      }));
+    }
+  }
+
+  // Отправка события "печитает" (legacy)
+  sendTypingEvent(chatId: string): void {
+    this.sendTypingStart(chatId);
+  }
+
+  // v3.11: Presence updates
+  onPresenceUpdate(callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void): void {
+    this.presenceUpdateListeners.push(callback);
+  }
+
+  offPresenceUpdate(callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void): void {
+    this.presenceUpdateListeners = this.presenceUpdateListeners.filter(l => l !== callback);
+  }
+
+  // v3.11: Receipt updates (read receipts)
+  onReceiptUpdate(callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void): void {
+    this.receiptUpdateListeners.push(callback);
+  }
+
+  offReceiptUpdate(callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void): void {
+    this.receiptUpdateListeners = this.receiptUpdateListeners.filter(l => l !== callback);
+  }
+
+  // v3.11: Send message read receipt
+  sendMessageRead(messageId: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: "message_read",
+        messageId,
         timestamp: Date.now()
       }));
     }
@@ -615,3 +695,4 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+

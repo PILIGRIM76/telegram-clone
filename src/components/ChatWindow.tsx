@@ -5,11 +5,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Message, Contact } from '../types';
 import { useImagePicker } from '../hooks/useImagePicker';
+import { useTypingIndicator } from '../hooks/useTypingIndicator';
 import { AttachmentSheet } from './AttachmentSheet';
 import { ContextMenu } from './ContextMenu';
 import AnimatedAvatar from './AnimatedAvatar';
 import { EncryptionBadge, type EncryptionType } from './EncryptionBadge';
 import { logger } from '../services/logger';
+import { apiService } from '../services/apiService';
 import { List, ListImperativeAPI } from 'react-window';
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 import MessageItem from './MessageItem';
@@ -19,7 +21,8 @@ interface ChatWindowProps {
   chatId: string;
   messages: Message[];
   onSendMessage: (text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string) => void;
-  partner?: Contact | { name: string };
+  // v3.11: Partner type extended with presence info
+  partner?: (Contact | { name: string }) & { isOnline?: boolean; lastSeen?: number; uid?: string };
   currentUserUid?: string;
   onBack?: () => void;
   onStartCall?: () => void;
@@ -33,6 +36,20 @@ interface ChatWindowProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
 }
+
+// v3.11: Format last seen timestamp
+const formatLastSeen = (timestamp: number): string => {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - timestamp;
+  
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин. назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч. назад`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} дн. назад`;
+  
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+};
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
   chatId,
@@ -58,6 +75,40 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [ctx, setCtx] = useState<{ x: number; y: number; messageId: string } | null>(null);
   const [editModalMessage, setEditModalMessage] = useState<Message | null>(null);
+  
+  // v3.11: Typing indicator
+  const { isTyping, onInputChange, onMessageSent } = useTypingIndicator(chatId);
+
+  // v3.11: Partner presence state
+  const [partnerIsOnline, setPartnerIsOnline] = useState(partner?.isOnline ?? false);
+  const [partnerLastSeen, setPartnerLastSeen] = useState(partner?.lastSeen);
+
+  // v3.11: Listen for presence updates
+  useEffect(() => {
+    const handlePresenceUpdate = (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => {
+      if (data.uid === partner?.uid) {
+        setPartnerIsOnline(data.isOnline);
+        if (data.lastSeen) {
+          setPartnerLastSeen(data.lastSeen);
+        }
+      }
+    };
+
+    const handleReceiptUpdate = (data: { messageId: string; readerUid: string; timestamp: number }) => {
+      // The message status will be updated via the readBy array in the message object
+      // which gets updated when the message is re-rendered
+      // We could trigger a re-render here if needed
+    };
+
+    apiService.onPresenceUpdate(handlePresenceUpdate);
+    apiService.onReceiptUpdate(handleReceiptUpdate);
+
+    return () => {
+      apiService.offPresenceUpdate(handlePresenceUpdate);
+      apiService.offReceiptUpdate(handleReceiptUpdate);
+    };
+  }, [partner?.uid]);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<ListImperativeAPI>(null);
   const { inputRef: fileInputRef, pendingImages, openPicker, handleFiles, removeImage, clearImages } = useImagePicker();
@@ -79,12 +130,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       setEditingId(null);
     } else {
       onSendMessage(trimmed, atts, replyTo?.id);
+      // v3.11: Stop typing indicator immediately on send
+      onMessageSent();
     }
     clearImages();
     setDraft('');
     setReplyTo(null);
     inputRef.current?.focus();
-  }, [draft, chatId, onSendMessage, onEditMessage, editingId, replyTo, pendingImages]);
+  }, [draft, chatId, onSendMessage, onEditMessage, editingId, replyTo, pendingImages, onMessageSent]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -216,6 +269,18 @@ const handleEditMessage = useCallback((messageId: string, newText: string) => {
             {partnerName}
             <EncryptionBadge encryptionType={encryptionType} />
           </div>
+          {/* v3.11: Typing indicator or last seen status */}
+          <div style={{ minHeight: 20 }}>
+            {isTyping ? (
+              <span style={{ color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+                печатает...
+              </span>
+            ) : (!partnerIsOnline && partnerLastSeen ? (
+              <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                был(а) в сети {formatLastSeen(partnerLastSeen)}
+              </span>
+            ) : null)}
+          </div>
           {callState === 'in-call' && (
             <span style={{ color: 'var(--color-success)', fontSize: 'var(--font-size-sm)' }}>🟢 В звонке</span>
           )}
@@ -336,7 +401,11 @@ const handleEditMessage = useCallback((messageId: string, newText: string) => {
             ref={inputRef}
             type="text"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              // v3.11: Trigger typing indicator
+              onInputChange();
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Введите сообщение..."
             aria-label="Поле ввода сообщения"
