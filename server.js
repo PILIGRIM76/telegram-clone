@@ -13,6 +13,9 @@ const { db, STORAGE_TYPE } = require('./db/index.js');
 const sqlDb = require('./server/databaseService.js');
 const authService = require('./server/authService.js');
 
+// v3.13: Push Notifications (FCM)
+const pushService = require('./server/pushService.js');
+
 // In-memory maps for WS routing only (data persisted in SQLite)
 const wsUsers = new Map(); // uid -> ws reference
 
@@ -324,6 +327,45 @@ app.post('/api/refresh', async (req, res) => {
   }
 });
 
+// v3.13: Register FCM push token for a user
+app.post('/api/push/register-token', async (req, res) => {
+  try {
+    const { uid, token, platform } = req.body;
+    if (!uid || !token) {
+      return res.status(400).json({ error: 'uid and token are required' });
+    }
+    // Validate the token format (basic check for FCM token)
+    if (typeof token !== 'string' || token.length < 100) {
+      return res.status(400).json({ error: 'Invalid token format' });
+    }
+    const user = sqlDb.getUserByUid(uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    sqlDb.savePushToken(uid, token, platform || 'web');
+    console.log(`[Push] Token registered for user ${uid} (${platform || 'web'})`);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[Push] Register token error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// v3.13: Unregister FCM push token
+app.post('/api/push/unregister-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'token is required' });
+    }
+    sqlDb.removePushToken(token);
+    console.log('[Push] Token unregistered');
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[Push] Unregister token error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.get('/key/:uid', (req, res) => {
   const { uid } = req.params;
@@ -814,7 +856,11 @@ app.get('/rewards/:uid', (req, res) => {
       if (msg.type === 'message' || msg.type === 'text') {
         const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
         const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
-        sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
+        // Save message and get the message ID
+        const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
+        // Attach messageId to outgoing message for receipts
+        исходящее.id = messageId;
+        
         if (channelId) {
           const канал = каналы.get(channelId);
           if (канал) {
@@ -957,6 +1003,21 @@ function отправить(uidПолучателя, данные) {
     }
     sqlDb.saveOfflineMessage({ senderUid: данные.from, receiverUid: uidПолучателя, content: typeof данные.content === 'string' ? данные.content : JSON.stringify(данные), encryptedAttachments: данные.encryptedAttachments || [] });
     console.log('[OFFLINE] recipient ' + uidПолучателя + ' not connected, queued in SQLite');
+
+    // v3.13: Send push notification for offline user
+    // Only for direct messages (not group/channel), and only if we have a message ID
+    if (senderUid && данные.id && !данные.groupId && !данные.channelId) {
+      // Get sender's username for push title
+      const sender = sqlDb.getUserByUid(senderUid);
+      const senderName = sender ? sender.username : 'Unknown';
+      
+      // chatId for direct messages is the other user's UID
+      const chatId = senderUid; // or uidПолучателя, both work for navigation
+      const messageId = данные.id;
+      
+      // Send push notification (non-blocking, fire-and-forget)
+      pushService.sendPushNotification(uidПолучателя, senderName, chatId, messageId);
+    }
   }
 }
 

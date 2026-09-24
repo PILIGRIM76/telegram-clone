@@ -564,6 +564,54 @@ class ApiService {
       this.callListeners[event].forEach(cb => cb(data));
     }
   }
+
+  // ============= Push Notifications (FCM) ============
+
+  /** Register FCM push token with the server */
+  async registerPushToken(token: string, platform: 'web' | 'android' | 'ios' = 'web'): Promise<boolean> {
+    try {
+      // Get current user UID from localStorage or session
+      const uid = localStorage.getItem('piligrim-uid') || localStorage.getItem('cipherlink-uid');
+      if (!uid) {
+        logger.warn('[API] registerPushToken: no uid found');
+        return false;
+      }
+      const response = await fetch(API_URL + '/api/push/register-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, token, platform }),
+      });
+      if (!response.ok) {
+        logger.warn('[API] registerPushToken failed:', response.status);
+        return false;
+      }
+      logger.info('[API] Push token registered successfully');
+      return true;
+    } catch (e) {
+      logger.error('[API] registerPushToken error:', e);
+      return false;
+    }
+  }
+
+  /** Unregister FCM push token from the server */
+  async unregisterPushToken(token: string): Promise<boolean> {
+    try {
+      const response = await fetch(API_URL + '/api/push/unregister-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) {
+        logger.warn('[API] unregisterPushToken failed:', response.status);
+        return false;
+      }
+      logger.info('[API] Push token unregistered');
+      return true;
+    } catch (e) {
+      logger.error('[API] unregisterPushToken error:', e);
+      return false;
+    }
+  }
 }
 
 export const apiService = new ApiService();

@@ -97,6 +97,19 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_user_profiles_uid ON user_profiles(uid);
+
+  -- v3.13: Push notifications (FCM) - device tokens storage
+  CREATE TABLE IF NOT EXISTS push_tokens (
+    id TEXT PRIMARY KEY,
+    user_uid TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    platform TEXT, -- 'web', 'android', 'ios'
+    last_active INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_push_tokens_uid ON push_tokens(user_uid);
+  CREATE INDEX IF NOT EXISTS idx_push_tokens_token ON push_tokens(token);
 `);
 
 // Insert a new user (uid, username, password_hash)
@@ -425,6 +438,62 @@ function isMessageDeletedForUser(messageId, uid) {
   }
 }
 
+// ===== v3.13: Push Notifications (FCM) =====
+
+// Save or update a push token for a user
+function savePushToken(userUid, token, platform = 'web') {
+  const crypto = require('crypto');
+  const id = crypto.randomBytes(16).toString('hex');
+  const now = Math.floor(Date.now() / 1000);
+  
+  const stmt = db.prepare(`
+    INSERT INTO push_tokens (id, user_uid, token, platform, last_active)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(token) DO UPDATE SET
+      user_uid = excluded.user_uid,
+      platform = excluded.platform,
+      last_active = excluded.last_active
+  `);
+  stmt.run(id, userUid, token, platform, now);
+  return true;
+}
+
+// Get all push tokens for a user
+function getPushTokens(userUid) {
+  return db.prepare(
+    'SELECT id, user_uid, token, platform, last_active FROM push_tokens WHERE user_uid = ?'
+  ).all(userUid);
+}
+
+// Remove a specific push token
+function removePushToken(token) {
+  const stmt = db.prepare('DELETE FROM push_tokens WHERE token = ?');
+  const result = stmt.run(token);
+  return result.changes > 0;
+}
+
+// Remove all push tokens for a user
+function removeAllPushTokens(userUid) {
+  const stmt = db.prepare('DELETE FROM push_tokens WHERE user_uid = ?');
+  const result = stmt.run(userUid);
+  return result.changes > 0;
+}
+
+// Clean up expired tokens (older than specified days)
+function cleanupExpiredTokens(days = 30) {
+  const cutoff = Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60);
+  const stmt = db.prepare('DELETE FROM push_tokens WHERE last_active < ?');
+  const result = stmt.run(cutoff);
+  return result.changes;
+}
+
+// Update last_active timestamp for a token
+function updatePushTokenActivity(token) {
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare('UPDATE push_tokens SET last_active = ? WHERE token = ?');
+  stmt.run(now, token);
+}
+
 module.exports = {
   db,
   createUser,
@@ -458,4 +527,11 @@ module.exports = {
   deleteMessage,
   getMessageHistory,
   isMessageDeletedForUser,
+  // v3.13: Push Notifications (FCM)
+  savePushToken,
+  getPushTokens,
+  removePushToken,
+  removeAllPushTokens,
+  cleanupExpiredTokens,
+  updatePushTokenActivity,
 };
