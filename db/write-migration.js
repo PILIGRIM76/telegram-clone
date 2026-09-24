@@ -1,38 +1,62 @@
 const fs = require('fs');
-const content = \#!/usr/bin/env node
+
+const content = `#!/usr/bin/env node
 const { MemoryStorage } = require('./index.js');
 const { SQLiteStorage } = require('./sqlite.new.js');
+const path = require('path');
 
-async function ìèãðèðîâàòü() {
-    console.log('[MIGRATE] Starting...');
-    const memoryDb = new MemoryStorage();
-    const sqliteDb = new SQLiteStorage('./data/cipherlink.db');
+async function migrateData() {
+    console.log('[MIGRATE] Starting migration from Memory to SQLite...');
     
-    await sqliteDb.ïîäêëþ÷èòüñÿ();
+    const memoryDb = new MemoryStorage();
+    const dbPath = path.resolve(__dirname, 'data', 'cipherlink.db');
+    console.log('[MIGRATE] Database path:', dbPath);
+    const sqliteDb = new SQLiteStorage(dbPath);
+    
+    await sqliteDb.Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒÑÑ();
     
     let migratedUsers = 0, migratedGroups = 0, migratedMessages = 0, migratedOffline = 0;
     
-    const users = await memoryDb.ïîëó÷èòüÂñåÏîëüçîâàòåëè();
-    for (const u of users) { await sqliteDb.ñîçäàòüÏîëüçîâàòåëÿ(u); migratedUsers++; }
-    
-    const groups = await memoryDb.ïîëó÷èòüÂñåÃðóïïû();
-    for (const g of groups) { await sqliteDb.ñîçäàòüÃðóïïó(g); migratedGroups++; }
-    
-    const messages = Array.from(memoryDb._ñîîáùåíèÿ.values());
-    for (const m of messages) { await sqliteDb.ñîõðàíèòüÑîîáùåíèå(m); migratedMessages++; }
-    
-    for (const [uid, msgs] of memoryDb._îôëàéíÑîîáùåíèÿ.entries()) {
-        for (const m of msgs) { await sqliteDb.äîáàâèòüÎôëàéíÑîîáùåíèå(uid, m); migratedOffline++; }
+    const users = await memoryDb.Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒÐ’ÑÐµÐŸÐ¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ð¸();
+    for (const u of users) { 
+        await sqliteDb.ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒÐŸÐ¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ(u); 
+        migratedUsers++; 
     }
+    console.log('[MIGRATE] Users migrated: ' + migratedUsers);
     
-    console.log('[MIGRATE] Users: ' + migratedUsers + ', Groups: ' + migratedGroups + ', Messages: ' + migratedMessages + ', Offline: ' + migratedOffline);
+    const groups = await memoryDb.Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒÐ’ÑÐµÐ“Ñ€ÑƒÐ¿Ð¿Ñ‹();
+    for (const g of groups) { 
+        await sqliteDb.ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒÐ“Ñ€ÑƒÐ¿Ð¿Ñƒ(g); 
+        migratedGroups++; 
+    }
+    console.log('[MIGRATE] Groups migrated: ' + migratedGroups);
     
-    await memoryDb.î÷èñòèòüÂñå();
-    await sqliteDb.îòêëþ÷èòüñÿ();
+    const messages = Array.from(memoryDb._ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ.values());
+    for (const m of messages) { 
+        await sqliteDb.ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒÐ¡Ð¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ(m); 
+        migratedMessages++; 
+    }
+    console.log('[MIGRATE] Messages migrated: ' + migratedMessages);
+    
+    for (const [uid, msgs] of memoryDb._Ð¾Ñ„Ð»Ð°Ð¹Ð½Ð¡Ð¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ.entries()) {
+        for (const m of msgs) { 
+            await sqliteDb.Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒÐžÑ„Ð»Ð°Ð¹Ð½Ð¡Ð¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ(uid, m); 
+            migratedOffline++; 
+        }
+    }
+    console.log('[MIGRATE] Offline messages migrated: ' + migratedOffline);
+    
+    console.log('[MIGRATE] \u2705 Migration completed successfully!');
+    
+    await memoryDb.Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒÑÑ?.();
+    await sqliteDb.Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒÑÑ();
 }
 
-ìèãðèðîâàòü().catch(e => { console.error(e); process.exit(1); });
-\;
+migrateData().catch(e => { 
+    console.error('Fatal migration error:', e); 
+    process.exit(1); 
+});
+`;
+
 fs.writeFileSync('F:/AntiPiry/db/MigrateMemoryToSQLite.js', content);
 console.log('Migration script created!');
-

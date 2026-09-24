@@ -1,4 +1,9 @@
-#!/usr/bin/env node
+import os
+
+with open('F:/AntiPiry/db/write-migration.js', 'w', encoding='utf-8') as f:
+    f.write(r'''const fs = require('fs');
+
+const content = `#!/usr/bin/env node
 const { MemoryStorage } = require('./index.js');
 const { SQLiteStorage } = require('./sqlite.new.js');
 const path = require('path');
@@ -44,7 +49,7 @@ async function migrateData() {
     }
     console.log('[MIGRATE] Offline messages migrated: ' + migratedOffline);
     
-    console.log('[MIGRATE] ✅ Migration completed successfully!');
+    console.log('[MIGRATE] \u2705 Migration completed successfully!');
     
     await memoryDb.отключиться?.();
     await sqliteDb.отключиться();
@@ -54,3 +59,10 @@ migrateData().catch(e => {
     console.error('Fatal migration error:', e); 
     process.exit(1); 
 });
+`;
+
+fs.writeFileSync('F:/AntiPiry/db/MigrateMemoryToSQLite.js', content);
+console.log('Migration script created!');
+''')
+
+print('write-migration.js fixed!')
