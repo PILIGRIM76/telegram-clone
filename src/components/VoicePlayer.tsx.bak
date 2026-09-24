@@ -1,0 +1,1 @@
+import React, { useState, useEffect, useRef, useCallback } from " "react\;\nimport { voiceService } from \../services/voiceService\;\nimport { VoiceMessageMetadata, DecryptedVoiceMessage } from \../types\;\n\ninterface VoicePlayerProps {\n  encryptedBlob: Blob;\n  metadata: VoiceMessageMetadata;\n  privateKeyHex: string;\n  isOwn: boolean;\n}\n\n

@@ -1,0 +1,9 @@
+﻿fix(db): add migration scripts for MemoryStorage to SQLite
+
+- write-migration.js: generator script that creates migration script
+- MigrateMemoryToSQLite.js: actual migration script with proper Russian method names
+- fix_write_migration.py: helper script to fix write-migration.js
+
+All scripts use correct Russian method names matching both storage classes:
+подключиться(), создатьПользователя(), создатьГруппу(), сохранитьСообщение(),
+добавитьОфлайнСообщение(), отключиться()
