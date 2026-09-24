@@ -187,6 +187,102 @@ class ApiService {
     return response.json();
   }
 
+  // === v3.14: Group Admin Tools ===
+  
+  async kickGroupMember(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/kick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid }),
+    });
+    if (!response.ok) throw new Error('Kick failed');
+  }
+
+  async banGroupMember(groupId: string, actorUid: string, targetUid: string, reason?: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/ban', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid, reason }),
+    });
+    if (!response.ok) throw new Error('Ban failed');
+  }
+
+  async unbanGroupMember(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/unban', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid }),
+    });
+    if (!response.ok) throw new Error('Unban failed');
+  }
+
+  async promoteGroupMember(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/promote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid }),
+    });
+    if (!response.ok) throw new Error('Promote failed');
+  }
+
+  async demoteGroupMember(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/demote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid }),
+    });
+    if (!response.ok) throw new Error('Demote failed');
+  }
+
+  async transferGroupOwnership(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/transfer-ownership', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupId, actorUid, targetUid }),
+    });
+    if (!response.ok) throw new Error('Transfer ownership failed');
+  }
+
+  async deleteGroup(groupId: string, actorUid: string): Promise<void> {
+    const response = await fetch(API_URL + '/groups/' + groupId, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actorUid }),
+    });
+    if (!response.ok) throw new Error('Delete group failed');
+  }
+
+  async getGroupAuditLog(groupId: string, actorUid: string, limit?: number, offset?: number): Promise<any> {
+    const params = new URLSearchParams({ actorUid });
+    if (limit) params.append('limit', limit.toString());
+    if (offset) params.append('offset', offset.toString());
+    const response = await fetch(API_URL + '/groups/' + groupId + '/audit-log?' + params.toString());
+    if (!response.ok) throw new Error('Get audit log failed');
+    return response.json();
+  }
+
+  async getGroupMembers(groupId: string, actorUid: string): Promise<any> {
+    const response = await fetch(API_URL + '/groups/' + groupId + '/members?actorUid=' + actorUid);
+    if (!response.ok) throw new Error('Get members failed');
+    return response.json();
+  }
+
+  async getGroupSettings(groupId: string, actorUid: string): Promise<any> {
+    const response = await fetch(API_URL + '/groups/' + groupId + '/settings?actorUid=' + actorUid);
+    if (!response.ok) throw new Error('Get settings failed');
+    return response.json();
+  }
+
+  async updateGroupSettings(groupId: string, actorUid: string, settings: { members_only?: boolean; admins_only?: boolean }): Promise<any> {
+    const response = await fetch(API_URL + '/groups/' + groupId + '/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actorUid, settings }),
+    });
+    if (!response.ok) throw new Error('Update settings failed');
+    return response.json();
+  }
+
   async updateBoard(boardId: string, data: any): Promise<void> {
     const response = await fetch(API_URL + '/boards/' + boardId, {
       method: 'PUT',

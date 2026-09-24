@@ -508,7 +508,193 @@ app.post('/groups/join', (req, res) => {
 
     // Возвращаем группу БЕЗ encryptedMembers (opaque blob, клиент его уже имеет).
     const { encryptedMembers: _omit, ...safeGroup } = группа;
+    // v3.14: Add member to group_members table
+    sqlDb.addGroupMember(группа.id, uid, 'member');
     res.json({ group: safeGroup });
+});
+
+// ===== v3.14: Group Admin Tools REST API =====
+
+// Kick member from group
+app.post('/groups/kick', (req, res) => {
+    const { groupId, actorUid, targetUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Недостаточно прав' });
+    }
+    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+    if (targetRole === 'owner') {
+        return res.status(403).json({ error: 'Нельзя кикнуть владельца' });
+    }
+    sqlDb.removeGroupMember(groupId, targetUid);
+    sqlDb.logGroupAction(groupId, actorUid, 'kick', targetUid, {});
+    res.json({ ok: true });
+});
+
+// Ban user from group
+app.post('/groups/ban', (req, res) => {
+    const { groupId, actorUid, targetUid, reason } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Недостаточно прав' });
+    }
+    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+    if (targetRole === 'owner') {
+        return res.status(403).json({ error: 'Нельзя забанить владельца' });
+    }
+    sqlDb.banUser(groupId, targetUid, actorUid, reason || '');
+    sqlDb.logGroupAction(groupId, actorUid, 'ban', targetUid, { reason: reason || '' });
+    res.json({ ok: true });
+});
+
+// Unban user from group
+app.post('/groups/unban', (req, res) => {
+    const { groupId, actorUid, targetUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Недостаточно прав' });
+    }
+    sqlDb.unbanUser(groupId, targetUid);
+    sqlDb.logGroupAction(groupId, actorUid, 'unban', targetUid, {});
+    res.json({ ok: true });
+});
+
+// Promote member to admin
+app.post('/groups/promote', (req, res) => {
+    const { groupId, actorUid, targetUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (actorRole !== 'owner') {
+        return res.status(403).json({ error: 'Только владелец может повышать' });
+    }
+    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+    if (targetRole !== 'member') {
+        return res.status(400).json({ error: 'Можно повысить только участника' });
+    }
+    sqlDb.promoteToAdmin(groupId, targetUid);
+    sqlDb.logGroupAction(groupId, actorUid, 'promote', targetUid, {});
+    res.json({ ok: true });
+});
+
+// Demote admin to member
+app.post('/groups/demote', (req, res) => {
+    const { groupId, actorUid, targetUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (actorRole !== 'owner') {
+        return res.status(403).json({ error: 'Только владелец может понижать' });
+    }
+    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+    if (targetRole !== 'admin') {
+        return res.status(400).json({ error: 'Можно понизить только админа' });
+    }
+    sqlDb.demoteToMember(groupId, targetUid);
+    sqlDb.logGroupAction(groupId, actorUid, 'demote', targetUid, {});
+    res.json({ ok: true });
+});
+
+// Transfer ownership
+app.post('/groups/transfer-ownership', (req, res) => {
+    const { groupId, actorUid, targetUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (actorRole !== 'owner') {
+        return res.status(403).json({ error: 'Только владелец может передать владение' });
+    }
+    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+    if (targetRole !== 'admin' && targetRole !== 'member') {
+        return res.status(400).json({ error: 'Можно передать только админу или участнику' });
+    }
+    sqlDb.transferOwnership(groupId, targetUid);
+    sqlDb.logGroupAction(groupId, actorUid, 'transfer_ownership', targetUid, {});
+    res.json({ ok: true });
+});
+
+// Delete group
+app.delete('/groups/:groupId', (req, res) => {
+    const { groupId } = req.params;
+    const { actorUid } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (actorRole !== 'owner') {
+        return res.status(403).json({ error: 'Только владелец может удалить группу' });
+    }
+    sqlDb.logGroupAction(groupId, actorUid, 'delete_group', null, {});
+    группы.delete(groupId);
+    const members = sqlDb.getGroupMembers(groupId);
+    for (const member of members) {
+        sqlDb.removeGroupMember(groupId, member.user_uid);
+    }
+    res.json({ ok: true });
+});
+
+// Get group audit log
+app.get('/groups/:groupId/audit-log', (req, res) => {
+    const { groupId } = req.params;
+    const { actorUid, limit, offset } = req.query;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Недостаточно прав' });
+    }
+    const logs = sqlDb.getGroupAuditLog(groupId, parseInt(limit) || 100, parseInt(offset) || 0);
+    res.json({ logs });
+});
+
+// Get group members
+app.get('/groups/:groupId/members', (req, res) => {
+    const { groupId } = req.params;
+    const { actorUid } = req.query;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin', 'member'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Вы не участник этой группы' });
+    }
+    const members = sqlDb.getGroupMembers(groupId);
+    const bannedUsers = sqlDb.getBannedUsers(groupId);
+    res.json({ members, bannedUsers });
+});
+
+// Get group settings
+app.get('/groups/:groupId/settings', (req, res) => {
+    const { groupId } = req.params;
+    const { actorUid } = req.query;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin', 'member'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Вы не участник этой группы' });
+    }
+    const settings = sqlDb.getGroupSettings(groupId);
+    res.json({ settings });
+});
+
+// Update group settings
+app.put('/groups/:groupId/settings', (req, res) => {
+    const { groupId } = req.params;
+    const { actorUid, settings } = req.body;
+    const group = группы.get(groupId);
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+    if (!['owner', 'admin'].includes(actorRole)) {
+        return res.status(403).json({ error: 'Недостаточно прав' });
+    }
+    sqlDb.updateGroupSettings(groupId, actorUid, settings);
+    sqlDb.logGroupAction(groupId, actorUid, 'update_settings', null, settings);
+    const updatedSettings = sqlDb.getGroupSettings(groupId);
+    res.json({ settings: updatedSettings });
 });
 
 // 4. ДОСКИ ОБЪЯВЛЕНИЙ
@@ -1016,6 +1202,196 @@ app.get('/rewards/:uid', (req, res) => {
         }
         // Also send back to sender for confirmation
         ws.send(broadcastMsg);
+// --- v3.14: Group Admin Tools ---
+
+      // Helper: Check group permission
+      function checkGroupPermission(groupId, actorUid, allowedRoles) {
+        const role = sqlDb.getGroupMemberRole(groupId, actorUid);
+        return allowedRoles.includes(role);
+      }
+      
+      // Helper: Broadcast to all group members
+      function broadcastToGroup(groupId, message) {
+        const members = sqlDb.getGroupMembers(groupId);
+        for (const member of members) {
+          const memberWs = wsUsers.get(member.user_uid);
+          if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+            memberWs.send(JSON.stringify(message));
+          }
+        }
+      }
+      
+      // Kick member from group (owner or admin)
+      if (msg.type === 'group_kick') {
+        const { groupId, targetUid } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для кика' }));
+          return;
+        }
+        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+        if (targetRole === 'owner') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Нельзя кикнуть владельца группы' }));
+          return;
+        }
+        sqlDb.removeGroupMember(groupId, targetUid);
+        sqlDb.logGroupAction(groupId, uid, 'kick', targetUid, {});
+        broadcastToGroup(groupId, { type: 'group_member_kicked', groupId, targetUid, kickedBy: uid });
+        return;
+      }
+      
+      // Ban user from group (owner or admin)
+      if (msg.type === 'group_ban') {
+        const { groupId, targetUid, reason } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для бана' }));
+          return;
+        }
+        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+        if (targetRole === 'owner') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Нельзя забанить владельца группы' }));
+          return;
+        }
+        sqlDb.banUser(groupId, targetUid, uid, reason || '');
+        sqlDb.logGroupAction(groupId, uid, 'ban', targetUid, { reason: reason || '' });
+        broadcastToGroup(groupId, { type: 'group_member_banned', groupId, targetUid, bannedBy: uid, reason: reason || '' });
+        return;
+      }
+      
+      // Unban user from group (owner or admin)
+      if (msg.type === 'group_unban') {
+        const { groupId, targetUid } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для разбана' }));
+          return;
+        }
+        sqlDb.unbanUser(groupId, targetUid);
+        sqlDb.logGroupAction(groupId, uid, 'unban', targetUid, {});
+        broadcastToGroup(groupId, { type: 'group_member_unbanned', groupId, targetUid, unbannedBy: uid });
+        return;
+      }
+      
+      // Promote member to admin (owner only)
+      if (msg.type === 'group_promote') {
+        const { groupId, targetUid } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может повышать до админа' }));
+          return;
+        }
+        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+        if (targetRole !== 'member') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Можно повысить только участника' }));
+          return;
+        }
+        sqlDb.promoteToAdmin(groupId, targetUid);
+        sqlDb.logGroupAction(groupId, uid, 'promote', targetUid, {});
+        broadcastToGroup(groupId, { type: 'group_member_promoted', groupId, targetUid, promotedBy: uid, newRole: 'admin' });
+        return;
+      }
+      
+      // Demote admin to member (owner only)
+      if (msg.type === 'group_demote') {
+        const { groupId, targetUid } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может понижать админов' }));
+          return;
+        }
+        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+        if (targetRole !== 'admin') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Можно понизить только админа' }));
+          return;
+        }
+        sqlDb.demoteToMember(groupId, targetUid);
+        sqlDb.logGroupAction(groupId, uid, 'demote', targetUid, {});
+        broadcastToGroup(groupId, { type: 'group_member_demoted', groupId, targetUid, demotedBy: uid, newRole: 'member' });
+        return;
+      }
+      
+      // Transfer ownership (owner only)
+      if (msg.type === 'group_transfer_ownership') {
+        const { groupId, targetUid } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может передать владение' }));
+          return;
+        }
+        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+        if (targetRole !== 'admin' and targetRole !== 'member') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Можно передать владение только админу или участнику' }));
+          return;
+        }
+        sqlDb.transferOwnership(groupId, targetUid);
+        sqlDb.logGroupAction(groupId, uid, 'transfer_ownership', targetUid, {});
+        broadcastToGroup(groupId, { type: 'group_ownership_transferred', groupId, newOwnerUid: targetUid, oldOwnerUid: uid });
+        return;
+      }
+      
+      // Delete group (owner only)
+      if (msg.type === 'group_delete') {
+        const { groupId } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может удалить группу' }));
+          return;
+        }
+        sqlDb.logGroupAction(groupId, uid, 'delete_group', null, {});
+        broadcastToGroup(groupId, { type: 'group_deleted', groupId, deletedBy: uid });
+        // Remove from memory
+        группы.delete(groupId);
+        // Remove all members from DB
+        const members = sqlDb.getGroupMembers(groupId);
+        for (const member of members) {
+          sqlDb.removeGroupMember(groupId, member.user_uid);
+        }
+        return;
+      }
+      
+      // Get group audit log (owner or admin)
+      if (msg.type === 'group_audit_log_request') {
+        const { groupId, limit, offset } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для просмотра лога' }));
+          return;
+        }
+        const logs = sqlDb.getGroupAuditLog(groupId, limit || 100, offset || 0);
+        ws.send(JSON.stringify({ type: 'group_audit_log_response', groupId, logs }));
+        return;
+      }
+      
+      // Get group members with roles (any member)
+      if (msg.type === 'group_members_request') {
+        const { groupId } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
+          return;
+        }
+        const members = sqlDb.getGroupMembers(groupId);
+        const bannedUsers = sqlDb.getBannedUsers(groupId);
+        ws.send(JSON.stringify({ type: 'group_members_response', groupId, members, bannedUsers }));
+        return;
+      }
+      
+      // Get group settings (any member)
+      if (msg.type === 'group_settings_request') {
+        const { groupId } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
+          return;
+        }
+        const settings = sqlDb.getGroupSettings(groupId);
+        ws.send(JSON.stringify({ type: 'group_settings_response', groupId, settings }));
+        return;
+      }
+      
+      // Update group settings (owner or admin)
+      if (msg.type === 'group_settings_update') {
+        const { groupId, settings } = msg;
+        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для изменения настроек' }));
+          return;
+        }
+        sqlDb.updateGroupSettings(groupId, uid, settings);
+        sqlDb.logGroupAction(groupId, uid, 'update_settings', null, settings);
+        const updatedSettings = sqlDb.getGroupSettings(groupId);
+        broadcastToGroup(groupId, { type: 'group_settings_updated', groupId, settings: updatedSettings, updatedBy: uid });
+        return;
       }
     } catch (e) { console.error(e); }
   });

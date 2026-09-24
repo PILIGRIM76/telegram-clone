@@ -115,6 +115,66 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_push_tokens_uid ON push_tokens(user_uid);
   CREATE INDEX IF NOT EXISTS idx_push_tokens_token ON push_tokens(token);
+
+  -- v3.14: Group Admin Tools - Group members with roles
+  CREATE TABLE IF NOT EXISTS group_members (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    user_uid TEXT NOT NULL,
+    role TEXT DEFAULT 'member', -- 'owner', 'admin', 'member'
+    joined_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE(group_id, user_uid)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id);
+  CREATE INDEX IF NOT EXISTS idx_group_members_user_uid ON group_members(user_uid);
+
+  -- v3.14: Banned users table
+  CREATE TABLE IF NOT EXISTS banned_users (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    user_uid TEXT NOT NULL,
+    banned_by TEXT NOT NULL,
+    reason TEXT,
+    banned_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE(group_id, user_uid)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_banned_users_group_id ON banned_users(group_id);
+  CREATE INDEX IF NOT EXISTS idx_banned_users_user_uid ON banned_users(user_uid);
+
+  -- v3.14: Group audit log
+  CREATE TABLE IF NOT EXISTS group_audit_log (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    actor_uid TEXT NOT NULL,
+    action TEXT NOT NULL, -- 'kick', 'ban', 'unban', 'promote', 'demote', 'transfer_ownership', 'delete_group', 'delete_message', 'update_settings'
+    target_uid TEXT,
+    metadata TEXT DEFAULT '{}',
+    created_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (actor_uid) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (target_uid) REFERENCES users(uid) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_audit_log_group_id ON group_audit_log(group_id);
+  CREATE INDEX IF NOT EXISTS idx_group_audit_log_actor_uid ON group_audit_log(actor_uid);
+  CREATE INDEX IF NOT EXISTS idx_group_audit_log_target_uid ON group_audit_log(target_uid);
+  CREATE INDEX IF NOT EXISTS idx_group_audit_log_created_at ON group_audit_log(created_at);
+
+  -- v3.14: Group settings
+  CREATE TABLE IF NOT EXISTS group_settings (
+    group_id TEXT PRIMARY KEY,
+    members_only INTEGER DEFAULT 0, -- 0 = false, 1 = true
+    admins_only INTEGER DEFAULT 0,  -- 0 = false, 1 = true
+    updated_at INTEGER DEFAULT (unixepoch()),
+    updated_by TEXT,
+    FOREIGN KEY (group_id) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(uid) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_settings_group_id ON group_settings(group_id);
 `);
 
 // Insert a new user (uid, username, password_hash)
@@ -547,6 +607,189 @@ function getReadStatus(messageId) {
   }
 }
 
+// ===== v3.14: Group Admin Tools =====
+
+const crypto = require('crypto');
+
+function generateId() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// Group Members Management
+
+// Add or update a group member with role
+function addGroupMember(groupId, userUid, role = 'member') {
+  const id = generateId();
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare(`
+    INSERT INTO group_members (id, group_id, user_uid, role, joined_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(group_id, user_uid) DO UPDATE SET
+      role = excluded.role,
+      joined_at = excluded.joined_at
+  `);
+  stmt.run(id, groupId, userUid, role, now);
+  return true;
+}
+
+// Remove a group member
+function removeGroupMember(groupId, userUid) {
+  const stmt = db.prepare('DELETE FROM group_members WHERE group_id = ? AND user_uid = ?');
+  const result = stmt.run(groupId, userUid);
+  return result.changes > 0;
+}
+
+// Get group member role
+function getGroupMemberRole(groupId, userUid) {
+  const row = db.prepare('SELECT role FROM group_members WHERE group_id = ? AND user_uid = ?').get(groupId, userUid);
+  return row ? row.role : null;
+}
+
+// Get all members of a group with their roles
+function getGroupMembers(groupId) {
+  return db.prepare('SELECT user_uid, role, joined_at FROM group_members WHERE group_id = ?').all(groupId);
+}
+
+// Check if user is owner of group
+function isGroupOwner(groupId, userUid) {
+  const role = getGroupMemberRole(groupId, userUid);
+  return role === 'owner';
+}
+
+// Check if user is admin or owner of group
+function isGroupAdmin(groupId, userUid) {
+  const role = getGroupMemberRole(groupId, userUid);
+  return role === 'owner' || role === 'admin';
+}
+
+// Check if user is member of group (any role)
+function isGroupMember(groupId, userUid) {
+  const role = getGroupMemberRole(groupId, userUid);
+  return role !== null;
+}
+
+// Promote member to admin (only owner can do this)
+function promoteToAdmin(groupId, targetUid) {
+  const stmt = db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?');
+  const result = stmt.run('admin', groupId, targetUid, 'member');
+  return result.changes > 0;
+}
+
+// Demote admin to member (only owner can do this)
+function demoteToMember(groupId, targetUid) {
+  const stmt = db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?');
+  const result = stmt.run('member', groupId, targetUid, 'admin');
+  return result.changes > 0;
+}
+
+// Transfer ownership (only current owner can do this)
+function transferOwnership(groupId, newOwnerUid) {
+  const transaction = db.transaction(() => {
+    // Demote current owner to admin
+    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND role = ?').run('admin', groupId, 'owner');
+    // Promote new owner
+    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ?').run('owner', groupId, newOwnerUid);
+  });
+  transaction();
+  return true;
+}
+
+// Banned Users Management
+
+// Ban a user from a group
+function banUser(groupId, userUid, bannedBy, reason = '') {
+  const id = generateId();
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare(`
+    INSERT INTO banned_users (id, group_id, user_uid, banned_by, reason, banned_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(group_id, user_uid) DO UPDATE SET
+      banned_by = excluded.banned_by,
+      reason = excluded.reason,
+      banned_at = excluded.banned_at
+  `);
+  stmt.run(id, groupId, userUid, bannedBy, reason, now);
+  // Also remove from group members if they were a member
+  removeGroupMember(groupId, userUid);
+  return true;
+}
+
+// Unban a user from a group
+function unbanUser(groupId, userUid) {
+  const stmt = db.prepare('DELETE FROM banned_users WHERE group_id = ? AND user_uid = ?');
+  const result = stmt.run(groupId, userUid);
+  return result.changes > 0;
+}
+
+// Check if user is banned from a group
+function isUserBanned(groupId, userUid) {
+  const row = db.prepare('SELECT * FROM banned_users WHERE group_id = ? AND user_uid = ?').get(groupId, userUid);
+  return row ? row : null;
+}
+
+// Get all banned users for a group
+function getBannedUsers(groupId) {
+  return db.prepare('SELECT user_uid, banned_by, reason, banned_at FROM banned_users WHERE group_id = ?').all(groupId);
+}
+
+// Group Audit Log
+
+// Log an admin action
+function logGroupAction(groupId, actorUid, action, targetUid = null, metadata = {}) {
+  const id = generateId();
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare(`
+    INSERT INTO group_audit_log (id, group_id, actor_uid, action, target_uid, metadata, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(id, groupId, actorUid, action, targetUid, JSON.stringify(metadata), now);
+  return true;
+}
+
+// Get audit log for a group
+function getGroupAuditLog(groupId, limit = 100, offset = 0) {
+  return db.prepare(`
+    SELECT id, group_id, actor_uid, action, target_uid, metadata, created_at
+    FROM group_audit_log
+    WHERE group_id = ?
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(groupId, limit, offset);
+}
+
+// Group Settings
+
+// Get group settings
+function getGroupSettings(groupId) {
+  const row = db.prepare('SELECT group_id, members_only, admins_only, updated_at, updated_by FROM group_settings WHERE group_id = ?').get(groupId);
+  if (!row) {
+    return { group_id: groupId, members_only: 0, admins_only: 0, updated_at: null, updated_by: null };
+  }
+  return {
+    group_id: row.group_id,
+    members_only: row.members_only === 1,
+    admins_only: row.admins_only === 1,
+    updated_at: row.updated_at,
+    updated_by: row.updated_by
+  };
+}
+
+// Update group settings
+function updateGroupSettings(groupId, updatedBy, settings) {
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare(`
+    INSERT INTO group_settings (group_id, members_only, admins_only, updated_at, updated_by)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(group_id) DO UPDATE SET
+      members_only = excluded.members_only,
+      admins_only = excluded.admins_only,
+      updated_at = excluded.updated_at,
+      updated_by = excluded.updated_by
+  `);
+  stmt.run(groupId, settings.members_only ? 1 : 0, settings.admins_only ? 1 : 0, now, updatedBy);
+  return true;
+}
+
 module.exports = {
   db,
   createUser,
@@ -591,4 +834,23 @@ module.exports = {
   updateUserPresence,
   markMessageAsRead,
   getReadStatus,
+  // v3.14: Group Admin Tools
+  addGroupMember,
+  removeGroupMember,
+  getGroupMemberRole,
+  getGroupMembers,
+  isGroupOwner,
+  isGroupAdmin,
+  isGroupMember,
+  promoteToAdmin,
+  demoteToMember,
+  transferOwnership,
+  banUser,
+  unbanUser,
+  isUserBanned,
+  getBannedUsers,
+  logGroupAction,
+  getGroupAuditLog,
+  getGroupSettings,
+  updateGroupSettings,
 };
