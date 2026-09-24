@@ -1,1 +1,0 @@
-'    privateKeyHex: string,'  

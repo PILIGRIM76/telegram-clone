@@ -1,5 +1,0 @@
-В строке отсутствует завершающий символ: '.
-    + CategoryInfo          : ParserError: (:) [], ParentContainsError 
-   RecordException
-    + FullyQualifiedErrorId : TerminatorExpectedAtEndOfString
- 
