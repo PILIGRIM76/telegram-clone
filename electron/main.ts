@@ -2,8 +2,38 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function getIndexHtmlPath(): string {
+  const isProd = app.isPackaged;
+  
+  if (isProd) {
+    // В production файлы находятся в app.asar/dist/index.html
+    // __dirname в packaged режиме = .../app.asar/dist-electron/
+    const asarPath = path.join(__dirname, '../dist/index.html');
+    if (fs.existsSync(asarPath)) {
+      console.log('[Electron] Using asar path:', asarPath);
+      return asarPath;
+    }
+    
+    // Fallback: process.resourcesPath + app.asar
+    const resourcesPath = path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html');
+    if (fs.existsSync(resourcesPath)) {
+      console.log('[Electron] Using resourcesPath:', resourcesPath);
+      return resourcesPath;
+    }
+    
+    console.error('[Electron] ❌ index.html not found in production!');
+    console.error('Tried:', asarPath, resourcesPath);
+    return asarPath; // fallback
+  } else {
+    // Dev режим
+    const devPath = path.join(__dirname, '../dist/index.html');
+    return devPath;
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
@@ -92,7 +122,22 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     // В production загружаем собранные файлы
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    const indexPath = getIndexHtmlPath();
+    console.log('[Electron] Loading index.html from:', indexPath);
+    console.log('[Electron] File exists:', fs.existsSync(indexPath));
+    mainWindow.loadFile(indexPath);
+    
+    // Открываем DevTools для отладки production
+    mainWindow.webContents.openDevTools();
+    
+    // Обработка ошибок загрузки
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('[Electron] Load failed:', errorCode, errorDescription);
+    });
+    
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log('[Electron] ✅ Page loaded successfully');
+    });
   }
 
   mainWindow.on('closed', () => {

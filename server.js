@@ -1480,4 +1480,17 @@ function broadcastPresenceUpdate(uid, isOnline) {
 app.use(express.static(path.join(__dirname, 'dist'))); // Если используется сборка
 app.use(express.static(__dirname)); // Для прямой раздачи файлов при разработке
 
+// Allow address reuse to avoid EADDRINUSE on rapid restarts
+сервер.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error('[Server] Port in use, retrying...');
+    setTimeout(() => {
+      сервер.close();
+      сервер.listen(ПОРТ);
+    }, 1000);
+  } else {
+    console.error('[Server] Error:', e);
+  }
+});
+
 сервер.listen(ПОРТ, () => console.log(`Сервер на порту ${ПОРТ}. Админка доступна по /admin (admin:admin123)`));

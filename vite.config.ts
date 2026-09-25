@@ -76,6 +76,7 @@ function bufferPolyfillPlugin(): Plugin {
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      base: './',  // ⚠️ ОБЯЗАТЕЛЬНО для Electron - относительные пути к ассетам
       server: {
         port: 5173,
         host: '0.0.0.0',
