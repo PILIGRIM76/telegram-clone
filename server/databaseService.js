@@ -4,9 +4,16 @@
 
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 // Open (or create) the SQLite database
 const dbPath = path.join(__dirname, '..', 'data', 'cipherlink.db');
+
+// Ensure data directory exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Phase 2: Use WAL mode for better concurrency
 const db = new Database(dbPath);

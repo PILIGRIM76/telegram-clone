@@ -2,6 +2,7 @@
   "name": "piligrim",
   "private": true,
   "version": "1.0.0",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && node scripts/copy-dist-to-public.js",
@@ -11,7 +12,12 @@
     "test": "jest",
     "test:e2e": "playwright test test/e2e-realtime.spec.ts",
     "check:encoding": "python scripts/check_encoding.py",
-    "fix:encoding": "python scripts/check_encoding.py --fix"
+    "fix:encoding": "python scripts/check_encoding.py --fix",
+    "dev:electron": "concurrently -k \"vite\" \"wait-on tcp:5173 && npx electron dist-electron/main.js\"",
+    "build:electron": "tsc && vite build && electron-builder",
+    "build:win": "tsc && vite build && electron-builder --win",
+    "build:mac": "tsc && vite build && electron-builder --mac",
+    "build:linux": "tsc && vite build && electron-builder --linux"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -44,6 +50,44 @@
     "tweetnacl-util": "^0.15.1",
     "ws": "^8.13.0"
   },
+  "build": {
+    "appId": "com.piligrim.cipherlink",
+    "productName": "CipherLink",
+    "directories": {
+      "output": "release"
+    },
+    "asarUnpack": [
+      "server.js",
+      "server/**/*",
+      "db"
+    ],
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "server.js",
+      "server/**/*",
+      "db/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "public/pwa-512x512.png"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "public/pwa-512x512.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/pwa-512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
@@ -54,6 +98,10 @@
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.14",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.5.0",
     "playwright": "^1.63.0",
@@ -62,6 +110,9 @@
     "tailwindcss": "^3.3.3",
     "ts-jest": "^29.4.12",
     "typescript": "^5.0.2",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^1.0.0",
+    "wait-on": "^9.1.0"
   }
 }

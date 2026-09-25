@@ -1,4 +1,5 @@
-﻿import { renderHook, act, waitFor } from "@testing-library/react";
+﻿import { renderHook, act } from "@testing-library/react";
+import { waitFor } from "@testing-library/dom";
 import { useCallHistory, useMissedCalls } from "../src/hooks/useCallHistory";
 import { prismaService } from "../src/services/prismaService";
 

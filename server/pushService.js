@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 const db = require('./databaseService');
 
 // Initialize Firebase Admin (keys from .env)
-if (!admin.apps.length) {
+if (!admin.getApps().length) {
   const projectId = process.env.FCM_PROJECT_ID;
   const clientEmail = process.env.FCM_CLIENT_EMAIL;
   const privateKey = process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n');
@@ -32,7 +32,7 @@ if (!admin.apps.length) {
 async function sendPushNotification(userUid, senderName, chatId, messageId) {
   try {
     // Check if Firebase Admin is initialized
-    if (!admin.apps.length) {
+    if (!admin.getApps().length) {
       console.log('[Push] Firebase Admin not initialized, skipping push');
       return;
     }

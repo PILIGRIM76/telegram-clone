@@ -1029,371 +1029,370 @@ app.get('/rewards/:uid', (req, res) => {
   });
 
   ws.on('message', (данные) => {
-    try {
-      const msg = JSON.parse(данные);
-      if (msg.type === 'noise') return;
+    let msg;
+    try { msg = JSON.parse(данные); } catch (e) { console.error(e); return; }
+    if (msg.type === 'noise') return;
+    // --- v3.11: Typing Indicators ---
+    if (msg.type === 'typing_start' || msg.type === 'typing_stop') {
+      const { chatId } = msg;
+      // Broadcast to chat participants (except sender)
+      broadcastTypingUpdate(chatId, uid, msg.type === 'typing_start');
+      return;
+    }
+    
+    // --- v3.11: Read Receipts ---
+    if (msg.type === 'message_read') {
+      const { messageId } = msg;
+      const readerUid = uid;
       
-      // --- v3.11: Typing Indicators ---
-      if (msg.type === 'typing_start' || msg.type === 'typing_stop') {
-        const { chatId } = msg;
-        // Broadcast to chat participants (except sender)
-        broadcastTypingUpdate(chatId, uid, msg.type === 'typing_start');
-        return;
+      sqlDb.markMessageAsRead(messageId, readerUid);
+      
+      // Notify sender that message was read
+      const message = sqlDb.getMessage(messageId);
+      if (message) {
+        отправить(message.sender_uid, {
+          type: 'receipt_update',
+          messageId,
+          readerUid,
+          timestamp: Date.now()
+        });
       }
+      return;
+    }
+    
+    if (msg.type === 'read' && msg.messageId) {
+      // Legacy read receipt handler - keep for backward compatibility
+      for (const [otherUid, otherUser] of wsUsers) {
+        if (otherUid === uid) continue;
+        if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+          otherUser.send(JSON.stringify({ type: 'receipt', receipt: 'read', messageId: msg.messageId, from: uid, timestamp: new Date().toISOString() }));
+        }
+      }
+      return;
+    }
+    if (msg.type === 'typing' && msg.to) {
+      // Legacy typing handler - keep for backward compatibility
+      отправить(msg.to, { type: 'typing', from: uid, chatId: msg.to, timestamp: new Date().toISOString() });
+      return;
+    }
+    if (msg.type === 'message' || msg.type === 'text') {
+      const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
+      const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
+      // Save message and get the message ID
+      const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
+      // Attach messageId to outgoing message for receipts
+      исходящее.id = messageId;
       
-      // --- v3.11: Read Receipts ---
-      if (msg.type === 'message_read') {
-        const { messageId } = msg;
-        const readerUid = uid;
-        
-        sqlDb.markMessageAsRead(messageId, readerUid);
-        
-        // Notify sender that message was read
-        const message = sqlDb.getMessage(messageId);
-        if (message) {
-          отправить(message.sender_uid, {
-            type: 'receipt_update',
-            messageId,
-            readerUid,
-            timestamp: Date.now()
+      if (channelId) {
+        const канал = каналы.get(channelId);
+        if (канал) {
+          const пост = { id: 'post_' + Date.now(), channelId: канал.id, authorId: uid, text: content || '', timestamp: new Date().toISOString(), views: 0 };
+          канал.posts = канал.posts || [];
+          канал.posts.push(пост);
+          канал.postCount = (канал.posts || []).length;
+          канал.subscribers.forEach(subUid => {
+            if (subUid === uid) return;
+            const subWs = wsUsers.get(subUid);
+            if (subWs && subWs.readyState === WebSocket.OPEN) {
+              subWs.send(JSON.stringify({ ...исходящее, type: 'channel_post', post, channelId: канал.id }));
+            }
           });
         }
-        return;
-      }
-      
-      if (msg.type === 'read' && msg.messageId) {
-        // Legacy read receipt handler - keep for backward compatibility
-        for (const [otherUid, otherUser] of wsUsers) {
-          if (otherUid === uid) continue;
-          if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-            otherUser.send(JSON.stringify({ type: 'receipt', receipt: 'read', messageId: msg.messageId, from: uid, timestamp: new Date().toISOString() }));
-          }
-        }
-        return;
-      }
-      if (msg.type === 'typing' && msg.to) {
-        // Legacy typing handler - keep for backward compatibility
-        отправить(msg.to, { type: 'typing', from: uid, chatId: msg.to, timestamp: new Date().toISOString() });
-        return;
-      }
-      if (msg.type === 'message' || msg.type === 'text') {
-        const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
-        const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
-        // Save message and get the message ID
-        const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
-        // Attach messageId to outgoing message for receipts
-        исходящее.id = messageId;
-        
-        if (channelId) {
-          const канал = каналы.get(channelId);
-          if (канал) {
-            const пост = { id: 'post_' + Date.now(), channelId: канал.id, authorId: uid, text: content || '', timestamp: new Date().toISOString(), views: 0 };
-            канал.posts = канал.posts || [];
-            канал.posts.push(пост);
-            канал.postCount = (канал.posts || []).length;
-            канал.subscribers.forEach(subUid => {
-              if (subUid === uid) return;
-              const subWs = wsUsers.get(subUid);
-              if (subWs && subWs.readyState === WebSocket.OPEN) {
-                subWs.send(JSON.stringify({ ...исходящее, type: 'channel_post', post, channelId: канал.id }));
-              }
-            });
-          }
-        } else if (groupId) {
-          const группа = группы.get(groupId);
-          if (группа) {
-            for (const [otherUid, otherUser] of wsUsers) {
-              if (otherUid === uid) continue;
-              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-                otherUser.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
-              }
+      } else if (groupId) {
+        const группа = группы.get(groupId);
+        if (группа) {
+          for (const [otherUid, otherUser] of wsUsers) {
+            if (otherUid === uid) continue;
+            if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+              otherUser.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
             }
           }
-        } else {
-          отправить(to, исходящее);
         }
-        if (id) {
-          const recWs = wsUsers.get(to);
-          const delivered = recWs && recWs.readyState === WebSocket.OPEN;
-          отправить(uid, { type: 'receipt', receipt: delivered ? 'delivered' : 'queued', messageId: id, to: to, timestamp: new Date().toISOString(), queued: !delivered });
-        }
+      } else {
+        отправить(to, исходящее);
       }
-      if (msg.type === 'reaction') {
-        const { messageId, emoji, action, to, groupId } = msg;
-        sqlDb.addReaction(messageId, uid, emoji);
-        const reactionMsg = { type: 'reaction', messageId, userUid: uid, emoji, action };
-        if (to) {
-          отправить(to, reactionMsg);
-        }
-        if (groupId) {
-          const группа = группы.get(groupId);
-          if (группа) {
-            for (const [otherUid, otherUser] of wsUsers) {
-              if (otherUid === uid) continue;
-              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-                otherUser.send(JSON.stringify({ ...reactionMsg, groupId: группа.id }));
-              }
+      if (id) {
+        const recWs = wsUsers.get(to);
+        const delivered = recWs && recWs.readyState === WebSocket.OPEN;
+        отправить(uid, { type: 'receipt', receipt: delivered ? 'delivered' : 'queued', messageId: id, to: to, timestamp: new Date().toISOString(), queued: !delivered });
+      }
+    }
+    if (msg.type === 'reaction') {
+      const { messageId, emoji, action, to, groupId } = msg;
+      sqlDb.addReaction(messageId, uid, emoji);
+      const reactionMsg = { type: 'reaction', messageId, userUid: uid, emoji, action };
+      if (to) {
+        отправить(to, reactionMsg);
+      }
+      if (groupId) {
+        const группа = группы.get(groupId);
+        if (группа) {
+          for (const [otherUid, otherUser] of wsUsers) {
+            if (otherUid === uid) continue;
+            if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+              otherUser.send(JSON.stringify({ ...reactionMsg, groupId: группа.id }));
             }
           }
         }
       }
+    }
 
-      // --- v3.12: Message Editing ---
-      if (msg.type === 'message_edit') {
-        const { messageId, newContent } = msg;
+    // --- v3.12: Message Editing ---
+    if (msg.type === 'message_edit') {
+      const { messageId, newContent } = msg;
 
-        // Verify the user owns the message
-        const message = sqlDb.getMessage(messageId);
-        if (!message || message.sender_uid !== uid) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на редактирование' }));
-          return;
-        }
-
-        // Save old version and update
-        sqlDb.editMessage(messageId, newContent);
-
-        // Broadcast to chat participants
-        const editedAt = Date.now();
-        const broadcastMsg = {
-          type: 'message_edited',
-          messageId,
-          newContent,
-          editedAt
-        };
-
-        if (message.receiver_uid) {
-          отправить(message.receiver_uid, broadcastMsg);
-        }
-        // Also send back to sender for confirmation
-        ws.send(broadcastMsg);
+      // Verify the user owns the message
+      const message = sqlDb.getMessage(messageId);
+      if (!message || message.sender_uid !== uid) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на редактирование' }));
+        return;
       }
 
-      // --- v3.12: Message Deletion ---
-      if (msg.type === 'message_delete') {
-        const { messageId, deleteForAll } = msg;
+      // Save old version and update
+      sqlDb.editMessage(messageId, newContent);
 
-        const message = sqlDb.getMessage(messageId);
-        if (!message) return;
+      // Broadcast to chat participants
+      const editedAt = Date.now();
+      const broadcastMsg = {
+        type: 'message_edited',
+        messageId,
+        newContent,
+        editedAt
+      };
 
-        // Check permissions: owner or group admin
-        const isOwner = message.sender_uid === uid;
-        let isAdmin = false;
+      if (message.receiver_uid) {
+        отправить(message.receiver_uid, broadcastMsg);
+      }
+      // Also send back to sender for confirmation
+      ws.send(broadcastMsg);
+    }
 
-        // For group messages, check if user is admin
-        // Note: This would need groupId to be passed in the message or derived from context
-        // For now, only owner can delete
+    // --- v3.12: Message Deletion ---
+    if (msg.type === 'message_delete') {
+      const { messageId, deleteForAll } = msg;
 
-        if (!isOwner && !isAdmin) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на удаление' }));
-          return;
-        }
+      const message = sqlDb.getMessage(messageId);
+      if (!message) return;
 
-        sqlDb.deleteMessage(messageId, deleteForAll, uid);
+      // Check permissions: owner or group admin
+      const isOwner = message.sender_uid === uid;
+      let isAdmin = false;
 
-        // Broadcast deletion event
-        const broadcastMsg = {
-          type: 'message_deleted',
-          messageId,
-          deleteForAll
-        };
+      // For group messages, check if user is admin
+      // Note: This would need groupId to be passed in the message or derived from context
+      // For now, only owner can delete
 
-        if (message.receiver_uid) {
-          отправить(message.receiver_uid, broadcastMsg);
-        }
-        // Also send back to sender for confirmation
-        ws.send(broadcastMsg);
+      if (!isOwner && !isAdmin) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на удаление' }));
+        return;
+      }
+
+      sqlDb.deleteMessage(messageId, deleteForAll, uid);
+
+      // Broadcast deletion event
+      const broadcastMsg = {
+        type: 'message_deleted',
+        messageId,
+        deleteForAll
+      };
+
+      if (message.receiver_uid) {
+        отправить(message.receiver_uid, broadcastMsg);
+      }
+      // Also send back to sender for confirmation
+      ws.send(broadcastMsg);
 // --- v3.14: Group Admin Tools ---
 
-      // Helper: Check group permission
-      function checkGroupPermission(groupId, actorUid, allowedRoles) {
-        const role = sqlDb.getGroupMemberRole(groupId, actorUid);
-        return allowedRoles.includes(role);
-      }
-      
-      // Helper: Broadcast to all group members
-      function broadcastToGroup(groupId, message) {
-        const members = sqlDb.getGroupMembers(groupId);
-        for (const member of members) {
-          const memberWs = wsUsers.get(member.user_uid);
-          if (memberWs && memberWs.readyState === WebSocket.OPEN) {
-            memberWs.send(JSON.stringify(message));
-          }
+    // Helper: Check group permission
+    function checkGroupPermission(groupId, actorUid, allowedRoles) {
+      const role = sqlDb.getGroupMemberRole(groupId, actorUid);
+      return allowedRoles.includes(role);
+    }
+    
+    // Helper: Broadcast to all group members
+    function broadcastToGroup(groupId, message) {
+      const members = sqlDb.getGroupMembers(groupId);
+      for (const member of members) {
+        const memberWs = wsUsers.get(member.user_uid);
+        if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+          memberWs.send(JSON.stringify(message));
         }
       }
-      
-      // Kick member from group (owner or admin)
-      if (msg.type === 'group_kick') {
-        const { groupId, targetUid } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для кика' }));
-          return;
-        }
-        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole === 'owner') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нельзя кикнуть владельца группы' }));
-          return;
-        }
-        sqlDb.removeGroupMember(groupId, targetUid);
-        sqlDb.logGroupAction(groupId, uid, 'kick', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_kicked', groupId, targetUid, kickedBy: uid });
+    }
+    
+    // Kick member from group (owner or admin)
+    if (msg.type === 'group_kick') {
+      const { groupId, targetUid } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для кика' }));
         return;
       }
-      
-      // Ban user from group (owner or admin)
-      if (msg.type === 'group_ban') {
-        const { groupId, targetUid, reason } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для бана' }));
-          return;
-        }
-        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole === 'owner') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нельзя забанить владельца группы' }));
-          return;
-        }
-        sqlDb.banUser(groupId, targetUid, uid, reason || '');
-        sqlDb.logGroupAction(groupId, uid, 'ban', targetUid, { reason: reason || '' });
-        broadcastToGroup(groupId, { type: 'group_member_banned', groupId, targetUid, bannedBy: uid, reason: reason || '' });
+      const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+      if (targetRole === 'owner') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нельзя кикнуть владельца группы' }));
         return;
       }
-      
-      // Unban user from group (owner or admin)
-      if (msg.type === 'group_unban') {
-        const { groupId, targetUid } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для разбана' }));
-          return;
-        }
-        sqlDb.unbanUser(groupId, targetUid);
-        sqlDb.logGroupAction(groupId, uid, 'unban', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_unbanned', groupId, targetUid, unbannedBy: uid });
+      sqlDb.removeGroupMember(groupId, targetUid);
+      sqlDb.logGroupAction(groupId, uid, 'kick', targetUid, {});
+      broadcastToGroup(groupId, { type: 'group_member_kicked', groupId, targetUid, kickedBy: uid });
+      return;
+    }
+    
+    // Ban user from group (owner or admin)
+    if (msg.type === 'group_ban') {
+      const { groupId, targetUid, reason } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для бана' }));
         return;
       }
-      
-      // Promote member to admin (owner only)
-      if (msg.type === 'group_promote') {
-        const { groupId, targetUid } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может повышать до админа' }));
-          return;
-        }
-        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole !== 'member') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Можно повысить только участника' }));
-          return;
-        }
-        sqlDb.promoteToAdmin(groupId, targetUid);
-        sqlDb.logGroupAction(groupId, uid, 'promote', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_promoted', groupId, targetUid, promotedBy: uid, newRole: 'admin' });
+      const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+      if (targetRole === 'owner') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нельзя забанить владельца группы' }));
         return;
       }
-      
-      // Demote admin to member (owner only)
-      if (msg.type === 'group_demote') {
-        const { groupId, targetUid } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может понижать админов' }));
-          return;
-        }
-        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole !== 'admin') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Можно понизить только админа' }));
-          return;
-        }
-        sqlDb.demoteToMember(groupId, targetUid);
-        sqlDb.logGroupAction(groupId, uid, 'demote', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_demoted', groupId, targetUid, demotedBy: uid, newRole: 'member' });
+      sqlDb.banUser(groupId, targetUid, uid, reason || '');
+      sqlDb.logGroupAction(groupId, uid, 'ban', targetUid, { reason: reason || '' });
+      broadcastToGroup(groupId, { type: 'group_member_banned', groupId, targetUid, bannedBy: uid, reason: reason || '' });
+      return;
+    }
+    
+    // Unban user from group (owner or admin)
+    if (msg.type === 'group_unban') {
+      const { groupId, targetUid } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для разбана' }));
         return;
       }
-      
-      // Transfer ownership (owner only)
-      if (msg.type === 'group_transfer_ownership') {
-        const { groupId, targetUid } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может передать владение' }));
-          return;
-        }
-        const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole !== 'admin' and targetRole !== 'member') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Можно передать владение только админу или участнику' }));
-          return;
-        }
-        sqlDb.transferOwnership(groupId, targetUid);
-        sqlDb.logGroupAction(groupId, uid, 'transfer_ownership', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_ownership_transferred', groupId, newOwnerUid: targetUid, oldOwnerUid: uid });
+      sqlDb.unbanUser(groupId, targetUid);
+      sqlDb.logGroupAction(groupId, uid, 'unban', targetUid, {});
+      broadcastToGroup(groupId, { type: 'group_member_unbanned', groupId, targetUid, unbannedBy: uid });
+      return;
+    }
+    
+    // Promote member to admin (owner only)
+    if (msg.type === 'group_promote') {
+      const { groupId, targetUid } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может повышать до админа' }));
         return;
       }
-      
-      // Delete group (owner only)
-      if (msg.type === 'group_delete') {
-        const { groupId } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может удалить группу' }));
-          return;
-        }
-        sqlDb.logGroupAction(groupId, uid, 'delete_group', null, {});
-        broadcastToGroup(groupId, { type: 'group_deleted', groupId, deletedBy: uid });
-        // Remove from memory
-        группы.delete(groupId);
-        // Remove all members from DB
-        const members = sqlDb.getGroupMembers(groupId);
-        for (const member of members) {
-          sqlDb.removeGroupMember(groupId, member.user_uid);
-        }
+      const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+      if (targetRole !== 'member') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Можно повысить только участника' }));
         return;
       }
-      
-      // Get group audit log (owner or admin)
-      if (msg.type === 'group_audit_log_request') {
-        const { groupId, limit, offset } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для просмотра лога' }));
-          return;
-        }
-        const logs = sqlDb.getGroupAuditLog(groupId, limit || 100, offset || 0);
-        ws.send(JSON.stringify({ type: 'group_audit_log_response', groupId, logs }));
+      sqlDb.promoteToAdmin(groupId, targetUid);
+      sqlDb.logGroupAction(groupId, uid, 'promote', targetUid, {});
+      broadcastToGroup(groupId, { type: 'group_member_promoted', groupId, targetUid, promotedBy: uid, newRole: 'admin' });
+      return;
+    }
+    
+    // Demote admin to member (owner only)
+    if (msg.type === 'group_demote') {
+      const { groupId, targetUid } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может понижать админов' }));
         return;
       }
-      
-      // Get group members with roles (any member)
-      if (msg.type === 'group_members_request') {
-        const { groupId } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
-          return;
-        }
-        const members = sqlDb.getGroupMembers(groupId);
-        const bannedUsers = sqlDb.getBannedUsers(groupId);
-        ws.send(JSON.stringify({ type: 'group_members_response', groupId, members, bannedUsers }));
+      const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+      if (targetRole !== 'admin') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Можно понизить только админа' }));
         return;
       }
-      
-      // Get group settings (any member)
-      if (msg.type === 'group_settings_request') {
-        const { groupId } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
-          return;
-        }
-        const settings = sqlDb.getGroupSettings(groupId);
-        ws.send(JSON.stringify({ type: 'group_settings_response', groupId, settings }));
+      sqlDb.demoteToMember(groupId, targetUid);
+      sqlDb.logGroupAction(groupId, uid, 'demote', targetUid, {});
+      broadcastToGroup(groupId, { type: 'group_member_demoted', groupId, targetUid, demotedBy: uid, newRole: 'member' });
+      return;
+    }
+    
+    // Transfer ownership (owner only)
+    if (msg.type === 'group_transfer_ownership') {
+      const { groupId, targetUid } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может передать владение' }));
         return;
       }
-      
-      // Update group settings (owner or admin)
-      if (msg.type === 'group_settings_update') {
-        const { groupId, settings } = msg;
-        if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для изменения настроек' }));
-          return;
-        }
-        sqlDb.updateGroupSettings(groupId, uid, settings);
-        sqlDb.logGroupAction(groupId, uid, 'update_settings', null, settings);
-        const updatedSettings = sqlDb.getGroupSettings(groupId);
-        broadcastToGroup(groupId, { type: 'group_settings_updated', groupId, settings: updatedSettings, updatedBy: uid });
+      const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+      if (targetRole !== 'admin' && targetRole !== 'member') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Можно передать владение только админу или участнику' }));
         return;
       }
-    } catch (e) { console.error(e); }
+      sqlDb.transferOwnership(groupId, targetUid);
+      sqlDb.logGroupAction(groupId, uid, 'transfer_ownership', targetUid, {});
+      broadcastToGroup(groupId, { type: 'group_ownership_transferred', groupId, newOwnerUid: targetUid, oldOwnerUid: uid });
+      return;
+    }
+    
+    // Delete group (owner only)
+    if (msg.type === 'group_delete') {
+      const { groupId } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может удалить группу' }));
+        return;
+      }
+      sqlDb.logGroupAction(groupId, uid, 'delete_group', null, {});
+      broadcastToGroup(groupId, { type: 'group_deleted', groupId, deletedBy: uid });
+      // Remove from memory
+      группы.delete(groupId);
+      // Remove all members from DB
+      const members = sqlDb.getGroupMembers(groupId);
+      for (const member of members) {
+        sqlDb.removeGroupMember(groupId, member.user_uid);
+      }
+      return;
+    }
+    
+    // Get group audit log (owner or admin)
+    if (msg.type === 'group_audit_log_request') {
+      const { groupId, limit, offset } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для просмотра лога' }));
+        return;
+      }
+      const logs = sqlDb.getGroupAuditLog(groupId, limit || 100, offset || 0);
+      ws.send(JSON.stringify({ type: 'group_audit_log_response', groupId, logs }));
+      return;
+    }
+    
+    // Get group members with roles (any member)
+    if (msg.type === 'group_members_request') {
+      const { groupId } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
+        return;
+      }
+      const members = sqlDb.getGroupMembers(groupId);
+      const bannedUsers = sqlDb.getBannedUsers(groupId);
+      ws.send(JSON.stringify({ type: 'group_members_response', groupId, members, bannedUsers }));
+      return;
+    }
+    
+    // Get group settings (any member)
+    if (msg.type === 'group_settings_request') {
+      const { groupId } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin', 'member'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Вы не участник этой группы' }));
+        return;
+      }
+      const settings = sqlDb.getGroupSettings(groupId);
+      ws.send(JSON.stringify({ type: 'group_settings_response', groupId, settings }));
+      return;
+    }
+    
+    // Update group settings (owner or admin)
+    if (msg.type === 'group_settings_update') {
+      const { groupId, settings } = msg;
+      if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для изменения настроек' }));
+        return;
+      }
+      sqlDb.updateGroupSettings(groupId, uid, settings);
+      sqlDb.logGroupAction(groupId, uid, 'update_settings', null, settings);
+      const updatedSettings = sqlDb.getGroupSettings(groupId);
+      broadcastToGroup(groupId, { type: 'group_settings_updated', groupId, settings: updatedSettings, updatedBy: uid });
+      return;
+    }
+  }
   });
 
   ws.on('close', () => {
