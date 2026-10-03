@@ -7,32 +7,30 @@ import fs from 'fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function getIndexHtmlPath(): string {
-  const isProd = app.isPackaged;
-  
-  if (isProd) {
-    // В production файлы находятся в app.asar/dist/index.html
-    // __dirname в packaged режиме = .../app.asar/dist-electron/
-    const asarPath = path.join(__dirname, '../dist/index.html');
-    if (fs.existsSync(asarPath)) {
-      console.log('[Electron] Using asar path:', asarPath);
-      return asarPath;
-    }
-    
-    // Fallback: process.resourcesPath + app.asar
-    const resourcesPath = path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html');
-    if (fs.existsSync(resourcesPath)) {
-      console.log('[Electron] Using resourcesPath:', resourcesPath);
-      return resourcesPath;
-    }
-    
-    console.error('[Electron] ❌ index.html not found in production!');
-    console.error('Tried:', asarPath, resourcesPath);
-    return asarPath; // fallback
-  } else {
-    // Dev режим
-    const devPath = path.join(__dirname, '../dist/index.html');
-    return devPath;
+  // В режиме разработки (vite dev server)
+  if (!app.isPackaged) {
+    return path.join(__dirname, '../dist/index.html');
   }
+
+  // В собранном приложении (Packaged)
+  // Мы распаковали dist в asarUnpack, поэтому он лежит рядом с main.js
+  const unpackedPath = path.join(__dirname, '../dist/index.html');
+  const resourcesPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'index.html');
+  
+  if (fs.existsSync(unpackedPath)) {
+    console.log('[Electron] ✅ Using unpacked dist path:', unpackedPath);
+    return unpackedPath;
+  }
+  if (fs.existsSync(resourcesPath)) {
+    console.log('[Electron] ✅ Using resources path:', resourcesPath);
+    return resourcesPath;
+  }
+
+  console.error('[Electron] ❌ CRITICAL: index.html NOT FOUND!');
+  console.error('Tried:', unpackedPath, 'and', resourcesPath);
+  
+  // Fallback: показать ошибку в окне
+  return path.join(__dirname, '../dist/index.html'); 
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -100,6 +98,9 @@ function startBackendServer(): Promise<void> {
 }
 
 function createWindow() {
+  // Иконка для окна приложения
+  const iconPath = path.join(__dirname, app.isPackaged ? '../build/piligrim.ico' : '../build/piligrim.ico');
+  
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -108,10 +109,10 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // preload: path.join(__dirname, 'preload.js') // Если понадобится IPC
+      webSecurity: false // Временно для отладки загрузки локальных файлов
     },
     title: 'CipherLink v1.0.0',
-    icon: path.join(__dirname, '../public/icon.png')
+    icon: iconPath
   });
 
   const isDev = !app.isPackaged;
@@ -123,8 +124,18 @@ function createWindow() {
   } else {
     // В production загружаем собранные файлы
     const indexPath = getIndexHtmlPath();
-    console.log('[Electron] Loading index.html from:', indexPath);
-    console.log('[Electron] File exists:', fs.existsSync(indexPath));
+    console.log('[Electron] Loading file://', indexPath);
+
+    // Читаем первые 200 символов, чтобы проверить, есть ли там "./assets"
+    if (fs.existsSync(indexPath)) {
+      const content = fs.readFileSync(indexPath, 'utf-8');
+      const hasRelativeAssets = content.includes('./assets/') || content.includes('src="./');
+      console.log('[Electron] index.html has relative assets (./):', hasRelativeAssets);
+      if (!hasRelativeAssets) {
+        console.warn('[Electron] ⚠️ WARNING: index.html might have absolute paths (/assets/). Check vite.config.ts base!');
+      }
+    }
+
     mainWindow.loadFile(indexPath);
     
     // Открываем DevTools для отладки production

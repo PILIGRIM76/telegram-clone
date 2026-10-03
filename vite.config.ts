@@ -5,6 +5,7 @@ import path from 'path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
+import fs from 'fs';
 
 
 /**
@@ -73,20 +74,59 @@ function bufferPolyfillPlugin(): Plugin {
   };
 }
 
+/**
+ * RelativeAssetsPlugin: rewrites absolute asset paths in index.html to relative for Electron.
+ * Uses generateBundle hook to modify the generated HTML file.
+ */
+function relativeAssetsPlugin(): Plugin {
+    return {
+        name: 'relative-assets-plugin',
+        generateBundle(options, bundle) {
+            console.log('[relativeAssetsPlugin] generateBundle hook called');
+            console.log('[relativeAssetsPlugin] Bundle keys:', Object.keys(bundle));
+        },
+        writeBundle(options, bundle) {
+            console.log('[relativeAssetsPlugin] writeBundle hook called');
+            // Read the generated index.html from disk and rewrite paths
+            const indexPath = path.join(options.dir, 'index.html');
+            if (fs.existsSync(indexPath)) {
+                console.log('[relativeAssetsPlugin] Found index.html at:', indexPath);
+                let source = fs.readFileSync(indexPath, 'utf-8');
+                const original = source;
+                source = source
+                    .replace(/href="\/assets\//g, 'href="./assets/')
+                    .replace(/src="\/assets\//g, 'src="./assets/')
+                    .replace(/href="\/icons\//g, 'href="./icons/')
+                    .replace(/href="\/favicon-/g, 'href="./favicon-')
+                    .replace(/href="\/pwa-/g, 'href="./pwa-')
+                    .replace(/src="\/src\//g, 'src="./src/');
+                if (source !== original) {
+                    console.log('[relativeAssetsPlugin] Replacements applied, writing file...');
+                    fs.writeFileSync(indexPath, source);
+                } else {
+                    console.log('[relativeAssetsPlugin] No replacements needed');
+                }
+            } else {
+                console.log('[relativeAssetsPlugin] index.html not found at:', indexPath);
+            }
+        },
+    };
+}
+
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      base: './',  // ⚠️ ОБЯЗАТЕЛЬНО для Electron - относительные пути к ассетам
-      server: {
-        port: 5173,
-        host: '0.0.0.0',
-      },
-      plugins: [react(), bufferPolyfillPlugin(), electron({
-        main: {
-          entry: 'electron/main.ts',
+        base: './',  // ⚠️ ОБЯЗАТЕЛЬНО для Electron - относительные пути к ассетам
+        server: {
+            port: 5173,
+            host: '0.0.0.0',
         },
-        renderer: {},
-      })],
+        plugins: [react(), bufferPolyfillPlugin(), relativeAssetsPlugin(), electron({
+            main: {
+                entry: 'electron/main.ts',
+            },
+            renderer: {},
+        })],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
