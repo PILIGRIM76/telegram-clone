@@ -57,6 +57,7 @@
     "appId": "com.piligrim.cipherlink",
     "productName": "CipherLink",
     "publish": null,
+    "artifactName": "${productName}-${version}-${arch}-portable.${ext}",
     "directories": {
       "output": "release"
     },
@@ -77,20 +78,24 @@
     "win": {
       "target": [
         "portable"
-      ]
+      ],
+      "icon": "build/piligrim.ico",
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/piligrim.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   },
   "devDependencies": {
