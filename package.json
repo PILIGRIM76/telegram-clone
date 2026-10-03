@@ -94,7 +94,7 @@
         "AppImage",
         "deb"
       ],
-      "icon": "build/piligrim.ico",
+      "icon": "build/icon.png",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   },
