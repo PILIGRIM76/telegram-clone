@@ -66,6 +66,29 @@ npm run server
 ```
 Запускает только бэкенд на порту 4000 (WebSocket + REST API).
 
+## 🚀 Автоматическая сборка (CI/CD)
+
+При создании тега версии (например, `v1.0.1`) GitHub Actions автоматически:
+1. Запускает все тесты (`npm test`)
+2. Собирает Portable EXE для Windows
+3. Собирает AppImage для Linux
+4. Создаёт GitHub Release с прикреплёнными файлами
+
+### Как создать релиз:
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+### Workflow детали
+- **Триггер**: push тега `v*` (например, v1.0.1, v1.1.0)
+- **Матрица**: Windows (portable EXE) + Linux (AppImage)
+- **Кэширование**: `node_modules` + Electron binary
+- **Иконка**: использует `build/piligrim.ico` из репозитория (не генерирует на лету)
+- **Артефакты**: загружаются в GitHub Actions, прикрепляются к Release
+
+---
+
 ## 📦 Сборка Desktop-клиента
 
 ### Автономное приложение

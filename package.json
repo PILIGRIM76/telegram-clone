@@ -5,7 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node scripts/copy-dist-to-public.js",
+    "build": "tsc && vite build --base=./ && node scripts/copy-dist-to-public.js",
     "build:android": "npm run build && cap sync android && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "server": "node server.js",
@@ -14,10 +14,10 @@
     "check:encoding": "python scripts/check_encoding.py",
     "fix:encoding": "python scripts/check_encoding.py --fix",
     "dev:electron": "concurrently -k \"vite\" \"wait-on tcp:5173 && npx electron dist-electron/main.js\"",
-    "build:electron": "tsc && vite build && electron-builder",
-    "build:win": "tsc && vite build && electron-builder --win --target portable",
-    "build:mac": "tsc && vite build && electron-builder --mac",
-    "build:linux": "tsc && vite build && electron-builder --linux",
+    "build:electron": "electron-builder --publish never",
+    "build:win": "vite build --base=./ && electron-builder --win portable",
+    "build:mac": "vite build --base=./ && electron-builder --mac",
+    "build:linux": "vite build --base=./ && electron-builder --linux AppImage",
     "build:win-safe": "powershell -ExecutionPolicy Bypass -File scripts/build-win.ps1",
     "verify:build": "node scripts/verify-build.js"
   },
@@ -38,6 +38,7 @@
     "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",
     "framer-motion": "^11.18.2",
+    "ico": "^0.3.3",
     "idb": "^8.0.3",
     "jsonwebtoken": "^9.0.3",
     "jsqr": "^1.4.0",
@@ -73,15 +74,21 @@
       "**/*.node"
     ],
     "win": {
-      "target": ["portable"],
-      "icon": "build/icon.ico"
+      "target": [
+        "portable"
+      ]
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "build/icon.icns"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "build/icon.png"
     }
   },
