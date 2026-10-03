@@ -88,6 +88,10 @@ function relativeAssetsPlugin(): Plugin {
         writeBundle(options, bundle) {
             console.log('[relativeAssetsPlugin] writeBundle hook called');
             // Read the generated index.html from disk and rewrite paths
+            if (!options.dir) {
+                console.warn('[relativeAssetsPlugin] options.dir is undefined, skipping index.html rewrite');
+                return;
+            }
             const indexPath = path.join(options.dir, 'index.html');
             if (fs.existsSync(indexPath)) {
                 console.log('[relativeAssetsPlugin] Found index.html at:', indexPath);
