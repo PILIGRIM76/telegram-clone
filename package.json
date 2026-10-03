@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "piligrim",
   "private": true,
   "version": "1.0.0",
@@ -78,24 +78,20 @@
     "win": {
       "target": [
         "portable"
-      ],
-      
-      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+      ]
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "icon": "build/icon.icns",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "icon": "build/icon.icns"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "build/icon.png",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "icon": "build/icon.png"
     }
   },
   "devDependencies": {
@@ -126,4 +122,3 @@
     "wait-on": "^9.1.0"
   }
 }
-
