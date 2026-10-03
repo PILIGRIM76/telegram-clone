@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "piligrim",
   "private": true,
   "version": "1.0.0",
@@ -79,7 +79,7 @@
       "target": [
         "portable"
       ],
-      "icon": "build/piligrim.ico",
+      
       "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
     },
     "mac": {
@@ -126,3 +126,4 @@
     "wait-on": "^9.1.0"
   }
 }
+
