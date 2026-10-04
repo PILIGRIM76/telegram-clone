@@ -42,9 +42,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      # - name: Run tests  # Temporarily disabled to verify build artifacts
-      #   run: npm test
-      
       - name: Build frontend
         run: npm run build
         env:
@@ -58,30 +55,43 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Sign Windows executable
-        if: matrix.platform == 'win' && env.WIN_CSC_LINK != ''
+        if: matrix.platform == 'win'
         shell: pwsh
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
-          # Р”РµРєРѕРґРёСЂСѓРµРј СЃРµСЂС‚РёС„РёРєР°С‚ РёР· Base64
+          # Надежная проверка: если секрет пустой, просто пропускаем шаг без ошибки
+          if ([string]::IsNullOrEmpty($env:WIN_CSC_LINK)) {
+            Write-Host "⏭️ WIN_CSC_LINK is empty. Skipping code signing." -ForegroundColor Yellow
+            exit 0
+          }
+          
+          Write-Host "🔐 Signing executables..." -ForegroundColor Cyan
+          
+          # Декодируем сертификат из Base64
           $pfxBytes = [Convert]::FromBase64String($env:WIN_CSC_LINK)
           $pfxPath = "$env:TEMP\cert.pfx"
           [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
           
-          # РС‰РµРј signtool
+          # Ищем signtool.exe
           $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Where-Object { $_.FullName -like "*x64*" } | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { Write-Host "вќЊ signtool.exe РЅРµ РЅР°Р№РґРµРЅ"; exit 1 }
           
-          # РџРѕРґРїРёСЃС‹РІР°РµРј РІСЃРµ .exe С„Р°Р№Р»С‹ РІ release/
+          if (-not $signtool) { 
+            Write-Host "❌ signtool.exe not found" -ForegroundColor Red
+            exit 1 
+          }
+          
+          # Подписываем все .exe файлы в папке release/
           $exeFiles = Get-ChildItem -Path "release" -Recurse -Filter "*.exe"
           foreach ($exe in $exeFiles) {
-            Write-Host "РџРѕРґРїРёСЃС‹РІР°РµРј: $($exe.FullName)"
+            Write-Host "Signing: $($exe.FullName)" -ForegroundColor Green
             & $signtool.FullName sign /f $pfxPath /p $env:WIN_CSC_KEY_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exe.FullName
             & $signtool.FullName verify /pa $exe.FullName
           }
           
           Remove-Item $pfxPath -Force
+          Write-Host "✅ Signing completed successfully!" -ForegroundColor Green
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -109,4 +119,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
