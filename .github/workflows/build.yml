@@ -1,4 +1,4 @@
-name: Build Desktop Apps
+﻿name: Build Desktop Apps
 
 on:
   push:
@@ -64,19 +64,19 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
-          # Декодируем сертификат из Base64
+          # Р”РµРєРѕРґРёСЂСѓРµРј СЃРµСЂС‚РёС„РёРєР°С‚ РёР· Base64
           $pfxBytes = [Convert]::FromBase64String($env:WIN_CSC_LINK)
           $pfxPath = "$env:TEMP\cert.pfx"
           [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
           
-          # Ищем signtool
+          # РС‰РµРј signtool
           $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Where-Object { $_.FullName -like "*x64*" } | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { Write-Host "❌ signtool.exe не найден"; exit 1 }
+          if (-not $signtool) { Write-Host "вќЊ signtool.exe РЅРµ РЅР°Р№РґРµРЅ"; exit 1 }
           
-          # Подписываем все .exe файлы в release/
+          # РџРѕРґРїРёСЃС‹РІР°РµРј РІСЃРµ .exe С„Р°Р№Р»С‹ РІ release/
           $exeFiles = Get-ChildItem -Path "release" -Recurse -Filter "*.exe"
           foreach ($exe in $exeFiles) {
-            Write-Host "Подписываем: $($exe.FullName)"
+            Write-Host "РџРѕРґРїРёСЃС‹РІР°РµРј: $($exe.FullName)"
             & $signtool.FullName sign /f $pfxPath /p $env:WIN_CSC_KEY_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exe.FullName
             & $signtool.FullName verify /pa $exe.FullName
           }
