@@ -57,6 +57,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Sign Windows executable
+        if: matrix.platform == 'win' && env.WIN_CSC_LINK != ''
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          # Декодируем сертификат из Base64
+          $pfxBytes = [Convert]::FromBase64String($env:WIN_CSC_LINK)
+          $pfxPath = "$env:TEMP\cert.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          
+          # Ищем signtool
+          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Where-Object { $_.FullName -like "*x64*" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { Write-Host "❌ signtool.exe не найден"; exit 1 }
+          
+          # Подписываем все .exe файлы в release/
+          $exeFiles = Get-ChildItem -Path "release" -Recurse -Filter "*.exe"
+          foreach ($exe in $exeFiles) {
+            Write-Host "Подписываем: $($exe.FullName)"
+            & $signtool.FullName sign /f $pfxPath /p $env:WIN_CSC_KEY_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exe.FullName
+            & $signtool.FullName verify /pa $exe.FullName
+          }
+          
+          Remove-Item $pfxPath -Force
+      
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
