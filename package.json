@@ -78,21 +78,11 @@
     "win": {
       "target": [
         "portable"
-      ],
-      "signingInfo": {
-        "sign": null
-      }
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "icon": "build/icon.icns"
+      ]
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "icon": "build/icon.png"
     }
