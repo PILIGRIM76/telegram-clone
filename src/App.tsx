@@ -38,7 +38,15 @@ import { CallsHistoryView } from './components/CallsHistoryView';
 import { DesktopJoystick } from './components/DesktopJoystick';
 import { FavoritesView } from './components/FavoritesView';
 import { ProfilePanel } from './components/ProfilePanel';
-import type { Chat, Contact, EncryptedAttachment, Group, IdentityType, Message } from './types';
+import type {
+  Chat,
+  Contact,
+  EncryptedAttachment,
+  Group,
+  IdentityType,
+  Message,
+  VoiceMessageMetadata,
+} from './types';
 // Signal Protocol обеспечивает прямую секретность через Double Ratchet.
 // Отправка сообщений предпочитает Signal, а при отсутствии сессии использует NaCl.
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
@@ -480,10 +488,18 @@ const App: React.FC = () => {
     text: string,
     attachments?: { id: string; dataUrl: string; name: string }[],
     replyTo?: string,
-    encryptedAttachments?: EncryptedAttachment[]
+    encryptedAttachments?: EncryptedAttachment[],
+    voiceMetadata?: VoiceMessageMetadata,
+    messageType?: Message['type']
   ) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (
+      !trimmed &&
+      (!encryptedAttachments || encryptedAttachments.length === 0) &&
+      !voiceMetadata
+    ) {
+      return;
+    }
     if (!identity) {
       logger.warn(
         '[PILIGRIM] handleSendMessage: identity РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РїСЂР°РІР»РµРЅРѕ'
@@ -513,6 +529,8 @@ const App: React.FC = () => {
           contact.publicKey,
           {
             id: msgId,
+            type: messageType,
+            voiceMetadata,
             encryptedAttachments:
               encryptedAttachments && encryptedAttachments.length > 0
                 ? encryptedAttachments
@@ -533,6 +551,8 @@ const App: React.FC = () => {
         if (contact?.publicKey && ws.isConnected) {
           try {
             apiService.sendMessage(contact.uid, trimmed, contact.publicKey, {
+              type: messageType,
+              voiceMetadata,
               encryptedAttachments:
                 encryptedAttachments && encryptedAttachments.length > 0
                   ? encryptedAttachments
@@ -563,9 +583,11 @@ const App: React.FC = () => {
       senderId: identity.uid,
       timestamp: new Date().toISOString(),
       status: 'sent',
+      type: messageType,
       attachments: attachments && attachments.length > 0 ? attachments : undefined,
       encryptedAttachments:
         encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined,
+      voiceMetadata,
       replyTo,
     };
     logger.info(
@@ -858,9 +880,26 @@ const App: React.FC = () => {
                   <ChatWindow
                     chatId={selectedChatId}
                     messages={chats[selectedChatId]?.messages || []}
-                    onSendMessage={(text, attachments, replyTo) => {
-                      void handleSendMessage(selectedChatId, text, attachments, replyTo);
+                    showHeader={false}
+                    onSendMessage={(
+                      text,
+                      attachments,
+                      replyTo,
+                      encryptedAttachments,
+                      voiceMetadata,
+                      messageType
+                    ) => {
+                      void handleSendMessage(
+                        selectedChatId,
+                        text,
+                        attachments,
+                        replyTo,
+                        encryptedAttachments,
+                        voiceMetadata,
+                        messageType
+                      );
                     }}
+                    currentIdentity={identity ?? undefined}
                     partner={(() => {
                       const c = contacts.find(c => c.id === selectedChatId);
                       if (c) return c;
@@ -985,6 +1024,7 @@ const App: React.FC = () => {
               }}
             />
           }
+          mobileShowList={!selectedChatId}
           // v3.0 Phase 2H: 3rd panel on desktop — открывается по клику на аватар в RightAppBar
           profilePanel={(() => {
             if (!isProfileOpen || !selectedChatId) return undefined;
@@ -1002,6 +1042,7 @@ const App: React.FC = () => {
                   if (partner.uid) void webrtcHook.startCall(partner.uid);
                 }}
                 onSearch={() => setIsSearchOpen(true)}
+                onShowMedia={() => pushToast('Медиа и файлы пока недоступны', 'info')}
                 onClose={() => setIsProfileOpen(false)}
               />
             );
@@ -1101,6 +1142,12 @@ const App: React.FC = () => {
           setIsDrawerOpen(false);
           setActiveTab('settings');
           setShowAccountPage(true);
+        }}
+        onCreateGroup={() => {
+          setActiveTab('chats');
+          window.setTimeout(() => {
+            window.dispatchEvent(new Event('piligrim:open-create-group'));
+          }, 0);
         }}
         onLogout={() => {
           setIsDrawerOpen(false);
@@ -1212,7 +1259,6 @@ const App: React.FC = () => {
             const target = contacts.find(c => c.uid === webrtcHook.currentCallUid);
             return target?.name || 'Контакт';
           })()}
-          partnerUid={webrtcHook.currentCallUid || ''}
           localStream={webrtcHook.localStream}
           remoteStream={webrtcHook.remoteStream}
           onAccept={() => void webrtcHook.answerCall()}

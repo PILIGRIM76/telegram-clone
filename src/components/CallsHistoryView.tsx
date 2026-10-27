@@ -58,13 +58,6 @@ function formatDuration(seconds: number): string {
   return m + ':' + s.toString().padStart(2, '0');
 }
 
-const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = 'rgba(0,0,0,0.02)';
-};
-const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = 'transparent';
-};
-
 interface CallsHistoryViewProps {
   onSearchClick?: () => void;
 }
@@ -115,11 +108,7 @@ export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onSearchClic
                 gap: 12,
                 padding: '12px 16px',
                 borderBottom: '1px solid rgba(0,0,0,0.04)',
-                cursor: 'pointer',
-                transition: 'background 150ms ease-out',
               }}
-              onMouseEnter={handleEnter}
-              onMouseLeave={handleLeave}
             >
               <AnimatedAvatar name={call.contactName} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>

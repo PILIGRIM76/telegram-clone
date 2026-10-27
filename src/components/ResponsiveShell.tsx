@@ -19,6 +19,7 @@ interface ResponsiveShellProps {
   desktopNav?: React.ReactNode;
 
   profilePanel?: React.ReactNode;
+  mobileShowList?: boolean;
 }
 
 export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
@@ -30,6 +31,7 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
   mobileNav,
   desktopNav,
   profilePanel,
+  mobileShowList = false,
 }) => {
   const bp: Breakpoint = useBreakpoint();
 
@@ -43,8 +45,18 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         width: '100%',
         position: 'relative' as const,
       },
-      left: { display: 'none' }, // скрывается когда открыт чат (toggle логика выше)
-      right: { flex: 1, display: 'flex', flexDirection: 'column' as const, minHeight: 0 },
+      left: {
+        display: mobileShowList ? 'flex' : 'none',
+        flexDirection: 'column' as const,
+        width: '100%',
+        minHeight: 0,
+      },
+      right: {
+        flex: 1,
+        display: mobileShowList ? 'none' : 'flex',
+        flexDirection: 'column' as const,
+        minHeight: 0,
+      },
     },
     tablet: {
       container: {

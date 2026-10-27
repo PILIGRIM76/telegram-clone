@@ -26,6 +26,7 @@ interface DrawerProps {
   activeView?: string;
   onNavigate?: (view: 'chats' | 'contacts' | 'calls' | 'favorites' | 'channels') => void;
   onOpenAccount?: () => void; // Открывает параметры безопасности.
+  onCreateGroup?: () => void;
 }
 
 const SLIDE_EASE = [0.2, 0.9, 0.4, 1] as const;
@@ -120,6 +121,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   activeView,
   onNavigate,
   onOpenAccount,
+  onCreateGroup,
 }) => {
   const bp: Breakpoint = useBreakpoint();
   const cfg = CFG[bp];
@@ -176,8 +178,7 @@ export const Drawer: React.FC<DrawerProps> = ({
       id: 'new-group',
       label: lang === 'ru' ? 'Новая группа' : 'New group',
       onClick: () => {
-        onNavigate?.('contacts');
-        window.dispatchEvent(new Event('piligrim:open-create-group'));
+        onCreateGroup?.();
         onClose();
       },
     },

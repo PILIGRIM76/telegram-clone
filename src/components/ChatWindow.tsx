@@ -3,13 +3,22 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListImperativeAPI } from 'react-window';
-import type { Contact, EncryptedAttachment, Identity, IdentityType, Message } from '../types';
+import { getPrivateKey } from '../services/cryptoService';
+import type {
+  Contact,
+  EncryptedAttachment,
+  IdentityType,
+  Message,
+  VoiceMessageMetadata,
+} from '../types';
 import AnimatedAvatar from './AnimatedAvatar';
 import { type EncryptionType } from './EncryptionBadge';
 import MessageItem from './MessageItem';
+import VoiceRecorder from './VoiceRecorder';
 import {
+  ArrowLeftIcon,
   CallIcon,
-  ClockIcon,
+  EmojiIcon,
   MicrophoneIcon,
   PaperAirplaneIcon,
   PaperClipIcon,
@@ -30,13 +39,19 @@ interface ChatWindowProps {
   onSendMessage: (
     text: string,
     attachments?: { id: string; dataUrl: string; name: string }[],
-    replyTo?: string
+    replyTo?: string,
+    encryptedAttachments?: EncryptedAttachment[],
+    voiceMetadata?: VoiceMessageMetadata,
+    messageType?: Message['type']
   ) => void;
   // Дополнительные данные собеседника, включая статус присутствия и сведения о группе.
   partner?: ChatPartner;
   currentUserUid?: string;
-  currentIdentity?: Identity;
+  currentIdentity?: IdentityType;
+  showHeader?: boolean;
   onBack?: () => void;
+  onSearchClick?: () => void;
+  onMenuClick?: () => void;
   onStartCall?: () => void;
   callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
   mutedUntil?: number;
@@ -93,6 +108,8 @@ interface ChatHeaderProps {
   partner: ChatPartner | undefined;
   currentUserUid?: string;
   onBack?: () => void;
+  onSearchClick?: () => void;
+  onMenuClick?: () => void;
   onStartCall?: () => void;
   callState?: 'idle' | 'calling' | 'in-call' | 'incoming';
   mutedUntil?: number;
@@ -103,6 +120,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   partner,
   currentUserUid,
   onBack,
+  onSearchClick,
+  onMenuClick,
   onStartCall,
   callState = 'idle',
   mutedUntil,
@@ -134,12 +153,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <header className="flex items-center justify-between px-4 py-2 h-[60px] border-b border-tg-border dark:border-tg-dark-border bg-tg-sidebar dark:bg-tg-dark-sidebar flex-shrink-0">
-      <div
-        className="flex items-center flex-1 cursor-pointer"
-        onClick={onBack ? onBack : undefined}
+      <button
+        type="button"
+        className="flex items-center flex-1 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left"
+        onClick={onBack}
+        aria-label={onBack ? 'Назад к списку чатов' : undefined}
+        disabled={!onBack}
       >
         {onBack && (
-          <SearchIcon className="w-5 h-5 text-tg-textSecondary dark:text-tg-dark-textSecondary mr-2 flex-shrink-0" />
+          <ArrowLeftIcon className="w-5 h-5 text-tg-textSecondary dark:text-tg-dark-textSecondary mr-2 flex-shrink-0" />
         )}
         <div className="flex items-center flex-1 min-w-0">
           <AnimatedAvatar name={partnerName} size={40} e2eeStatus="verified" isOnline={isOnline} />
@@ -150,13 +172,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <p className={`${statusColor} truncate`}>{statusText}</p>
           </div>
         </div>
-      </div>
+      </button>
 
       <div className="flex items-center space-x-1 flex-shrink-0">
         <button
           className="w-6 h-6 rounded-full p-2 text-tg-textSecondary dark:text-tg-dark-textSecondary hover:bg-tg-hover dark:hover:bg-tg-dark-hover transition-colors duration-200 flex items-center justify-center"
           title="Поиск"
-          aria-label="Search"
+          aria-label="Поиск в чате"
+          onClick={onSearchClick}
         >
           <SearchIcon className="w-4 h-4" />
         </button>
@@ -165,7 +188,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             className="w-6 h-6 rounded-full p-2 text-tg-textSecondary dark:text-tg-dark-textSecondary hover:bg-tg-hover dark:hover:bg-tg-dark-hover transition-colors duration-200 flex items-center justify-center"
             onClick={onStartCall}
             title="Звонок"
-            aria-label="Call"
+            aria-label="Аудиозвонок"
           >
             <CallIcon className="w-4 h-4" />
           </button>
@@ -173,7 +196,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <button
           className="w-6 h-6 rounded-full p-2 text-tg-textSecondary dark:text-tg-dark-textSecondary hover:bg-tg-hover dark:hover:bg-tg-dark-hover transition-colors duration-200 flex items-center justify-center"
           title="Ещё"
-          aria-label="More"
+          aria-label="Дополнительные действия чата"
+          onClick={onMenuClick}
         >
           <span className="w-4 h-4 flex items-center justify-center text-tg-textSecondary dark:text-tg-dark-textSecondary">
             ⋮
@@ -188,7 +212,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 interface MessageListProps {
   messages: Message[];
   currentUserUid?: string;
-  currentIdentity?: Identity;
+  currentIdentity?: IdentityType;
   partner?: ChatPartner;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -310,7 +334,10 @@ interface MessageInputProps {
   onSendMessage: (
     text: string,
     attachments?: { id: string; dataUrl: string; name: string }[],
-    replyTo?: string
+    replyTo?: string,
+    encryptedAttachments?: EncryptedAttachment[],
+    voiceMetadata?: VoiceMessageMetadata,
+    messageType?: Message['type']
   ) => void;
   identity: IdentityType | null;
   draft: string;
@@ -335,6 +362,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [fileError, setFileError] = useState('');
   const [encryptedAttachments, setEncryptedAttachments] = useState<EncryptedAttachment[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const typingTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -374,7 +402,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
               name: enc.name,
             }))
           : undefined;
-      onSendMessage(draft.trim(), attachments, replyTo?.id);
+      onSendMessage(draft.trim(), attachments, replyTo?.id, encryptedAttachments);
       setDraft('');
       setEncryptedAttachments([]);
       setMediaFile(null);
@@ -411,10 +439,61 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setEncryptedAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const insertEmoji = (emoji: string) => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? draft.length;
+    const end = textarea?.selectionEnd ?? draft.length;
+    const nextDraft = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+
+    setDraft(nextDraft);
+    setShowEmojiPicker(false);
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const handleVoiceRecorded = async (encryptedBlob: Blob, voiceMetadata: VoiceMessageMetadata) => {
+    const encryptedContent = await encryptedBlob.text();
+    const payload: unknown = JSON.parse(encryptedContent);
+    if (typeof payload !== 'object' || payload === null) {
+      throw new Error('Не удалось подготовить голосовое сообщение');
+    }
+
+    const voice = payload as Record<string, unknown>;
+    if (
+      typeof voice.ciphertext !== 'string' ||
+      typeof voice.iv !== 'string' ||
+      typeof voice.key !== 'string' ||
+      typeof voice.name !== 'string' ||
+      typeof voice.type !== 'string' ||
+      typeof voice.size !== 'number'
+    ) {
+      throw new Error('Данные голосового сообщения повреждены');
+    }
+
+    const attachment: EncryptedAttachment = {
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `voice-${Date.now()}`,
+      name: voice.name,
+      type: voice.type,
+      size: voice.size,
+      ciphertext: encryptedContent,
+      iv: voice.iv,
+      key: voice.key,
+    };
+
+    onSendMessage('', undefined, replyTo?.id, [attachment], voiceMetadata, 'voice');
+    setReplyTo(null);
+  };
+
   const hasContent = draft.trim() || mediaFile || encryptedAttachments.length > 0;
+  const emojis = ['😀', '😂', '😊', '😍', '👍', '🙏', '🎉', '❤️', '🤔', '😢', '🔥', '👋'];
 
   return (
-    <div className="flex items-end px-4 py-3 border-t border-tg-border dark:border-tg-dark-border bg-tg-sidebar dark:bg-tg-dark-sidebar mt-auto flex-shrink-0">
+    <div className="relative flex items-end px-4 py-3 border-t border-tg-border dark:border-tg-dark-border bg-tg-sidebar dark:bg-tg-dark-sidebar mt-auto flex-shrink-0">
       <div className="flex items-center space-x-2 mr-3 flex-shrink-0">
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -424,13 +503,31 @@ const MessageInput: React.FC<MessageInputProps> = ({
         >
           <PaperClipIcon className="w-4 h-4" />
         </button>
-        <button
-          className="w-6 h-6 text-tg-textSecondary dark:text-tg-dark-textSecondary hover:text-tg-primary dark:hover:text-tg-dark-primary transition-colors duration-200 flex items-center justify-center"
-          title="Эмодзи"
-          aria-label="Emoji"
-        >
-          <ClockIcon className="w-4 h-4" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowEmojiPicker(open => !open)}
+            className="w-6 h-6 text-tg-textSecondary dark:text-tg-dark-textSecondary hover:text-tg-primary dark:hover:text-tg-dark-primary transition-colors duration-200 flex items-center justify-center"
+            title="Эмодзи"
+            aria-label="Эмодзи"
+            aria-expanded={showEmojiPicker}
+          >
+            <EmojiIcon className="w-4 h-4" />
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-full left-0 mb-2 z-30 grid grid-cols-6 gap-1 rounded-lg bg-tg-menuBg p-2 text-tg-menuText shadow-xl dark:bg-tg-dark-menuBg dark:text-tg-dark-menuText">
+              {emojis.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => insertEmoji(emoji)}
+                  className="flex h-8 w-8 items-center justify-center rounded hover:bg-tg-menuHover dark:hover:bg-tg-dark-menuHover"
+                  aria-label={`Вставить эмодзи ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="relative min-w-0 flex-1 rounded-2xl bg-tg-background dark:bg-tg-dark-background focus-within:ring-2 focus-within:ring-tg-primary">
@@ -463,23 +560,32 @@ const MessageInput: React.FC<MessageInputProps> = ({
             className="min-w-0 flex-1 bg-transparent outline-none text-tg-text dark:text-tg-dark-text placeholder:text-tg-textSecondary dark:placeholder:text-tg-dark-textSecondary resize-none py-2 px-2 max-h-[200px] overflow-y-auto"
             rows={1}
           />
-          <button
-            onClick={send}
-            disabled={!hasContent}
-            className={`m-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-opacity duration-200 ${
-              hasContent
-                ? 'bg-tg-primary dark:bg-tg-dark-primary text-white hover:opacity-80'
-                : 'bg-tg-textSecondary dark:bg-tg-dark-textSecondary text-white opacity-50 cursor-not-allowed'
-            }`}
-            aria-label="Отправить"
-            title="Отправить"
-          >
-            {hasContent ? (
+          {hasContent ? (
+            <button
+              onClick={send}
+              className="m-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-tg-primary text-white transition-opacity duration-200 hover:opacity-80 dark:bg-tg-dark-primary"
+              aria-label="Отправить"
+              title="Отправить"
+            >
               <PaperAirplaneIcon className="w-5 h-5" />
-            ) : (
-              <MicrophoneIcon className="w-5 h-5" />
-            )}
-          </button>
+            </button>
+          ) : identity ? (
+            <VoiceRecorder
+              privateKeyHex={getPrivateKey(identity)}
+              onVoiceRecorded={handleVoiceRecorded}
+              onCancel={() => setFileError('')}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="m-1 flex h-9 w-9 flex-shrink-0 cursor-not-allowed items-center justify-center rounded-full text-tg-textSecondary opacity-50 dark:text-tg-dark-textSecondary"
+              aria-label="Войдите, чтобы записать голосовое сообщение"
+              title="Войдите, чтобы записать голосовое сообщение"
+            >
+              <MicrophoneIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {fileError && <p className="text-[10px] text-red-400 mt-1">{fileError}</p>}
@@ -549,7 +655,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   partner,
   currentUserUid,
   currentIdentity,
+  showHeader = true,
   onBack,
+  onSearchClick,
+  onMenuClick,
   onStartCall,
   callState = 'idle',
   mutedUntil,
@@ -586,24 +695,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     (
       text: string,
       attachments?: { id: string; dataUrl: string; name: string }[],
-      replyToId?: string
+      replyToId?: string,
+      encryptedAttachments?: EncryptedAttachment[],
+      voiceMetadata?: VoiceMessageMetadata,
+      messageType?: Message['type']
     ) => {
-      onSendMessage(text, attachments, replyToId);
+      onSendMessage(text, attachments, replyToId, encryptedAttachments, voiceMetadata, messageType);
     },
     [onSendMessage]
   );
 
   return (
     <div className="flex flex-col h-full bg-tg-background dark:bg-tg-dark-background">
-      <ChatHeader
-        partner={partner}
-        currentUserUid={currentUserUid}
-        onBack={onBack}
-        onStartCall={onStartCall}
-        callState={callState}
-        mutedUntil={mutedUntil}
-        onVerifyContact={onVerifyContact}
-      />
+      {showHeader && (
+        <ChatHeader
+          partner={partner}
+          currentUserUid={currentUserUid}
+          onBack={onBack}
+          onSearchClick={onSearchClick}
+          onMenuClick={onMenuClick}
+          onStartCall={onStartCall}
+          callState={callState}
+          mutedUntil={mutedUntil}
+          onVerifyContact={onVerifyContact}
+        />
+      )}
 
       <MessageList
         messages={messages}
@@ -620,7 +736,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
       <MessageInput
         onSendMessage={handleSend}
-        identity={null}
+        identity={currentIdentity ?? null}
         draft={draft}
         setDraft={setDraft}
         replyTo={replyTo}

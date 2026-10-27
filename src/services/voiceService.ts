@@ -1,5 +1,31 @@
 import type { DecryptedVoiceMessage, VoiceMessageMetadata } from '../types';
 import { decryptFile, encryptFile } from './cryptoService';
+import { logger } from './logger';
+
+interface EncryptedVoicePayload {
+  ciphertext: string;
+  iv: string;
+  key: string;
+  type: string;
+  size: number;
+}
+
+function isEncryptedVoicePayload(value: unknown): value is EncryptedVoicePayload {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'ciphertext' in value &&
+    typeof value.ciphertext === 'string' &&
+    'iv' in value &&
+    typeof value.iv === 'string' &&
+    'key' in value &&
+    typeof value.key === 'string' &&
+    'type' in value &&
+    typeof value.type === 'string' &&
+    'size' in value &&
+    typeof value.size === 'number'
+  );
+}
 
 class VoiceService {
   private mediaRecorder: MediaRecorder | null = null;
@@ -12,6 +38,8 @@ class VoiceService {
   private onLevelUpdate: ((level: number) => void) | null = null;
   private maxDuration: number = 300;
   private durationTimerId: number | null = null;
+  private recordingResult: Promise<Blob> | null = null;
+  private resolveRecording: ((blob: Blob) => void) | null = null;
 
   async startRecording(onLevelUpdate?: (level: number) => void): Promise<void> {
     this.onLevelUpdate = onLevelUpdate || null;
@@ -34,21 +62,36 @@ class VoiceService {
         audioBitsPerSecond: 128000, // Устанавливаем битрейт 128 кбит/с.
       });
 
+      const recorder = this.mediaRecorder;
       this.audioChunks = [];
 
-      this.mediaRecorder.ondataavailable = event => {
+      this.recordingResult = new Promise(resolve => {
+        this.resolveRecording = resolve;
+      });
+
+      recorder.ondataavailable = event => {
         if (event.data.size > 0) {
           this.audioChunks.push(event.data);
         }
       };
+      recorder.onstop = () => {
+        const audioBlob = new Blob(this.audioChunks, {
+          type: recorder.mimeType || 'audio/webm',
+        });
+        this.resolveRecording?.(audioBlob);
+        this.resolveRecording = null;
+        this.stopDurationTimer();
+        this.cleanup();
+      };
 
       this.setupAudioVisualization();
 
-      this.mediaRecorder.start(100);
+      recorder.start(100);
 
       // Запускаем таймер длительности записи.
       this.startDurationTimer();
     } catch (error) {
+      this.cleanup();
       throw new Error(
         `Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -57,34 +100,28 @@ class VoiceService {
 
   // Stop recording and return audio blob
   stopRecording(): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
-        this.cleanup();
-        reject(new Error('Recording not started'));
-        return;
-      }
+    if (!this.recordingResult) {
+      return Promise.reject(new Error('Recording not started'));
+    }
 
-      this.mediaRecorder.onstop = () => {
-        const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
-        const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-
-        this.stopDurationTimer();
-        this.cleanup();
-
-        resolve(audioBlob);
-      };
-
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
-    });
+    }
+
+    return this.recordingResult;
   }
 
   // Cancel recording
   cancelRecording(): void {
-    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
+    const recorder = this.mediaRecorder;
+    if (recorder) {
+      recorder.onstop = null;
+      if (recorder.state !== 'inactive') recorder.stop();
     }
     this.stopDurationTimer();
     this.cleanup();
+    this.recordingResult = null;
+    this.resolveRecording = null;
   }
 
   // Encrypt voice message
@@ -135,7 +172,10 @@ class VoiceService {
   ): Promise<DecryptedVoiceMessage> {
     // Parse the encrypted data
     const text = await encryptedBlob.text();
-    const encryptedData = JSON.parse(text);
+    const encryptedData: unknown = JSON.parse(text);
+    if (!isEncryptedVoicePayload(encryptedData)) {
+      throw new Error('Invalid encrypted voice message');
+    }
 
     const decryptedBlob = await decryptFile(
       encryptedData.ciphertext,
@@ -189,7 +229,12 @@ class VoiceService {
   private setupAudioVisualization(): void {
     if (!this.stream) return;
 
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+
+    this.audioContext = new AudioContextConstructor();
     this.analyser = this.audioContext.createAnalyser();
 
     const source = this.audioContext.createMediaStreamSource(this.stream);
@@ -280,7 +325,9 @@ class VoiceService {
 
     // Close audio context
     if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
+      void this.audioContext.close().catch(error => {
+        logger.warn('[VoiceService] Failed to close audio context:', error);
+      });
       this.audioContext = null;
     }
 

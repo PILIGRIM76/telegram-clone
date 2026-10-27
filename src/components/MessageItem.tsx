@@ -1,8 +1,8 @@
 ﻿import { logger } from '../services/logger';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { decryptAESGCM, decryptFile, getPrivateKey } from '../services/cryptoService';
-import type { Contact, Identity, Message } from '../types';
+import type { Contact, IdentityType, Message } from '../types';
 import type { MenuItem } from './ContextMenu';
 import { ContextMenu } from './ContextMenu';
 import { ClockIcon } from './icons/ClockIcon';
@@ -10,7 +10,7 @@ import { VoicePlayer } from './VoicePlayer';
 
 interface MessageItemProps {
   message: Message;
-  currentIdentity: Identity;
+  currentIdentity: IdentityType;
   onDelete?: (messageId: string) => void;
   disappearTimer?: number;
   currentUserUid?: string;
@@ -129,6 +129,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const messageRef = useRef<HTMLDivElement>(null);
   const currentUid = currentUserUid || currentIdentity?.uid || '';
+  const voiceAttachment = message.encryptedAttachments?.[0];
+  const encryptedVoiceBlob = useMemo(
+    () =>
+      voiceAttachment ? new Blob([voiceAttachment.ciphertext], { type: 'application/json' }) : null,
+    [voiceAttachment?.ciphertext]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +163,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   useEffect(() => {
     const attachments = message.encryptedAttachments;
-    if (!attachments?.length) return;
+    if (!attachments?.length || message.type === 'voice') return;
     let cancelled = false;
     const decrypt = async () => {
       const privateKey = getPrivateKey(currentIdentity);
@@ -359,11 +365,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {!isEditing && (
             <>
               {message.type === 'voice' &&
-                message.encryptedAttachments &&
-                message.encryptedAttachments.length > 0 &&
+                voiceAttachment &&
+                encryptedVoiceBlob &&
                 message.voiceMetadata && (
                   <VoicePlayer
-                    encryptedBlob={message.encryptedAttachments[0].ciphertext as unknown as Blob}
+                    encryptedBlob={encryptedVoiceBlob}
                     metadata={message.voiceMetadata}
                     privateKeyHex={getPrivateKey(currentIdentity)}
                     isOwn={isOwn}

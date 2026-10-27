@@ -8,6 +8,7 @@ interface ProfilePanelProps {
   onCall?: () => void;
   onVideo?: () => void;
   onSearch?: () => void;
+  onShowMedia?: () => void;
   onClose?: () => void;
 }
 
@@ -39,6 +40,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
   onCall,
   onVideo,
   onSearch,
+  onShowMedia,
   onClose,
 }) => {
   return (
@@ -191,8 +193,10 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
             color: 'var(--color-text-secondary)',
             cursor: 'pointer',
           }}
+          onClick={onShowMedia}
+          aria-label="Открыть медиа и файлы"
         >
-          Media, files, links
+          Медиа, файлы и ссылки
         </button>
       </div>
 

@@ -6,7 +6,6 @@ import { playEndCallSound, playRingtone, stopRingtone } from '../utils/callSound
 interface CallModalProps {
   callState: 'idle' | 'calling' | 'in-call' | 'incoming';
   partnerName: string;
-  partnerUid: string;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   onAccept: () => void;
@@ -25,7 +24,6 @@ interface CallModalProps {
 export const CallModal: React.FC<CallModalProps> = ({
   callState,
   partnerName,
-  partnerUid,
   localStream,
   remoteStream,
   onAccept,
@@ -101,6 +99,7 @@ export const CallModal: React.FC<CallModalProps> = ({
         <div style={{ display: 'flex', gap: 32, marginTop: 32 }}>
           <button
             onClick={onDecline}
+            aria-label="Отклонить звонок"
             style={{
               width: 64,
               height: 64,
@@ -117,6 +116,7 @@ export const CallModal: React.FC<CallModalProps> = ({
           </button>
           <button
             onClick={onAccept}
+            aria-label="Ответить на звонок"
             style={{
               width: 64,
               height: 64,
@@ -169,7 +169,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             zIndex: 10,
           }}
         >
-          ⏱️ {callDuration}
+          ⏱️ {formatTime(callDuration)}
         </div>
         <div style={{ flex: 1, position: 'relative' }}>
           <video
@@ -282,6 +282,7 @@ export const CallModal: React.FC<CallModalProps> = ({
         >
           <button
             onClick={onToggleMute}
+            aria-label={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
             style={{
               width: '60px',
               height: '60px',
@@ -297,6 +298,7 @@ export const CallModal: React.FC<CallModalProps> = ({
           </button>
           <button
             onClick={onToggleVideo}
+            aria-label={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
             style={{
               width: '60px',
               height: '60px',
@@ -325,12 +327,13 @@ export const CallModal: React.FC<CallModalProps> = ({
               transition: 'all 0.2s ease',
               boxShadow: isScreenSharing ? '0 0 12px rgba(251, 191, 36, 0.6)' : 'none',
             }}
-            aria-label={isScreenSharing ? 'Stop screen sharing' : 'Start screen sharing'}
+            aria-label={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Поделиться экраном'}
           >
             {isScreenSharing ? '🛑' : '🖥️'}
           </button>
           <button
             onClick={onEnd}
+            aria-label="Завершить звонок"
             style={{
               width: '60px',
               height: '60px',
@@ -382,6 +385,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               playEndCallSound();
               onEnd();
             }}
+            aria-label="Отменить звонок"
             style={{
               marginTop: '20px',
               padding: '12px 32px',
