@@ -156,6 +156,31 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
           {profilePanel}
         </div>
       )}
+
+      {profilePanel && bp !== 'desktop' && (
+        <div
+          data-testid="profile-panel-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'var(--color-scrim)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(320px, 100%)',
+              height: '100%',
+              background: 'var(--color-bg-primary)',
+              boxShadow: 'var(--shadow-3)',
+            }}
+          >
+            {profilePanel}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

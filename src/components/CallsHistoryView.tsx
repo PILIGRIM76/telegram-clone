@@ -1,6 +1,3 @@
-import { logger } from '../services/logger'; // Этап 2C: история звонков для планшетов.
-// На следующем этапе здесь появится история звонков из WebRTC через useCallHistory.
-
 import React from 'react';
 import { AnimatedAvatar } from './AnimatedAvatar';
 import { LeftAppBar } from './LeftAppBar';
@@ -68,7 +65,11 @@ const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
   e.currentTarget.style.background = 'transparent';
 };
 
-export const CallsHistoryView: React.FC = () => {
+interface CallsHistoryViewProps {
+  onSearchClick?: () => void;
+}
+
+export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onSearchClick }) => {
   return (
     <div
       data-testid="calls-history-view"
@@ -82,7 +83,7 @@ export const CallsHistoryView: React.FC = () => {
       <LeftAppBar
         title="Звонки"
         onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))}
-        onSearchClick={() => logger.info('[PILIGRIM] Search (Phase 2E)')}
+        onSearchClick={() => onSearchClick?.()}
       />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {DEMO_CALLS.length === 0 ? (

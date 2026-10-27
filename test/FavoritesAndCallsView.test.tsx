@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { CallsHistoryView } from '../src/components/CallsHistoryView';
 import { FavoritesView } from '../src/components/FavoritesView';
 
@@ -26,6 +26,17 @@ describe('FavoritesView Russian text', () => {
 
     expect(screen.getByText('Верифицирован')).toBeInTheDocument();
   });
+
+  test('opens search when the search icon is clicked', () => {
+    const onSearchClick = jest.fn();
+    render(
+      <FavoritesView contacts={[]} onSelectContact={jest.fn()} onSearchClick={onSearchClick} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Поиск' }));
+
+    expect(onSearchClick).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('CallsHistoryView Russian text', () => {
@@ -40,5 +51,14 @@ describe('CallsHistoryView Russian text', () => {
     expect(screen.getAllByText('Аудио')).toHaveLength(2);
     expect(screen.getByText('Сегодня, 14:30')).toBeInTheDocument();
     expect(screen.getByText('Сегодня, 11:15')).toBeInTheDocument();
+  });
+
+  test('opens search when the search icon is clicked', () => {
+    const onSearchClick = jest.fn();
+    render(<CallsHistoryView onSearchClick={onSearchClick} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Поиск' }));
+
+    expect(onSearchClick).toHaveBeenCalledTimes(1);
   });
 });

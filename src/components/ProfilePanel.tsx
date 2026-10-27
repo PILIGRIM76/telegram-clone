@@ -47,6 +47,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
       style={{
         width: 320,
         flexShrink: 0,
+        height: '100%',
         background: 'var(--color-bg-primary)',
         borderLeft: '1px solid rgba(0,0,0,0.05)',
         display: 'flex',
@@ -149,7 +150,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           data-testid="profile-action-call"
           style={actionBtn}
           onClick={onCall}
-          aria-label="Call"
+          aria-label="Аудиозвонок"
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}
         >
@@ -159,7 +160,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           data-testid="profile-action-video"
           style={actionBtn}
           onClick={onVideo}
-          aria-label="Video"
+          aria-label="Видеозвонок"
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}
         >
@@ -169,7 +170,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           data-testid="profile-action-search"
           style={actionBtn}
           onClick={onSearch}
-          aria-label="Search"
+          aria-label="Поиск"
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}
         >

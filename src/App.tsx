@@ -399,9 +399,12 @@ const App: React.FC = () => {
     );
     logger.info(`рџ“Ѓ [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
   };
-  const handleOpenProfile = () => logger.info('[PILIGRIM] handleOpenProfile stub');
-  const handleOpenStore = () => logger.info('[PILIGRIM] handleOpenStore stub');
-  const handleOpenBoards = () => logger.info('[PILIGRIM] handleOpenBoards stub');
+  const handleOpenProfile = () => {
+    setActiveTab('settings');
+    setShowAccountPage(true);
+  };
+  const handleOpenStore = () => pushToast('Магазин пока недоступен', 'info');
+  const handleOpenBoards = () => pushToast('Доски объявлений пока недоступны', 'info');
 
   // v1.6 Batch 4: handleVerifyContact — пометить контакт как verified
   const handleVerifyContact = (chatId: string) => {
@@ -744,6 +747,7 @@ const App: React.FC = () => {
           top: '8px',
           right: '12px',
           zIndex: 100,
+          pointerEvents: 'none',
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
@@ -834,8 +838,17 @@ const App: React.FC = () => {
                     alert('Contact not found or has no UID');
                   }
                 }}
-                onVideoClick={() => logger.info('[PILIGRIM] Video call (Phase 2F)')}
-                onMenuClick={() => setShowLogoutModal(true)}
+                onVideoClick={() => {
+                  const target = contacts.find(
+                    c => c.id === selectedChatId || c.uid === selectedChatId
+                  );
+                  if (target?.uid) {
+                    void webrtcHook.startCall(target.uid);
+                  } else {
+                    pushToast('Видеозвонок доступен только для личных чатов', 'info');
+                  }
+                }}
+                onMenuClick={() => setIsDrawerOpen(true)}
                 // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel
                 onAvatarClick={() => setIsProfileOpen(true)}
               />
@@ -982,8 +995,12 @@ const App: React.FC = () => {
                 contactName={partner.name}
                 contactUid={partner.uid}
                 isOnline={wsStatus === 'open'}
-                onCall={() => logger.info('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
-                onVideo={() => logger.info('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
+                onCall={() => {
+                  if (partner.uid) void webrtcHook.startCall(partner.uid);
+                }}
+                onVideo={() => {
+                  if (partner.uid) void webrtcHook.startCall(partner.uid);
+                }}
                 onSearch={() => setIsSearchOpen(true)}
                 onClose={() => setIsProfileOpen(false)}
               />
@@ -1003,7 +1020,7 @@ const App: React.FC = () => {
         />
       )}
 
-      {activeTab === 'calls' && <CallsHistoryView />}
+      {activeTab === 'calls' && <CallsHistoryView onSearchClick={() => setIsSearchOpen(true)} />}
 
       {/* v3.0 Phase 2C: вкладка Избранное — только verified контакты */}
       {activeTab === 'favorites' && (
@@ -1013,6 +1030,7 @@ const App: React.FC = () => {
             handleTabChange('chats');
             void handleSelectChat(uid);
           }}
+          onSearchClick={() => setIsSearchOpen(true)}
         />
       )}
 

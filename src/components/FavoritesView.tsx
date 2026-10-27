@@ -1,7 +1,3 @@
-import { logger } from '../services/logger'; // Этап 2C: отображаются только проверенные контакты.
-// Это security-фича: стимулирует использование Verify (anti-MITM).
-// Контакт считается проверенным после сравнения отпечатков; это защищает от атак посредника.
-
 import React from 'react';
 import { AnimatedAvatar } from './AnimatedAvatar';
 import { LeftAppBar } from './LeftAppBar';
@@ -15,6 +11,7 @@ interface Contact {
 interface FavoritesViewProps {
   contacts: Contact[];
   onSelectContact: (uid: string) => void;
+  onSearchClick?: () => void;
 }
 
 const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -24,7 +21,11 @@ const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
   e.currentTarget.style.background = 'transparent';
 };
 
-export const FavoritesView: React.FC<FavoritesViewProps> = ({ contacts, onSelectContact }) => {
+export const FavoritesView: React.FC<FavoritesViewProps> = ({
+  contacts,
+  onSelectContact,
+  onSearchClick,
+}) => {
   const favorites = contacts.filter(c => c.verified);
 
   return (
@@ -40,7 +41,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ contacts, onSelect
       <LeftAppBar
         title="Избранное"
         onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))}
-        onSearchClick={() => logger.info('[PILIGRIM] Search (Phase 2E)')}
+        onSearchClick={() => onSearchClick?.()}
       />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {favorites.length === 0 ? (
