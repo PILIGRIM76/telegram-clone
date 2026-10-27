@@ -1,5 +1,5 @@
 import { logger } from './logger';
-// Phase 2: Traffic padding — шумовые пакеты для защиты от traffic analysis.
+// Этап 2: заполнение трафика шумовыми пакетами для защиты от анализа сетевой активности.
 // Сервер не может отличить реальные сообщения от шумовых по частоте/времени.
 
 /**
@@ -15,11 +15,11 @@ export class TrafficPadder {
   private enabled = false;
 
   /** Минимальный интервал между шумовыми пакетами (мс). */
-  readonly MIN_INTERVAL = 30000;  // 30 секунд
+  readonly MIN_INTERVAL = 30000; // 30 секунд
   /** Максимальный интервал между шумовыми пакетами (мс). */
-  readonly MAX_INTERVAL = 60000;  // 60 секунд
+  readonly MAX_INTERVAL = 60000; // 60 секунд
   /** Размер padding в шумовом пакете (символов). */
-  readonly PACKET_SIZE = 1024;    // 1KB фиксированный
+  readonly PACKET_SIZE = 1024; // 1KB фиксированный
 
   connect(ws: WebSocket, enabled = true) {
     this.ws = ws;
@@ -74,16 +74,16 @@ export class TrafficPadder {
 }
 
 /**
- * Padding для реальных сообщений — все пакеты constant-size 2KB,
- * чтобы противник не мог делать traffic analysis по размеру сообщений.
+ * Дополняет реальные сообщения до фиксированного размера 2 КБ,
+ * чтобы нельзя было анализировать их размер.
  */
 export const TARGET_PACKET_SIZE = 2048;
 
 export function padMessage(payload: string, targetSize = TARGET_PACKET_SIZE): string {
-  // Null-byte padding до фиксированного размера. Получатель обрезает trailing nulls.
+  // Дополняет пакет нулевыми байтами до заданного размера; получатель удаляет их в конце.
   if (payload.length >= targetSize) {
-    // Edge case: payload больше targetSize. Не обрезаем — возвращаем как есть.
-    // В реальности такого не должно быть (JSON payload обычно < 1KB).
+    // Если данные превышают целевой размер, не обрезаем их, а возвращаем без изменений.
+    // Обычно данные JSON меньше 1 КБ.
     return payload;
   }
   const padded = payload + '\0'.repeat(targetSize - payload.length);
@@ -91,24 +91,27 @@ export function padMessage(payload: string, targetSize = TARGET_PACKET_SIZE): st
 }
 
 export function unpadMessage(payload: string): string {
-  // Удаляем trailing null bytes.
+  // Удаляем завершающие нулевые байты.
   return payload.replace(/\0+$/, '');
 }
 
 /**
- * Кодирование constant-size пакета с префиксом длины для надёжного unpadding.
- * Формат: 4-char hex length + JSON payload + null padding to targetSize.
+ * Кодирует пакет фиксированного размера с префиксом длины для надёжного извлечения данных.
+ * Формат: длина в виде восьми шестнадцатеричных символов, JSON-данные и нулевое дополнение.
  *
- * Префикс длины позволяет получателю корректно извлечь payload даже
- * если JSON содержит trailing whitespace или специальные символы.
+ * Префикс длины позволяет получателю извлечь данные, даже если JSON содержит
+ * завершающие пробелы или специальные символы.
  */
-export function encodeConstantSizePacket(jsonPayload: string, targetSize = TARGET_PACKET_SIZE): string {
+export function encodeConstantSizePacket(
+  jsonPayload: string,
+  targetSize = TARGET_PACKET_SIZE
+): string {
   const payloadLen = jsonPayload.length;
-  const lenHex = payloadLen.toString(16).padStart(8, '0');  // 4 байта hex = 8 chars
+  const lenHex = payloadLen.toString(16).padStart(8, '0'); // 4 байта hex = 8 chars
   const header = lenHex + ':';
   const totalContent = header + jsonPayload;
   if (totalContent.length >= targetSize) {
-    // Не помещается — отправляем без padding (edge case)
+    // Если данные не помещаются, отправляем их без дополнения.
     return totalContent;
   }
   return totalContent + '\0'.repeat(targetSize - totalContent.length);
@@ -119,7 +122,7 @@ export function decodeConstantSizePacket(packet: string): string {
   const unpadded = packet.replace(/\0+$/, '');
   const colonIdx = unpadded.indexOf(':');
   if (colonIdx !== 8) {
-    // Нет префикса длины или неверный формат — fallback: считаем весь payload
+    // Если префикс длины отсутствует или некорректен, считаем полезными данными весь пакет.
     return unpadded;
   }
   const lenHex = unpadded.substring(0, 8);

@@ -1,10 +1,11 @@
 import { logger } from '../services/logger';
-// v1.5.2 Stage 6: WebRTC React hook поверх browser-native webrtcService.
+// Этап 6: React-хук для работы с WebRTC через webrtcService и API браузера.
 // Сигналинг через apiService WebSocket (Этап 5).
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { webrtcService, SignalPayload } from '../services/webrtcService';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
+import type { SignalPayload } from '../services/webrtcService';
+import { webrtcService } from '../services/webrtcService';
 
 export interface IncomingCall {
   from: string;
@@ -23,7 +24,7 @@ export function useWebRTC(_currentUserId: string) {
   const [currentCallUid, setCurrentCallUid] = useState<string>('');
   const lastCallInitiatorRef = useRef<string>('');
 
-  // callDuration timer
+  // Таймер длительности звонка.
   useEffect(() => {
     let interval: number | undefined;
     if (isInCall || isCalling) {
@@ -81,8 +82,8 @@ export function useWebRTC(_currentUserId: string) {
     setCurrentCallUid(to);
     lastCallInitiatorRef.current = to;
     await webrtcService.initCall(to, {
-      onLocalStream: (stream) => setLocalStream(stream),
-      onStream: (stream) => {
+      onLocalStream: stream => setLocalStream(stream),
+      onStream: stream => {
         setRemoteStream(stream);
         setIsInCall(true);
         setIsCalling(false);
@@ -95,7 +96,7 @@ export function useWebRTC(_currentUserId: string) {
         setLocalStream(null);
         setCurrentCallUid('');
       },
-      onError: (error) => {
+      onError: error => {
         logger.error('[PILIGRIM] useWebRTC: call error', error);
         setIsCalling(false);
         setIsInCall(false);
@@ -103,15 +104,15 @@ export function useWebRTC(_currentUserId: string) {
         alert(`Ошибка звонка: ${error.message}`);
       },
       onScreenShareStarted: () => setIsScreenSharing(true),
-      onScreenShareStopped: () => setIsScreenSharing(false)
+      onScreenShareStopped: () => setIsScreenSharing(false),
     });
   }, []);
 
   const answerCall = useCallback(async () => {
     if (!incomingCall) return;
     await webrtcService.answerCall(incomingCall.from, incomingCall.signal, {
-      onLocalStream: (stream) => setLocalStream(stream),
-      onStream: (stream) => {
+      onLocalStream: stream => setLocalStream(stream),
+      onStream: stream => {
         setRemoteStream(stream);
         setIsInCall(true);
         setIncomingCall(null);
@@ -124,14 +125,14 @@ export function useWebRTC(_currentUserId: string) {
         setLocalStream(null);
         setCurrentCallUid('');
       },
-      onError: (error) => {
+      onError: error => {
         logger.error('[PILIGRIM] useWebRTC: answer error', error);
         setIncomingCall(null);
         setCurrentCallUid('');
         alert(`Ошибка ответа: ${error.message}`);
       },
       onScreenShareStarted: () => setIsScreenSharing(true),
-      onScreenShareStopped: () => setIsScreenSharing(false)
+      onScreenShareStopped: () => setIsScreenSharing(false),
     });
   }, [incomingCall]);
 
@@ -195,6 +196,6 @@ export function useWebRTC(_currentUserId: string) {
     toggleVideo,
     isAudioEnabled,
     isVideoEnabled,
-    toggleScreenShare
+    toggleScreenShare,
   };
 }

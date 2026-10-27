@@ -1,29 +1,29 @@
-// v3.0 Phase 1.5: AnimatedAvatar — анимированный аватар с conic-gradient
+// Этап 1.5: анимированный аватар с коническим градиентом.
 // Использует Framer Motion для плавного вращения.
 // Цвет генерируется из имени (детерминированно), что даёт стабильный визуал.
 
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 
 interface AnimatedAvatarProps {
   name: string;
   size?: number;
   accentColor?: string;
-  /** v3.0 Phase 2F: white 3px border + extra shadow (for large header avatars) */
+
   bordered?: boolean;
-  /** E2EE status: verified/pending/unverified */
+  /** Статус сквозного шифрования: подтверждён, ожидает проверки или не подтверждён. */
   e2eeStatus?: 'verified' | 'pending' | 'unverified';
-  /** Online status indicator */
+  /** Признак подключения пользователя. */
   isOnline?: boolean;
-  /** Typing indicator */
+  /** Признак того, что пользователь набирает текст. */
   isTyping?: boolean;
-  /** Avatar image URL (if set, overrides gradient) */
+  /** URL изображения аватара; если задан, заменяет градионный фон. */
   avatarUrl?: string;
-  /** Custom border color (default white for bordered, or avatar container color) */
+  /** Пользовательский цвет рамки: по умолчанию белый для обведённого аватара или цвет контейнера. */
   borderColor?: string;
-  /** Enable hover effect (scale + translateY) */
+  /** Включить эффект при наведении: масштабирование и смещение по вертикали. */
   hoverable?: boolean;
-  /** Glow intensity for E2EE status indication */
+  /** Интенсивность свечения, обозначающего статус сквозного шифрования. */
   glowIntensity?: 'none' | 'low' | 'high';
 }
 
@@ -44,15 +44,20 @@ function hashColor(name: string): string {
  * Первые 2 буквы имени для отображения в аватаре.
  */
 function getInitials(name: string): string {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  return name
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 /**
- * AnimatedAvatar — animated avatar 48×48 (by default).
- * Conic-gradient background + initials centered.
+ * Анимированный аватар размером 48×48 пикселей по умолчанию.
+ * Фон с коническим градиентом и инициалы по центру.
  *
- * v3.0: Added E2EE status ring, online indicator, typing dots.
- * - verified: green ring + dot
+ * Показывает статус сквозного шифрования, подключение и индикатор набора текста.
+ * Подтверждённый статус обозначается зелёной рамкой и точкой.
  * - pending: amber ring (pulse) + dot
  * - unverified: accent ring (low opacity, spin)
  */
@@ -76,17 +81,23 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
 
   const getRingColor = (): string => {
     switch (e2eeStatus) {
-      case 'verified': return '#4CAF50';
-      case 'pending': return '#FFC107';
-      default: return color1;
+      case 'verified':
+        return '#4CAF50';
+      case 'pending':
+        return '#FFC107';
+      default:
+        return color1;
     }
   };
 
   const getRingOpacity = (): number => {
     switch (e2eeStatus) {
-      case 'verified': return 0.8;
-      case 'pending': return 1;
-      default: return 0.2;
+      case 'verified':
+        return 0.8;
+      case 'pending':
+        return 1;
+      default:
+        return 0.2;
     }
   };
 
@@ -108,10 +119,12 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
     return 0;
   };
 
-  const borderStyle = bordered ? {
-    border: '3px solid white',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  } : {};
+  const borderStyle = bordered
+    ? {
+        border: '3px solid white',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      }
+    : {};
 
   const containerStyles: React.CSSProperties = {
     width: size,
@@ -122,7 +135,10 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
     flexShrink: 0,
     transform: isHovered && hoverable ? 'scale(1.05) translateY(-2px)' : 'scale(1)',
     transition: 'transform 200ms ease',
-    boxShadow: glowIntensity !== 'none' ? `0 0 ${glowIntensity === 'high' ? '20px' : '10px'} ${getGlowColor()}` : 'none',
+    boxShadow:
+      glowIntensity !== 'none'
+        ? `0 0 ${glowIntensity === 'high' ? '20px' : '10px'} ${getGlowColor()}`
+        : 'none',
     ...borderStyle,
   };
 
@@ -153,26 +169,92 @@ export const AnimatedAvatar: React.FC<AnimatedAvatarProps> = ({
       />
       {/* Main avatar */}
       {avatarUrl ? (
-        <img src={avatarUrl} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', position: 'relative', zIndex: 1 }} />
+        <img
+          src={avatarUrl}
+          alt={name}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        />
       ) : (
         <>
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: 'linear' }} style={{ position: 'absolute', inset: 0, background: `conic-gradient(from 0deg, ${color1}, ${color2}, ${color1})`, zIndex: 0 }} />
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: size * 0.33, textShadow: '0 1px 2px rgba(0,0,0,0.3)', letterSpacing: '0.5px', fontFamily: 'inherit', zIndex: 1 }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `conic-gradient(from 0deg, ${color1}, ${color2}, ${color1})`,
+              zIndex: 0,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: size * 0.33,
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+              letterSpacing: '0.5px',
+              fontFamily: 'inherit',
+              zIndex: 1,
+            }}
+          >
             {initials}
           </div>
         </>
       )}
       {/* E2EE status dot */}
-      <div style={{ position: 'absolute', bottom: 0, right: 0, width: size * 0.25, height: size * 0.25, borderRadius: '50%', background: getStatusDotColor(), border: `2px solid ${borderColor}`, zIndex: 2 }} />
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          right: 0,
+          width: size * 0.25,
+          height: size * 0.25,
+          borderRadius: '50%',
+          background: getStatusDotColor(),
+          border: `2px solid ${borderColor}`,
+          zIndex: 2,
+        }}
+      />
       {/* Typing indicator */}
       {isTyping && (
-        <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 3, zIndex: 2 }}>
-          {[0, 1, 2].map((i) => (
-            <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: '#FFC107', animation: `typing 1.4s infinite ${i * 0.2}s` }} />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 3,
+            zIndex: 2,
+          }}
+        >
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: '#FFC107',
+                animation: `typing 1.4s infinite ${i * 0.2}s`,
+              }}
+            />
           ))}
         </div>
       )}
-        </div>
+    </div>
   );
 };
 

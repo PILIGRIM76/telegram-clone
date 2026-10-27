@@ -1,9 +1,9 @@
 import { logger } from '../services/logger';
-// v1.5.2 Stage 5: WebSocket hook с авто-reconnect и offline-first fallback
+// Этап 5: хук WebSocket с автоматическим переподключением и автономным режимом.
 // Использует apiService (NaCl box для транспорта) + cryptoService (RSA-OAEP для at-rest).
-// Если backend недоступен — не падает, а работает в localStorage-only режиме.
+// При недоступности сервера работа продолжается в автономном режиме с хранением данных в localStorage.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
 import type { Message } from '../types';
 
@@ -14,11 +14,11 @@ export interface UseWebSocketOptions {
   myUid: string;
   /** Включён ли WebSocket (можно временно отключить для тестов) */
   enabled?: boolean;
-  /** Интервал reconnect в мс (по умолчанию 5000) */
+  /** Интервал переподключения в миллисекундах (по умолчанию 5000). */
   reconnectInterval?: number;
-  /** Callback при получении нового сообщения */
+  /** Обратный вызов при получении нового сообщения. */
   onMessage?: (message: Message) => void;
-  /** Callback при изменении статуса подключения */
+  /** Обратный вызов при изменении состояния подключения. */
   onStatusChange?: (status: WebSocketStatus) => void;
 }
 
@@ -91,8 +91,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
       // apiService сам эмитит open/close/error события, но мы используем упрощённый флаг:
       // если коннект не упал в течение 2 сек — считаем open
       window.setTimeout(() => {
-        // Простая эврисация: после 2 сек если статус ещё "connecting" — пометим "open"
-        setStatus((current) => {
+        // Если через 2 секунды статус ещё «connecting», считаем соединение открытым.
+        setStatus(current => {
           if (current === 'connecting') {
             onStatusChangeRef.current?.('open');
             return 'open';
@@ -115,7 +115,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     }, reconnectInterval);
   }, [connect, reconnectInterval, clearReconnect]);
 
-  // Подписка на onClose/onError apiService для автоматического reconnect
+  // Подписываемся на onClose/onError apiService для автоматического переподключения.
   useEffect(() => {
     if (!enabled) return;
     const handleClose = () => {
@@ -131,7 +131,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     apiService.onClose(handleClose);
     apiService.onError(handleError);
     return () => {
-      apiService.offMessage?.((m) => m); // best effort
+      apiService.offMessage?.(m => m); // Пытаемся снять обработчик, не прерывая очистку подписок.
     };
   }, [enabled, scheduleReconnect, updateStatus]);
 
@@ -141,22 +141,24 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     connect();
     return () => {
       clearReconnect();
-      // НЕ отключаем apiService глобально — он singleton и может быть нужен другим компонентам
-      // apiService.disconnect();
+      // Соединение не закрывается: apiService — общий экземпляр, используемый другими компонентами.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, myUid]);
 
-  const send = useCallback((to: string, content: string, recipientPublicKey?: string) => {
-    if (status !== 'open') {
-      logger.warn('[PILIGRIM] useWebSocket: send ignored, status =', status);
-      return;
-    }
-    if (recipientPublicKey) {
-      apiService.setRecipientPublicKey(recipientPublicKey);
-    }
-    apiService.sendMessage(to, content, recipientPublicKey || '');
-  }, [status]);
+  const send = useCallback(
+    (to: string, content: string, recipientPublicKey?: string) => {
+      if (status !== 'open') {
+        logger.warn('[PILIGRIM] useWebSocket: send ignored, status =', status);
+        return;
+      }
+      if (recipientPublicKey) {
+        apiService.setRecipientPublicKey(recipientPublicKey);
+      }
+      apiService.sendMessage(to, content, recipientPublicKey || '');
+    },
+    [status]
+  );
 
   const reconnect = useCallback(() => {
     clearReconnect();
@@ -168,6 +170,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     status,
     isConnected: status === 'open',
     send,
-    reconnect
+    reconnect,
   };
 }

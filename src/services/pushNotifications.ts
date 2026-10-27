@@ -1,12 +1,12 @@
 import { logger } from './logger';
-// Phase 3: Push notifications — wake up offline recipients.
-// Использует Web Push API + Service Worker.
-// В production: требует VAPID ключ (Firebase Cloud Messaging или собственный).
+// Push-уведомления помогают связаться с получателями, которые сейчас не в сети.
+// Использует Web Push API и Service Worker.
+// Для боевой версии требуется ключ VAPID (Firebase Cloud Messaging или собственный).
 
 export interface PushConfig {
-  /** VAPID public key (base64url). Заменить на свой для production. */
+  /** Открытый ключ VAPID в base64url. Замените его собственным для боевой версии. */
   vapidPublicKey: string;
-  /** Сервис для отправки (Firebase, OneSignal, собственный). */
+  /** Сервис отправки уведомлений: Firebase, OneSignal или собственный. */
   provider: 'web-push' | 'fcm' | 'onesignal';
 }
 
@@ -25,7 +25,7 @@ export class PushNotificationService {
   }
 
   /**
-   * Проверяет поддержку Web Push API.
+   * Проверяет, поддерживается ли Web Push API.
    */
   isSupported(): boolean {
     return (
@@ -65,7 +65,9 @@ export class PushNotificationService {
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: this.urlBase64ToUint8Array(this.config.vapidPublicKey) as unknown as BufferSource,
+          applicationServerKey: this.urlBase64ToUint8Array(
+            this.config.vapidPublicKey
+          ) as unknown as BufferSource,
         });
         logger.info('[Push] New subscription created');
       } else {
@@ -130,15 +132,13 @@ export class PushNotificationService {
   }
 
   /**
-   * Конвертирует VAPID public key из base64url в Uint8Array.
+   * Преобразует открытый ключ VAPID из base64url в Uint8Array.
    */
   private urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
-    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+    return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
   }
 }
 

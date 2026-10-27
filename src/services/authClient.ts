@@ -1,10 +1,10 @@
-// src/services/authClient.ts
-// Browser-side auth client for JWT-based authentication
-// Uses simple localStorage keys: accessToken, refreshToken, uid
+// Клиентская аутентификация в браузере с использованием JWT.
+// Токены доступа и обновления, а также UID хранятся в localStorage.
 
-const API_URL = (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL)
-  ? process.env.VITE_API_URL.replace(/\/+$/, '')
-  : 'http://192.168.100.4:4000';
+const API_URL =
+  typeof process !== 'undefined' && process.env && process.env.VITE_API_URL
+    ? process.env.VITE_API_URL.replace(/\/+$/, '')
+    : 'http://192.168.100.4:4000';
 
 export interface AuthResponse {
   uid: string;

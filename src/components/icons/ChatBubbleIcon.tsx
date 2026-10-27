@@ -6,10 +6,10 @@ interface IconProps {
   className?: string;
 }
 
-export const ChatBubbleIcon: React.FC<IconProps> = ({ 
-  size = 22, 
-  color = 'currentColor', 
-  className 
+export const ChatBubbleIcon: React.FC<IconProps> = ({
+  size = 22,
+  color = 'currentColor',
+  className,
 }) => (
   <svg
     width={size}

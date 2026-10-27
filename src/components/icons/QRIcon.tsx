@@ -6,11 +6,7 @@ interface IconProps {
   className?: string;
 }
 
-export const QRIcon: React.FC<IconProps> = ({
-  size = 22,
-  color = 'currentColor',
-  className,
-}) => (
+export const QRIcon: React.FC<IconProps> = ({ size = 22, color = 'currentColor', className }) => (
   <svg
     width={size}
     height={size}

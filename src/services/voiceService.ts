@@ -1,5 +1,5 @@
-import { VoiceMessageMetadata, DecryptedVoiceMessage } from '../types';
-import { encryptFile, decryptFile } from './cryptoService';
+import type { DecryptedVoiceMessage, VoiceMessageMetadata } from '../types';
+import { decryptFile, encryptFile } from './cryptoService';
 
 class VoiceService {
   private mediaRecorder: MediaRecorder | null = null;
@@ -10,15 +10,14 @@ class VoiceService {
   private dataArray: Uint8Array | null = null;
   private animationFrameId: number | null = null;
   private onLevelUpdate: ((level: number) => void) | null = null;
-  private maxDuration: number = 300; // 5 minutes in seconds
+  private maxDuration: number = 300;
   private durationTimerId: number | null = null;
 
-  // Start recording
   async startRecording(onLevelUpdate?: (level: number) => void): Promise<void> {
     this.onLevelUpdate = onLevelUpdate || null;
 
     try {
-      // Request microphone access
+      // Запрашиваем доступ к микрофону.
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -27,31 +26,32 @@ class VoiceService {
         },
       });
 
-      // Determine supported MIME type
+      // Выбираем поддерживаемый MIME-тип записи.
       const mimeType = this.getSupportedMimeType();
 
       this.mediaRecorder = new MediaRecorder(this.stream, {
         mimeType,
-        audioBitsPerSecond: 128000, // 128 kbps
+        audioBitsPerSecond: 128000, // Устанавливаем битрейт 128 кбит/с.
       });
 
       this.audioChunks = [];
 
-      this.mediaRecorder.ondataavailable = (event) => {
+      this.mediaRecorder.ondataavailable = event => {
         if (event.data.size > 0) {
           this.audioChunks.push(event.data);
         }
       };
 
-      // Set up audio visualization
       this.setupAudioVisualization();
 
-      this.mediaRecorder.start(100); // Collect data every 100ms for smoother visualization
+      this.mediaRecorder.start(100);
 
-      // Start duration timer
+      // Запускаем таймер длительности записи.
       this.startDurationTimer();
     } catch (error) {
-      throw new Error(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -67,10 +67,10 @@ class VoiceService {
       this.mediaRecorder.onstop = () => {
         const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
         const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-        
+
         this.stopDurationTimer();
         this.cleanup();
-        
+
         resolve(audioBlob);
       };
 
@@ -93,28 +93,30 @@ class VoiceService {
     privateKeyHex: string
   ): Promise<{ encryptedBlob: Blob; metadata: VoiceMessageMetadata }> {
     const duration = await this.getAudioDuration(audioBlob);
-    
+
     // Convert Blob to File for encryptFile
-    const audioFile = new File([audioBlob], 'voice_message.webm', { 
+    const audioFile = new File([audioBlob], 'voice_message.webm', {
       type: audioBlob.type || 'audio/webm',
-      lastModified: Date.now()
+      lastModified: Date.now(),
     });
-    
+
     const encryptedData = await encryptFile(audioFile, privateKeyHex);
-    
+
     // Create encrypted blob from the encrypted data
     const encryptedBlob = new Blob(
-      [JSON.stringify({
-        ciphertext: encryptedData.ciphertext,
-        iv: encryptedData.iv,
-        key: encryptedData.key,
-        name: encryptedData.name,
-        type: encryptedData.type,
-        size: encryptedData.size
-      })],
+      [
+        JSON.stringify({
+          ciphertext: encryptedData.ciphertext,
+          iv: encryptedData.iv,
+          key: encryptedData.key,
+          name: encryptedData.name,
+          type: encryptedData.type,
+          size: encryptedData.size,
+        }),
+      ],
       { type: 'application/json' }
     );
-    
+
     return {
       encryptedBlob,
       metadata: {
@@ -134,7 +136,7 @@ class VoiceService {
     // Parse the encrypted data
     const text = await encryptedBlob.text();
     const encryptedData = JSON.parse(text);
-    
+
     const decryptedBlob = await decryptFile(
       encryptedData.ciphertext,
       encryptedData.iv,
@@ -143,9 +145,9 @@ class VoiceService {
       encryptedData.type,
       encryptedData.size
     );
-    
+
     const url = URL.createObjectURL(decryptedBlob);
-    
+
     return {
       blob: decryptedBlob,
       url,
@@ -156,13 +158,13 @@ class VoiceService {
   // Get current audio level (0-1) for visualization
   getAudioLevel(): number {
     if (!this.analyser || !this.dataArray) return 0;
-    
+
     this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
-    
+
     // Calculate average level
     const sum = this.dataArray.reduce((acc, val) => acc + val, 0);
     const average = sum / this.dataArray.length;
-    
+
     // Normalize to 0-1 range
     return Math.min(average / 128, 1);
   }
@@ -180,7 +182,7 @@ class VoiceService {
   // Get current recording state
   getState(): 'idle' | 'recording' | 'paused' | 'inactive' {
     if (!this.mediaRecorder) return 'idle';
-    return this.mediaRecorder.state as 'idle' | 'recording' | 'paused' | 'inactive';
+    return this.mediaRecorder.state;
   }
 
   // Private: Set up audio visualization
@@ -189,13 +191,13 @@ class VoiceService {
 
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.analyser = this.audioContext.createAnalyser();
-    
+
     const source = this.audioContext.createMediaStreamSource(this.stream);
     source.connect(this.analyser);
-    
+
     this.analyser.fftSize = 256;
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    
+
     // Start visualization loop
     this.visualize();
   }
@@ -206,15 +208,15 @@ class VoiceService {
       this.animationFrameId = null;
       return;
     }
-    
+
     this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
-    
+
     const sum = this.dataArray.reduce((acc, val) => acc + val, 0);
     const average = sum / this.dataArray.length;
     const level = Math.min(average / 128, 1);
-    
+
     this.onLevelUpdate(level);
-    
+
     this.animationFrameId = requestAnimationFrame(() => this.visualize());
   }
 
@@ -237,12 +239,7 @@ class VoiceService {
 
   // Private: Get supported MIME type
   private getSupportedMimeType(): string {
-    const types = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/wav',
-    ];
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/wav'];
 
     for (const type of types) {
       if (MediaRecorder.isTypeSupported(type)) {
@@ -255,20 +252,20 @@ class VoiceService {
 
   // Private: Get audio duration
   private getAudioDuration(blob: Blob): Promise<number> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const audio = new Audio();
       const url = URL.createObjectURL(blob);
-      
+
       audio.onloadedmetadata = () => {
         resolve(audio.duration);
         URL.revokeObjectURL(url);
       };
-      
+
       audio.onerror = () => {
         resolve(0);
         URL.revokeObjectURL(url);
       };
-      
+
       audio.src = url;
     });
   }
@@ -280,23 +277,23 @@ class VoiceService {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-    
+
     // Close audio context
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
       this.audioContext = null;
     }
-    
+
     this.analyser = null;
     this.dataArray = null;
     this.onLevelUpdate = null;
-    
+
     // Stop media stream tracks
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }
-    
+
     this.mediaRecorder = null;
     this.audioChunks = [];
   }

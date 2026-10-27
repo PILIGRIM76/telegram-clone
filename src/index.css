@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PILIGRIM — Unified Design System (v4.0)
    ----------------------------------------------------------------------------
@@ -61,60 +65,64 @@
   --radius-chat-other: 20px 20px 20px 4px;
 
   /* ── Brand gradient (terra-cotta → lavender) ────────────────────────── */
-  --brand-start: #E86A58;
-  --brand-end: #B388EB;
+  --brand-start: #e86a58;
+  --brand-end: #b388eb;
   --brand-gradient: linear-gradient(135deg, var(--brand-start) 0%, var(--brand-end) 100%);
-  --brand-gradient-soft: linear-gradient(135deg, rgba(232,106,88,0.16) 0%, rgba(179,136,235,0.16) 100%);
+  --brand-gradient-soft: linear-gradient(
+    135deg,
+    rgba(232, 106, 88, 0.16) 0%,
+    rgba(179, 136, 235, 0.16) 100%
+  );
 
   /* Solid primary derived from the brand (used where gradients are awkward) */
-  --color-primary: #E86A58;
-  --color-primary-hover: #D4543F;
-  --color-on-primary: #FFFFFF;
+  --color-primary: #e86a58;
+  --color-primary-hover: #d4543f;
+  --color-on-primary: #ffffff;
 
   /* ── Time-of-day ACCENT — DEFAULT (day). Overridden by body.theme-*. ───
      Defining it at :root guarantees it is NEVER undefined.                  */
-  --color-accent: #E86A58;
-  --color-accent-hover: #D4543F;
+  --color-accent: #e86a58;
+  --color-accent-hover: #d4543f;
   --color-accent-soft: rgba(232, 106, 88, 0.14);
   --color-accent-softer: rgba(232, 106, 88, 0.07);
   --color-accent-glow: rgba(232, 106, 88, 0.5);
-  --color-accent-contrast: #FFFFFF;
+  --color-accent-contrast: #ffffff;
 
   /* ── Surfaces & text — LIGHT defaults ───────────────────────────────── */
-  --color-bg-primary: #FCF9F7;     /* warm white */
-  --color-bg-secondary: #F4EFEB;   /* subtly raised */
-  --color-surface: #FFFFFF;
-  --color-surface-2: #FBF8F6;     /* sunken / inset */
-  --color-surface-variant: #F0ECE9;
+  --color-bg-primary: #fcf9f7; /* warm white */
+  --color-bg-secondary: #f4efeb; /* subtly raised */
+  --color-surface: #ffffff;
+  --color-surface-2: #fbf8f6; /* sunken / inset */
+  --color-surface-variant: #f0ece9;
 
-  --color-text-primary: #1C1816;   /* near-black, warm */
-  --color-text-secondary: #7A736F; /* warm grey */
-  --color-text-tertiary: #A39D99;
+  --color-text-primary: #1c1816; /* near-black, warm */
+  --color-text-secondary: #7a736f; /* warm grey */
+  --color-text-tertiary: #a39d99;
 
   --color-border: rgba(28, 24, 22, 0.08);
   --color-border-strong: rgba(28, 24, 22, 0.14);
   --color-divider: rgba(28, 24, 22, 0.06);
 
-  --color-overlay: rgba(20, 18, 16, 0.5);   /* modal scrim */
-  --color-scrim: rgba(20, 18, 16, 0.4);     /* light dimming */
+  --color-overlay: rgba(20, 18, 16, 0.5); /* modal scrim */
+  --color-scrim: rgba(20, 18, 16, 0.4); /* light dimming */
   --color-backdrop: rgba(20, 18, 16, 0.32);
 
   /* ── Chat bubbles ───────────────────────────────────────────────────── */
   --color-bubble-own: var(--brand-gradient);
-  --color-bubble-own-solid: #E86A58;
-  --color-bubble-own-text: #FFFFFF;
-  --color-bubble-other: #F0ECE9;
-  --color-bubble-other-text: #1C1816;
+  --color-bubble-own-solid: #e86a58;
+  --color-bubble-own-text: #ffffff;
+  --color-bubble-other: #f0ece9;
+  --color-bubble-other-text: #1c1816;
   --color-bubble-other-border: rgba(28, 24, 22, 0.06);
 
   /* ── Semantic status colours ────────────────────────────────────────── */
-  --color-success: #2E9E6B;
+  --color-success: #2e9e6b;
   --color-success-soft: rgba(46, 158, 107, 0.14);
-  --color-warning: #E0A93B;
+  --color-warning: #e0a93b;
   --color-warning-soft: rgba(224, 169, 59, 0.16);
-  --color-danger: #E5484D;
+  --color-danger: #e5484d;
   --color-danger-soft: rgba(229, 72, 77, 0.14);
-  --color-online: #2E9E6B;
+  --color-online: #2e9e6b;
 
   /* ── Elevation ──────────────────────────────────────────────────────── */
   --shadow-1: 0 1px 2px rgba(28, 24, 22, 0.08), 0 1px 3px rgba(28, 24, 22, 0.05);
@@ -122,7 +130,7 @@
   --shadow-3: 0 12px 32px rgba(28, 24, 22, 0.12);
   --shadow-floating: 0 12px 40px var(--color-accent-glow);
   --shadow-hover: 0 8px 24px var(--color-accent-glow);
-  --shadow-modal: 0 20px 60px rgba(20, 18, 16, 0.30);
+  --shadow-modal: 0 20px 60px rgba(20, 18, 16, 0.3);
 
   /* ── Focus & scrollbar ──────────────────────────────────────────────── */
   --color-focus-ring: var(--color-accent);
@@ -155,48 +163,48 @@
 
 /* УТРО (06:00–12:00) — bright mandarin */
 body.theme-morning {
-  --color-accent: #FF8A50;
-  --color-accent-hover: #F2732F;
+  --color-accent: #ff8a50;
+  --color-accent-hover: #f2732f;
   --color-accent-soft: rgba(255, 138, 80, 0.14);
   --color-accent-softer: rgba(255, 138, 80, 0.07);
   --color-accent-glow: rgba(255, 138, 80, 0.5);
-  --color-accent-contrast: #FFFFFF;
+  --color-accent-contrast: #ffffff;
   --shadow-hover: 0 8px 24px rgba(255, 138, 80, 0.18);
   --shadow-floating: 0 12px 40px rgba(255, 138, 80, 0.22);
 }
 
 /* ДЕНЬ (12:00–18:00) — terracotta (primary brand) */
 body.theme-day {
-  --color-accent: #E86A58;
-  --color-accent-hover: #D4543F;
+  --color-accent: #e86a58;
+  --color-accent-hover: #d4543f;
   --color-accent-soft: rgba(232, 106, 88, 0.14);
   --color-accent-softer: rgba(232, 106, 88, 0.07);
   --color-accent-glow: rgba(232, 106, 88, 0.5);
-  --color-accent-contrast: #FFFFFF;
+  --color-accent-contrast: #ffffff;
   --shadow-hover: 0 8px 24px rgba(232, 106, 88, 0.18);
-  --shadow-floating: 0 12px 40px rgba(179, 136, 235, 0.20);
+  --shadow-floating: 0 12px 40px rgba(179, 136, 235, 0.2);
 }
 
 /* ВЕЧЕР (18:00–23:00) — deep violet */
 body.theme-evening {
-  --color-accent: #7B4B9A;
-  --color-accent-hover: #6A3D8A;
+  --color-accent: #7b4b9a;
+  --color-accent-hover: #6a3d8a;
   --color-accent-soft: rgba(123, 75, 154, 0.16);
   --color-accent-softer: rgba(123, 75, 154, 0.08);
   --color-accent-glow: rgba(123, 75, 154, 0.5);
-  --color-accent-contrast: #FFFFFF;
-  --shadow-hover: 0 8px 24px rgba(123, 75, 154, 0.20);
+  --color-accent-contrast: #ffffff;
+  --shadow-hover: 0 8px 24px rgba(123, 75, 154, 0.2);
   --shadow-floating: 0 12px 40px rgba(123, 75, 154, 0.24);
 }
 
 /* НОЧЬ (23:00–06:00) — lavender neon */
 body.theme-night {
-  --color-accent: #B388EB;
-  --color-accent-hover: #9D6FD4;
+  --color-accent: #b388eb;
+  --color-accent-hover: #9d6fd4;
   --color-accent-soft: rgba(179, 136, 235, 0.18);
   --color-accent-softer: rgba(179, 136, 235, 0.09);
   --color-accent-glow: rgba(179, 136, 235, 0.6);
-  --color-accent-contrast: #1A1320;
+  --color-accent-contrast: #1a1320;
   --shadow-hover: 0 8px 24px rgba(179, 136, 235, 0.22);
   --shadow-floating: 0 12px 40px rgba(179, 136, 235, 0.28);
   --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.7);
@@ -207,14 +215,14 @@ body.theme-night {
    ═══════════════════════════════════════════════════════════════════════════ */
 body.theme-dark {
   --color-bg-primary: #141212;
-  --color-bg-secondary: #1A1716;
-  --color-surface: #1E1B1A;
-  --color-surface-2: #221F1D;
-  --color-surface-variant: #2A2624;
+  --color-bg-secondary: #1a1716;
+  --color-surface: #1e1b1a;
+  --color-surface-2: #221f1d;
+  --color-surface-variant: #2a2624;
 
-  --color-text-primary: #EFECE9;
-  --color-text-secondary: #A39D99;
-  --color-text-tertiary: #6E6864;
+  --color-text-primary: #efece9;
+  --color-text-secondary: #a39d99;
+  --color-text-tertiary: #6e6864;
 
   --color-border: rgba(255, 255, 255, 0.09);
   --color-border-strong: rgba(255, 255, 255, 0.15);
@@ -224,17 +232,17 @@ body.theme-dark {
   --color-scrim: rgba(0, 0, 0, 0.5);
   --color-backdrop: rgba(0, 0, 0, 0.45);
 
-  --color-bubble-other: #2A2624;
-  --color-bubble-other-text: #EFECE9;
+  --color-bubble-other: #2a2624;
+  --color-bubble-other-text: #efece9;
   --color-bubble-other-border: rgba(255, 255, 255, 0.06);
 
-  --color-success: #4CC38A;
+  --color-success: #4cc38a;
   --color-success-soft: rgba(76, 195, 138, 0.16);
-  --color-warning: #F0BB55;
+  --color-warning: #f0bb55;
   --color-warning-soft: rgba(240, 187, 85, 0.16);
-  --color-danger: #F2555A;
+  --color-danger: #f2555a;
   --color-danger-soft: rgba(242, 85, 90, 0.16);
-  --color-online: #4CC38A;
+  --color-online: #4cc38a;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -248,7 +256,9 @@ body.theme-dark {
 /* ═══════════════════════════════════════════════════════════════════════════
    Base layout
    ═══════════════════════════════════════════════════════════════════════════ */
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -265,21 +275,31 @@ body {
 }
 
 /* Scrollbar — warm, theme-aware */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--color-scrollbar-track); }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar-thumb);
   border-radius: var(--radius-pill);
 }
-::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-thumb-hover); }
-* { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar-thumb) transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) transparent;
+}
 
 /* Keyboard focus — uses the time accent, never the old blue */
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 a:focus-visible,
-[role="button"]:focus-visible {
+[role='button']:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -288,25 +308,55 @@ a:focus-visible,
    Shared motion primitives
    ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes piligrim-fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes piligrim-scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes piligrim-slideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes piligrim-messageIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.piligrim-fade-in { animation: piligrim-fadeIn var(--duration-base) var(--ease-out); }
-.piligrim-scale-in { animation: piligrim-scaleIn var(--duration-base) var(--ease-out); }
-.piligrim-slide-in { animation: piligrim-slideIn 0.25s var(--ease-out); }
-.piligrim-message-in { animation: piligrim-messageIn var(--duration-base) var(--ease-out); }
+.piligrim-fade-in {
+  animation: piligrim-fadeIn var(--duration-base) var(--ease-out);
+}
+.piligrim-scale-in {
+  animation: piligrim-scaleIn var(--duration-base) var(--ease-out);
+}
+.piligrim-slide-in {
+  animation: piligrim-slideIn 0.25s var(--ease-out);
+}
+.piligrim-message-in {
+  animation: piligrim-messageIn var(--duration-base) var(--ease-out);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Interaction utility classes (token-based).
@@ -323,9 +373,14 @@ a:focus-visible,
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-button);
-  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
-.pg-icon-btn:hover { color: var(--color-accent); background: var(--color-surface-2); }
+.pg-icon-btn:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-2);
+}
 
 .pg-primary-btn {
   background: var(--color-accent);
@@ -339,8 +394,13 @@ a:focus-visible,
   gap: var(--space-1);
   transition: background var(--duration-fast) var(--ease-out);
 }
-.pg-primary-btn:hover { background: var(--color-accent-hover); }
-.pg-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.pg-primary-btn:hover {
+  background: var(--color-accent-hover);
+}
+.pg-primary-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 .pg-footer-btn {
   background: transparent;
@@ -353,7 +413,9 @@ a:focus-visible,
   gap: 2px;
   transition: color var(--duration-fast) var(--ease-out);
 }
-.pg-footer-btn:hover { color: var(--color-accent); }
+.pg-footer-btn:hover {
+  color: var(--color-accent);
+}
 
 .pg-list-row {
   width: 100%;
@@ -369,9 +431,15 @@ a:focus-visible,
   color: var(--color-text-primary);
   transition: background var(--duration-fast) var(--ease-out);
 }
-.pg-list-row:hover { background: var(--color-surface-2); }
-.pg-list-row.is-selected { background: var(--color-accent-soft); }
-.pg-list-row.is-selected:hover { background: var(--color-accent-soft); }
+.pg-list-row:hover {
+  background: var(--color-surface-2);
+}
+.pg-list-row.is-selected {
+  background: var(--color-accent-soft);
+}
+.pg-list-row.is-selected:hover {
+  background: var(--color-accent-soft);
+}
 
 .pg-menu-row {
   width: 100%;
@@ -386,4 +454,52 @@ a:focus-visible,
   gap: var(--space-2);
   transition: background var(--duration-fast) var(--ease-out);
 }
-.pg-menu-row:hover { background: var(--color-surface-2); }
+.pg-menu-row:hover {
+  background: var(--color-surface-2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Telegram Desktop — тонкие скроллбары
+   ═══════════════════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Скрыть скроллбар но оставить прокрутку (для списка чатов и сообщений) */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Telegram Desktop — паттерн фона чата (стена за сообщениями)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.chat-wallpaper {
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+.dark .chat-wallpaper,
+.chat-wallpaper.dark {
+  background-color: #17212b;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}

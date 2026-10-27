@@ -1,13 +1,8 @@
-// Signal Protocol Manager (Phase 1: PFS via Double Ratchet)
-import {
-  ProtocolAddress,
-  SessionBuilder,
-  SessionCipher,
-  type E2ESession,
-} from 'libsignal';
-import { SignalStorage } from './SignalStorage';
+// Управление сессиями Signal Protocol с прямой секретностью через Double Ratchet.
+import { ProtocolAddress, SessionBuilder, SessionCipher, type E2ESession } from 'libsignal';
 import { SessionStore } from './SessionStore';
-import type { PreKeyBundle, EncryptedSignalMessage, SignalConfig } from './types';
+import { SignalStorage } from './SignalStorage';
+import type { EncryptedSignalMessage, PreKeyBundle, SignalConfig } from './types';
 import { DEFAULT_SIGNAL_CONFIG, generateDeviceId } from './types';
 
 export interface PreKeyGenerationResult {
@@ -50,7 +45,12 @@ export class SignalProtocolManager {
       registrationId: regId,
       preKeys,
       signedPreKey: signed
-        ? { id: signed.id, publicKey: signed.publicKey, privateKey: signed.privateKey, signature: signed.signature }
+        ? {
+            id: signed.id,
+            publicKey: signed.publicKey,
+            privateKey: signed.privateKey,
+            signature: signed.signature,
+          }
         : { id: 0, publicKey: '', privateKey: '', signature: '' },
     };
   }
@@ -83,7 +83,11 @@ export class SignalProtocolManager {
     };
   }
 
-  async createSession(remoteUid: string, remoteDeviceId: number, bundle: PreKeyBundle): Promise<void> {
+  async createSession(
+    remoteUid: string,
+    remoteDeviceId: number,
+    bundle: PreKeyBundle
+  ): Promise<void> {
     const remoteAddress = new ProtocolAddress(remoteUid, remoteDeviceId);
     const e2eSession: E2ESession = {
       registrationId: bundle.registrationId,
@@ -102,7 +106,11 @@ export class SignalProtocolManager {
     await sessionBuilder.initOutgoing(e2eSession);
   }
 
-  async encryptMessage(remoteUid: string, remoteDeviceId: number, plaintext: string): Promise<EncryptedSignalMessage> {
+  async encryptMessage(
+    remoteUid: string,
+    remoteDeviceId: number,
+    plaintext: string
+  ): Promise<EncryptedSignalMessage> {
     const remoteAddress = new ProtocolAddress(remoteUid, remoteDeviceId);
     const cipher = new SessionCipher(this.storage, remoteAddress);
     const encoded = new TextEncoder().encode(plaintext);
@@ -110,12 +118,15 @@ export class SignalProtocolManager {
     return { messageType: result.type, ciphertext: result.body };
   }
 
-  async decryptMessage(remoteUid: string, remoteDeviceId: number, ciphertext: string, type: number): Promise<string> {
+  async decryptMessage(
+    remoteUid: string,
+    remoteDeviceId: number,
+    ciphertext: string,
+    type: number
+  ): Promise<string> {
     const remoteAddress = new ProtocolAddress(remoteUid, remoteDeviceId);
     const cipher = new SessionCipher(this.storage, remoteAddress);
-    const bytes = new Uint8Array(
-      ciphertext.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
-    );
+    const bytes = new Uint8Array(ciphertext.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
     let plaintext: Buffer;
     if (type === 3) plaintext = await cipher.decryptPreKeyWhisperMessage(bytes);
     else plaintext = await cipher.decryptWhisperMessage(bytes);
@@ -123,11 +134,10 @@ export class SignalProtocolManager {
   }
 
   private async generateIdentityKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
-    const kp = await crypto.subtle.generateKey(
-      { name: 'ECDH', namedCurve: 'P-256' },
-      true,
-      ['deriveKey', 'deriveBits']
-    );
+    const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, [
+      'deriveKey',
+      'deriveBits',
+    ]);
     const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
     const priv = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
     return {
@@ -137,14 +147,16 @@ export class SignalProtocolManager {
   }
 
   private async generatePreKeys(count: number): Promise<void> {
-    const startId = (await SessionStore.listPreKeys()).reduce(
-      (max, k) => Math.max(max, k.id), 0
-    ) + 1;
+    const startId =
+      (await SessionStore.listPreKeys()).reduce((max, k) => Math.max(max, k.id), 0) + 1;
     for (let i = 0; i < count; i++) {
       const id = startId + i;
       const kp = await this.generateIdentityKeyPair();
       await SessionStore.savePreKey({
-        id, publicKey: kp.publicKey, privateKey: kp.privateKey, createdAt: Date.now()
+        id,
+        publicKey: kp.publicKey,
+        privateKey: kp.privateKey,
+        createdAt: Date.now(),
       });
     }
   }

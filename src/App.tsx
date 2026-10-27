@@ -1,48 +1,48 @@
-import { logger } from './services/logger';
-/* App.tsx updated for Telegram-style tablet layout */
-﻿// v1.5.2 Stage 5: WebSocket real-time для зашифрованных сообщений
+// Этап 5: обмен зашифрованными сообщениями в реальном времени через WebSocket.
+
 // Цель: доставка входящих сообщений от других клиентов + индикатор статуса подключения
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import ChatWindow from './components/ChatWindow';
+import ContactList from './components/ContactList';
 import LoginPage from './components/LoginPage';
 import SeedPhraseModal from './components/SeedPhraseModal';
-import ContactList from './components/ContactList';
-import ChatWindow from './components/ChatWindow';
+import { Toasts } from './components/Toast';
 import VerifyModal from './components/VerifyModal';
-import Toasts from './components/Toast';
-// FIX 2026-09-10: 27 dead component imports removed (not rendered in JSX):
-// These components exist but are not wired into the current UI (Phase 10 backlog).
 import { useTranslation } from './contexts/LanguageContext';
-import { useToasts } from './hooks/useToasts';
-import { generateIdentity, restoreIdentityFromSeed, getPublicKey, encryptFile, getPrivateKey } from './services/cryptoService';
-import { apiService } from './services/apiService';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useWebRTC } from './hooks/useWebRTC';
+import { useLogout } from './hooks/useLogout';
 import { useTimeTheme } from './hooks/useTimeTheme';
-import { ResponsiveShell } from './components/ResponsiveShell';
-import { LeftAppBar } from './components/LeftAppBar';
-import { RightAppBar } from './components/RightAppBar';
+import { useToasts } from './hooks/useToasts';
+import { useWebRTC } from './hooks/useWebRTC';
+import { useWebSocket } from './hooks/useWebSocket';
+import { apiService } from './services/apiService';
+import { generateIdentity, getPublicKey, restoreIdentityFromSeed } from './services/cryptoService';
+import { logger } from './services/logger';
+
 import { CallModal } from './components/CallModal';
-import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { ChannelsView } from './components/ChannelsView';
 import { FloatingActionButton } from './components/FloatingActionButton';
-// v3.0 Phase 2G: mobile floating circle nav
-import { FloatingCircleNav } from './components/FloatingCircleNav';
-// v3.0 Phase 2H: desktop joystick + profile panel
-import { DesktopJoystick } from './components/DesktopJoystick';
-import { ProfilePanel } from './components/ProfilePanel';
-import { useLogout } from './hooks/useLogout';
+
+import { TabletTabBar, type TabView } from './components/TabletTabBar';
+
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
-import { CallsHistoryView } from './components/CallsHistoryView';
-import { FavoritesView } from './components/FavoritesView';
 import { Drawer } from './components/Drawer';
+import { FloatingCircleNav } from './components/FloatingCircleNav';
+import { LeftAppBar } from './components/LeftAppBar';
+import { ResponsiveShell } from './components/ResponsiveShell';
+import { RightAppBar } from './components/RightAppBar';
 import { SearchModal } from './components/SearchModal';
+
 import AccountPage from './components/AccountPage';
-import type { Contact, Group, Chat, Message, Identity, IdentityType, EncryptedAttachment } from './types';
-// Phase 2: Signal Protocol — PFS via Double Ratchet.
-// handleSendMessage использует apiService.sendMessageSecure (Signal preferred, NaCl fallback).
+import { CallsHistoryView } from './components/CallsHistoryView';
+import { DesktopJoystick } from './components/DesktopJoystick';
+import { FavoritesView } from './components/FavoritesView';
+import { ProfilePanel } from './components/ProfilePanel';
+import type { Chat, Contact, EncryptedAttachment, Group, IdentityType, Message } from './types';
+// Signal Protocol обеспечивает прямую секретность через Double Ratchet.
+// Отправка сообщений предпочитает Signal, а при отсутствии сессии использует NaCl.
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
-import { SignalProtocolManager } from './crypto/signal/SignalProtocolManager';
 import { PreKeyManager } from './crypto/signal/PreKeyManager';
+import { SignalProtocolManager } from './crypto/signal/SignalProtocolManager';
 // FIX 2026-09-10: bundleToPreKeyBundle удалён — не используется в App.tsx
 // (он нужен только в SignalMessageLayer.ts для внутреннего conversion).
 
@@ -50,101 +50,113 @@ const App: React.FC = () => {
   const [identity, setIdentity] = useState<IdentityType | null>(() => {
     try {
       const saved = localStorage.getItem('piligrim-identity');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? (JSON.parse(saved) as IdentityType) : null;
     } catch {
       return null;
     }
   });
   const [pendingIdentity, setPendingIdentity] = useState<IdentityType | null>(null);
   const [showSeedModal, setShowSeedModal] = useState(false);
-  // v3.0 Phase 2B-3: активная вкладка TabletTabBar (chats/contacts/calls/favorites)
+  // Этап 2B-3: активная вкладка TabletTabBar (чаты, контакты, звонки, избранное).
   const [activeTab, setActiveTab] = useState<TabView>('chats');
   // v3.0 Logout: модалка подтверждения выхода из аккаунта
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  // v3.0 Phase 2D: Drawer (боковая штора профиля)
+  // Этап 2D: Drawer — боковая панель профиля.
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  // v3.0 Phase 2E: Search modal (Ctrl+K command palette)
+  // Модальное окно поиска открывается сочетанием Ctrl+K.
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // v3.0 Phase 2H: Profile panel (3rd desktop panel)
+  // Боковая панель профиля на компьютере.
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  // v3.0 Security Dashboard: AccountPage (Security settings)
+  // Страница параметров безопасности учётной записи.
   const [showAccountPage, setShowAccountPage] = useState(false);
-  // Phase 2: флаг публикации своего Signal pre-key bundle на сервер.
-  // Выставляется в true после успешного POST /keys/publish, чтобы не делать это повторно.
+  // Этап 2: флаг публикации собственного набора предварительных ключей Signal на сервере.
+  // Становится true после успешного POST /keys/publish, чтобы не повторять запрос.
   const [preKeysPublished, setPreKeysPublished] = useState(false);
 
-  // v3.0 Phase 2D: слушаем кастомное событие от CallsHistoryView/FavoritesView
-  // для открытия Drawer через window event (loose coupling)
+  // Этап 2D: слушаем пользовательское событие от CallsHistoryView/FavoritesView,
+  // чтобы открыть Drawer через событие window и не связывать компоненты напрямую.
   useEffect(() => {
     const handler = () => setIsDrawerOpen(true);
     window.addEventListener('piligrim:open-drawer', handler);
     return () => window.removeEventListener('piligrim:open-drawer', handler);
   }, []);
 
-  // v3.0 Phase 2E: Ctrl+K (Cmd+K на Mac) hotkey для command palette
+  // Этап 2E: сочетание Ctrl+K (Cmd+K на Mac) открывает палитру команд.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsSearchOpen((open) => !open);
+        setIsSearchOpen(open => !open);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // v3.0 Logout: hook для очистки identity + WebSocket + reload
+  // Выход: хук очищает identity, закрывает WebSocket и перезагружает приложение.
   const logout = useLogout({ clearData: false });
 
-  // v1.5.2 Stage 1: локальные списки (без useLocalStorage, чтобы не нарушать правила хуков)
+  // Этап 1: локальные списки без useLocalStorage, чтобы соблюдать правила хуков.
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [chats, setChats] = useState<Record<string, Chat>>({});
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  // v1.5.2 Stage 5: статус WebSocket для UI-индикатора (Online/Offline/Reconnecting)
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error' | 'unsupported'>('closed');
-  // v1.6 Batch 4: РїРѕРєР°Р·С‹РІР°С‚СЊ РјРѕРґР°Р»РєСѓ РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р°
+  // Этап 5: состояние WebSocket для индикатора в интерфейсе (в сети, не в сети, подключение).
+  const [wsStatus, setWsStatus] = useState<
+    'connecting' | 'open' | 'closed' | 'error' | 'unsupported'
+  >('closed');
+  // v1.6 Этап 4: показывать модалку верификации контакта
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const { language, setLanguage } = useTranslation();
-  // v1.6 Batch 4: toast-СѓРІРµРґРѕРјР»РµРЅРёСЏ (РѕР±СЉСЏРІР»РµРЅС‹ СЂР°РЅСЊС€Рµ handlers, С‡С‚РѕР±С‹ РёС… РјРѕР¶РЅРѕ Р±С‹Р»Рѕ РІС‹Р·С‹РІР°С‚СЊ)
+  // v1.6 Этап 4: toast-уведомления (объявлены раньше handlers, чтобы их можно было вызывать)
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
-  const searchableContacts = useMemo(() => contacts.map((c) => ({
-    uid: c.uid,
-    name: c.name,
-    lastMessage: chats[c.uid]?.messages?.slice(-1)[0]?.text,
-  })), [contacts, chats]);
+  const searchableContacts = useMemo(
+    () =>
+      contacts.map(c => ({
+        uid: c.uid,
+        name: c.name,
+        lastMessage: chats[c.uid]?.messages?.slice(-1)[0]?.text,
+      })),
+    [contacts, chats]
+  );
 
-  // v1.5.2 Stage 2: Р·Р°РіСЂСѓР·РєР° РєРѕРЅС‚Р°РєС‚РѕРІ, РіСЂСѓРїРї Рё С‡Р°С‚РѕРІ РёР· localStorage РїРѕСЃР»Рµ РјРѕРЅС‚РёСЂРѕРІР°РЅРёСЏ
+  // Этап 2: загрузка контактов, групп и чатов из localStorage после монтирования.
   useEffect(() => {
-  // Phase 1 fix: ensure transport keys exist for loaded/restored identity
-  {
+    // Инициализируем транспортные ключи загруженной identity до восстановления данных.
     if (identity && !identity.transportPublicKey) {
       apiService.initKeys(identity.uid);
       const updated = { ...identity, transportPublicKey: apiService.getTransportPublicKey() };
-      setIdentity(updated);
+      queueMicrotask(() => setIdentity(updated));
       try {
         localStorage.setItem('piligrim-identity', JSON.stringify(updated));
       } catch (e) {
         logger.warn('[PILIGRIM] Failed to update identity with transportPublicKey:', e);
       }
     }
-  }
 
-    logger.info('[PILIGRIM] App mounted (v1.5.2 Stage 2 вЂ” AddContact enabled)');
+    logger.info('[PILIGRIM] App mounted (v1.5.2 Stage 2 � AddContact enabled)');
     try {
       const savedContacts = localStorage.getItem('piligrim-contacts');
-      if (savedContacts) setContacts(JSON.parse(savedContacts));
-    } catch {}
+      if (savedContacts) queueMicrotask(() => setContacts(JSON.parse(savedContacts) as Contact[]));
+    } catch {
+      // Игнорируем ошибку разбора списка контактов.
+    }
     try {
       const savedGroups = localStorage.getItem('piligrim-groups');
-      if (savedGroups) setGroups(JSON.parse(savedGroups));
-    } catch {}
+      if (savedGroups) queueMicrotask(() => setGroups(JSON.parse(savedGroups) as Group[]));
+    } catch {
+      // Игнорируем ошибку разбора списка групп.
+    }
     try {
       const savedChats = localStorage.getItem('piligrim-chats');
-      if (savedChats) setChats(JSON.parse(savedChats));
-    } catch {}
+      if (savedChats)
+        queueMicrotask(() => setChats(JSON.parse(savedChats) as Record<string, Chat>));
+    } catch {
+      // Игнорируем ошибку разбора списка чатов.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- identity используется только для инициализации транспортных ключей выше.
   }, []);
 
-  // v1.5.2 Stage 2: Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёРµ contacts РІ localStorage РїСЂРё РєР°Р¶РґРѕРј РёР·РјРµРЅРµРЅРёРё
+  // Этап 2: сохранение контактов в localStorage при каждом изменении.
   useEffect(() => {
     try {
       localStorage.setItem('piligrim-contacts', JSON.stringify(contacts));
@@ -153,7 +165,7 @@ const App: React.FC = () => {
     }
   }, [contacts]);
 
-  // v1.5.2 Stage 2: Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёРµ groups РІ localStorage РїСЂРё РєР°Р¶РґРѕРј РёР·РјРµРЅРµРЅРёРё
+  // Этап 2: сохранение групп в localStorage при каждом изменении.
   useEffect(() => {
     try {
       localStorage.setItem('piligrim-groups', JSON.stringify(groups));
@@ -162,7 +174,7 @@ const App: React.FC = () => {
     }
   }, [groups]);
 
-  // v1.5.2 Stage 2: Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёРµ chats РІ localStorage РїСЂРё РєР°Р¶РґРѕРј РёР·РјРµРЅРµРЅРёРё
+  // Этап 2: сохранение чатов в localStorage при каждом изменении.
   useEffect(() => {
     try {
       localStorage.setItem('piligrim-chats', JSON.stringify(chats));
@@ -170,12 +182,11 @@ const App: React.FC = () => {
       logger.error('[PILIGRIM] РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ chats:', e);
     }
   }, [chats]);
-// Phase 2: после инициализации identity → генерируем Signal pre-keys
-  // и публикуем свой pre-key bundle на сервер для инициаторов сессий.
-  // Этот шаг ОБЯЗАТЕЛЕН чтобы собеседники могли инициализировать Signal сессию с нами.
+  // Этап 2: после инициализации identity создаём предварительные ключи Signal
+  // и публикуем их на сервере, чтобы собеседники могли начать с нами сессию Signal.
   useEffect(() => {
     if (!identity || preKeysPublished) return;
-    (async () => {
+    void (async () => {
       try {
         const { SignalStorage } = await import('./crypto/signal/SignalStorage');
         const storage = new SignalStorage();
@@ -203,7 +214,9 @@ const App: React.FC = () => {
       logger.info('рџ”‘ [PILIGRIM] РЁР°Рі 1: generateIdentity()...');
       const startTime = Date.now();
       const newIdentity = await generateIdentity();
-      logger.info(`вњ… [PILIGRIM] generateIdentity() Р·Р°РІРµСЂС€РµРЅ Р·Р° ${Date.now() - startTime}ms`);
+      logger.info(
+        `вњ… [PILIGRIM] generateIdentity() Р·Р°РІРµСЂС€РµРЅ Р·Р° ${Date.now() - startTime}ms`
+      );
 
       // Phase 1 fix: generate and persist transport NaCl box keys for E2EE
       apiService.initKeys(newIdentity.uid);
@@ -213,9 +226,15 @@ const App: React.FC = () => {
       setShowSeedModal(true);
       logger.info('рџЋ­ [PILIGRIM] setShowSeedModal(true) РІС‹РїРѕР»РЅРµРЅ');
 
-      apiService.register(newIdentity.uid, apiService.getTransportPublicKey())
+      apiService
+        .register(newIdentity.uid, apiService.getTransportPublicKey())
         .then(() => logger.info('вњ… [PILIGRIM] register success'))
-        .catch((err: any) => logger.warn('вљ пёЏ [PILIGRIM] register failed (ignored):', err?.message || err));
+        .catch((err: unknown) =>
+          logger.warn(
+            'вљ пёЏ [PILIGRIM] register failed (ignored):',
+            err instanceof Error ? err.message : String(err)
+          )
+        );
     } catch (error) {
       logger.error('вќЊ [PILIGRIM] РћС€РёР±РєР° РІ handleCreateIdentity:', error);
     }
@@ -241,17 +260,24 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('piligrim-identity', JSON.stringify(pendingIdentity));
         setIdentity(pendingIdentity);
-      } catch {}
+      } catch {
+        // ignore localStorage error
+      }
       setPendingIdentity(null);
       setShowSeedModal(false);
     }
   };
 
-  // v1.5.2 Stage 2: СЂРµР°Р»СЊРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє РґРѕР±Р°РІР»РµРЅРёСЏ РєРѕРЅС‚Р°РєС‚Р° (offline-first)
+  // v1.5.2 Stage 2: реальный обработчик добавления контакта (offline-first)
   const handleAddContact = async (name: string, uid: string, publicKey?: string) => {
-    logger.info('вћ• [PILIGRIM] handleAddContact:', name, uid, publicKey ? '(with pubKey)' : '(no pubKey)');
+    logger.info(
+      'вћ• [PILIGRIM] handleAddContact:',
+      name,
+      uid,
+      publicKey ? '(with pubKey)' : '(no pubKey)'
+    );
 
-    // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёРєР°С‚РѕРІ: РµСЃР»Рё РєРѕРЅС‚Р°РєС‚ СЃ С‚Р°РєРёРј uid СѓР¶Рµ РµСЃС‚СЊ, РЅРµ РґРѕР±Р°РІР»СЏРµРј
+    // Защита от дубликатов: если контакт с таким uid уже есть, не добавляем
     if (contacts.some(c => c.uid === uid)) {
       logger.warn('вљ пёЏ [PILIGRIM] РљРѕРЅС‚Р°РєС‚ СЃ uid', uid, 'СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚');
       alert(`РљРѕРЅС‚Р°РєС‚ "${name}" СѓР¶Рµ РґРѕР±Р°РІР»РµРЅ РІ РІР°С€ СЃРїРёСЃРѕРє.`);
@@ -265,12 +291,12 @@ const App: React.FC = () => {
       verified: false,
       publicKey,
       archived: false,
-      // mutedUntil РЅРµ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј вЂ” С‡Р°С‚ РЅРµ Р·Р°РјСЊСЋС‡РµРЅ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
+      // mutedUntil не устанавливаем — чат не замьючен по умолчанию
     };
 
     setContacts(prev => [...prev, newContact]);
 
-    // РЎРѕР·РґР°С‘Рј РїСѓСЃС‚РѕР№ С‡Р°С‚ РґР»СЏ РЅРѕРІРѕРіРѕ РєРѕРЅС‚Р°РєС‚Р°
+    // Создаём пустой чат для нового контакта
     setChats(prev => ({
       ...prev,
       [uid]: {
@@ -281,7 +307,7 @@ const App: React.FC = () => {
     }));
 
     logger.info('вњ… [PILIGRIM] РљРѕРЅС‚Р°РєС‚ РґРѕР±Р°РІР»РµРЅ:', newContact);
-// Phase 2: попытка инициализации Signal сессии в фоне.
+    // Phase 2: попытка инициализации Signal сессии в фоне.
     // Не блокируем UI — если упадёт, остаётся NaCl fallback.
     try {
       const remoteBundle = await apiService.getPreKeyBundle(uid);
@@ -317,8 +343,8 @@ const App: React.FC = () => {
         type,
         inviteToken: result.token,
       };
-      setGroups((prev) => [...prev, newGroup]);
-      setChats((prev) => ({
+      setGroups(prev => [...prev, newGroup]);
+      setChats(prev => ({
         ...prev,
         [result.id]: { contactId: result.id, messages: [] },
       }));
@@ -329,8 +355,8 @@ const App: React.FC = () => {
       pushToast('Ошибка создания группы', 'error');
     }
   };
-  // v1.6 Batch 4: handleMuteChat вЂ” Р·Р°РіР»СѓС€РёС‚СЊ СѓРІРµРґРѕРјР»РµРЅРёСЏ С‡Р°С‚Р° РЅР° Р·Р°РґР°РЅРЅРѕРµ РІСЂРµРјСЏ
-  // duration: number (РјСЃ РґРѕ РєРѕРЅС†Р°) | 'forever' | null (null = СЃРЅСЏС‚СЊ Р·Р°РіР»СѓС€РµРЅРёРµ)
+  // v1.6 Batch 4: handleMuteChat — заглушить уведомления чата на заданное время
+  // duration: number (мс до конца) | 'forever' | null (null = снять заглушение)
   const handleMuteChat = (chatId: string, duration: number | 'forever' | null) => {
     const now = Date.now();
     let mutedUntil: number | undefined;
@@ -341,7 +367,7 @@ const App: React.FC = () => {
     } else {
       mutedUntil = undefined;
     }
-    setChats((prev) => {
+    setChats(prev => {
       const updated = { ...prev };
       const existing = updated[chatId] || { contactId: chatId, messages: [] };
       updated[chatId] = { ...existing, mutedUntil };
@@ -355,27 +381,32 @@ const App: React.FC = () => {
       const hours = Math.round(duration / 3600000);
       pushToast(`Р§Р°С‚ Р·Р°РіР»СѓС€С‘РЅ РЅР° ${hours} С‡`, 'info');
     }
-    logger.info(`рџ”‡ [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`);
+    logger.info(
+      `рџ”‡ [PILIGRIM] handleMuteChat: chatId=${chatId}, duration=${duration === 'forever' ? 'forever' : duration === null ? 'unmute' : `${duration}ms`}, until=${mutedUntil ?? 'unmuted'}`
+    );
   };
-  // v1.6 Batch 4: handleArchiveChat вЂ” Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ/СЂР°Р·Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ С‡Р°С‚
+  // v1.6 Batch 4: handleArchiveChat — архивировать/разархивировать чат
   const handleArchiveChat = (chatId: string, archive: boolean) => {
-    setChats((prev) => {
+    setChats(prev => {
       const updated = { ...prev };
       const existing = updated[chatId] || { contactId: chatId, messages: [] };
       updated[chatId] = { ...existing, archived: archive };
       return updated;
     });
-    pushToast(archive ? 'Р§Р°С‚ Р°СЂС…РёРІРёСЂРѕРІР°РЅ' : 'Р§Р°С‚ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ', 'success');
+    pushToast(
+      archive ? 'Р§Р°С‚ Р°СЂС…РёРІРёСЂРѕРІР°РЅ' : 'Р§Р°С‚ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ',
+      'success'
+    );
     logger.info(`рџ“Ѓ [PILIGRIM] handleArchiveChat: chatId=${chatId}, archive=${archive}`);
   };
   const handleOpenProfile = () => logger.info('[PILIGRIM] handleOpenProfile stub');
   const handleOpenStore = () => logger.info('[PILIGRIM] handleOpenStore stub');
   const handleOpenBoards = () => logger.info('[PILIGRIM] handleOpenBoards stub');
 
-  // v1.6 Batch 4: handleVerifyContact вЂ” РїРѕРјРµС‚РёС‚СЊ РєРѕРЅС‚Р°РєС‚ РєР°Рє verified
+  // v1.6 Batch 4: handleVerifyContact — пометить контакт как verified
   const handleVerifyContact = (chatId: string) => {
-    setContacts((prev) =>
-      prev.map((c) => {
+    setContacts(prev =>
+      prev.map(c => {
         if (c.id === chatId || c.uid === chatId) {
           return { ...c, verified: true, verifiedAt: new Date().toISOString() };
         }
@@ -387,42 +418,44 @@ const App: React.FC = () => {
     logger.info(`вњ… [PILIGRIM] handleVerifyContact: chatId=${chatId} marked as verified`);
   };
 
-  // v1.5.2 Stage 5: WebSocket real-time РґР»СЏ РІС…РѕРґСЏС‰РёС… СЃРѕРѕР±С‰РµРЅРёР№.
+  // v1.5.2 Stage 5: WebSocket real-time для входящих сообщений.
   // РСЃРїРѕР»СЊР·СѓРµС‚ apiService (NaCl box РґР»СЏ С‚СЂР°РЅСЃРїРѕСЂС‚Р°) + graceful degradation
-  // РїСЂРё РЅРµРґРѕСЃС‚СѓРїРЅРѕСЃС‚Рё Р±СЌРєРµРЅРґР° (С‚РѕР»СЊРєРѕ localStorage).
+  // при недоступности бэкенда (только localStorage).
   const ws = useWebSocket({
     myUid: identity?.uid || '',
     enabled: !!identity,
-    onMessage: (incomingMessage) => {
-      // incomingMessage РїСЂРёС…РѕРґРёС‚ РѕС‚ apiService СѓР¶Рµ СЃ СЂР°СЃС€РёС„СЂРѕРІР°РЅРЅС‹Рј С‚РµРєСЃС‚РѕРј
-      // (РµСЃР»Рё NaCl box РєР»СЋС‡Рё Р±С‹Р»Рё РЅР°СЃС‚СЂРѕРµРЅС‹), РёРЅР°С‡Рµ СЃ raw text
-      logger.info(`рџ“© [PILIGRIM] WS: incoming message from ${incomingMessage.senderId}, chatId=${incomingMessage.groupId ?? 'dm'}`);
+    onMessage: incomingMessage => {
+      // incomingMessage приходит от apiService уже с расшифрованным текстом
+      // (если NaCl box ключи были настроены), иначе с raw text
+      logger.info(
+        `рџ“© [PILIGRIM] WS: incoming message from ${incomingMessage.senderId}, chatId=${incomingMessage.groupId ?? 'dm'}`
+      );
       const chatId = incomingMessage.groupId || incomingMessage.senderId;
-      setChats((prev) => {
+      setChats(prev => {
         const updated = { ...prev };
         if (!updated[chatId]) {
           updated[chatId] = { contactId: chatId, messages: [] };
         }
-        // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёРєР°С‚РѕРІ (РЅР° СЃР»СѓС‡Р°Р№ re-connect)
-        const exists = (updated[chatId].messages || []).some((m) => m.id === incomingMessage.id);
+        // Защита от дубликатов (на случай re-connect)
+        const exists = (updated[chatId].messages || []).some(m => m.id === incomingMessage.id);
         if (exists) {
           logger.info(`[PILIGRIM] WS: duplicate message ${incomingMessage.id}, skipped`);
           return prev;
         }
         updated[chatId] = {
           ...updated[chatId],
-          messages: [...(updated[chatId].messages || []), incomingMessage]
+          messages: [...(updated[chatId].messages || []), incomingMessage],
         };
         return updated;
       });
     },
-    onStatusChange: (status) => {
+    onStatusChange: status => {
       logger.info(`[PILIGRIM] WS status: ${status}`);
       setWsStatus(status);
-    }
+    },
   });
 
-  // v1.5.2 Stage 6: WebRTC hook вЂ” РґР»СЏ Р·РІРѕРЅРєРѕРІ Рё РґРµРјРѕРЅСЃС‚СЂР°С†РёРё СЌРєСЂР°РЅР°.
+  // v1.5.2 Stage 6: WebRTC hook — для звонков и демонстрации экрана.
   const webrtcHook = useWebRTC(identity?.uid || '');
   // v3.0 Phase 1: time-based theme (morning/day/evening/night)
   const theme = useTimeTheme();
@@ -431,21 +464,29 @@ const App: React.FC = () => {
     logger.info('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
   };
-  // v1.5.2 Stage 4: handleSendMessage вЂ” С€РёС„СЂСѓРµС‚ СЃРѕРѕР±С‰РµРЅРёРµ РїСѓР±Р»РёС‡РЅС‹Рј РєР»СЋС‡РѕРј РєРѕРЅС‚Р°РєС‚Р°
-  // (RSA-OAEP) РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј РІ localStorage. Р•СЃР»Рё publicKey РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ вЂ”
-  // РѕС‚РїСЂР°РІР»СЏРµРј РІ plaintext СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј (graceful fallback РґР»СЏ UX).
-  const handleSendMessage = async (chatId: string, text: string, attachments?: { id: string; dataUrl: string; name: string }[], replyTo?: string, encryptedAttachments?: EncryptedAttachment[]) => {
+  // v1.5.2 Stage 4: handleSendMessage — шифрует сообщение публичным ключом контакта
+  // (RSA-OAEP) перед сохранением в localStorage. Если publicKey отсутствует —
+  // отправляем в plaintext с предупреждением (graceful fallback для UX).
+  const handleSendMessage = async (
+    chatId: string,
+    text: string,
+    attachments?: { id: string; dataUrl: string; name: string }[],
+    replyTo?: string,
+    encryptedAttachments?: EncryptedAttachment[]
+  ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!identity) {
-      logger.warn('[PILIGRIM] handleSendMessage: identity РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РїСЂР°РІР»РµРЅРѕ');
+      logger.warn(
+        '[PILIGRIM] handleSendMessage: identity РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РїСЂР°РІР»РµРЅРѕ'
+      );
       return;
     }
 
     // 1. РС‰РµРј РєРѕРЅС‚Р°РєС‚, С‡С‚РѕР±С‹ РїРѕР»СѓС‡РёС‚СЊ РµРіРѕ publicKey
-    const contact = contacts.find((c) => c.id === chatId || c.uid === chatId);
+    const contact = contacts.find(c => c.id === chatId || c.uid === chatId);
 
-    // 2. РЁРёС„СЂСѓРµРј, РµСЃР»Рё РµСЃС‚СЊ publicKey
+    // 2. Шифруем, если есть publicKey
     let encryptedPayload: string | undefined;
     let isEncrypted = false;
     // Phase 2: Signal (PFS Double Ratchet) preferred, NaCl fallback.
@@ -454,78 +495,93 @@ const App: React.FC = () => {
     let encryptionType: 'signal' | 'nacl' | undefined;
     if (contact?.publicKey && ws.isConnected) {
       try {
-        const msgId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const msgId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         const secureResult = await apiService.sendMessageSecure(
           contact.uid,
           trimmed,
           contact.publicKey,
-          { id: msgId, encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined }
+          {
+            id: msgId,
+            encryptedAttachments:
+              encryptedAttachments && encryptedAttachments.length > 0
+                ? encryptedAttachments
+                : undefined,
+          }
         );
         encryptionType = secureResult?.type;
         isEncrypted = !!encryptionType;
         if (encryptionType) {
           encryptedPayload = '[secure:' + encryptionType + ']';
         }
-        logger.info(`[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`);
+        logger.info(
+          `[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`
+        );
       } catch (error) {
         logger.error(`[PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
         // Fallback: отправляем в plaintext, но НЕ теряем сообщение
         if (contact?.publicKey && ws.isConnected) {
           try {
-            apiService.sendMessage(
-              contact.uid,
-              trimmed,
-              contact.publicKey,
-              { encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined }
-            );
+            apiService.sendMessage(contact.uid, trimmed, contact.publicKey, {
+              encryptedAttachments:
+                encryptedAttachments && encryptedAttachments.length > 0
+                  ? encryptedAttachments
+                  : undefined,
+            });
           } catch (e) {
             logger.error('[PILIGRIM] plaintext fallback send failed', e);
           }
         }
       }
     } else if (!contact?.publicKey) {
-      logger.warn(`[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`);
+      logger.warn(
+        `[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`
+      );
     } else if (!ws.isConnected) {
       logger.info(`[PILIGRIM] WS offline, message saved locally only (encryptionType deferred)`);
     }
 
-    // 3. РЎРѕР·РґР°С‘Рј Message (text вЂ” РґР»СЏ Р»РѕРєР°Р»СЊРЅРѕРіРѕ UI, encryptedPayload вЂ” РґР»СЏ С…СЂР°РЅРµРЅРёСЏ/РїРµСЂРµРґР°С‡Рё)
+    // 3. Создаём Message (text — для локального UI, encryptedPayload — для хранения/передачи)
     const newMessage: Message = {
-      id: (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       text: trimmed,
       encryptedPayload,
       isEncrypted,
       senderId: identity.uid,
       timestamp: new Date().toISOString(),
-                  status: 'sent',
+      status: 'sent',
       attachments: attachments && attachments.length > 0 ? attachments : undefined,
-      encryptedAttachments: encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined,
-      replyTo
+      encryptedAttachments:
+        encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined,
+      replyTo,
     };
-    logger.info(`[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`);
-    setChats((prev) => {
+    logger.info(
+      `[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`
+    );
+    setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) {
         updated[chatId] = { contactId: chatId, messages: [] };
       }
       updated[chatId] = {
         ...updated[chatId],
-        messages: [...(updated[chatId].messages || []), newMessage]
+        messages: [...(updated[chatId].messages || []), newMessage],
       };
       return updated;
     });
 
-    // Stage 5: РµСЃР»Рё WebSocket РїРѕРґРєР»СЋС‡С‘РЅ вЂ” РѕС‚РїСЂР°РІР»СЏРµРј СЃРѕРѕР±С‰РµРЅРёРµ РїРѕР»СѓС‡Р°С‚РµР»СЋ С‡РµСЂРµР· СЃРµСЂРІРµСЂ.
-    // apiService РёСЃРїРѕР»СЊР·СѓРµС‚ NaCl box (X25519+XSalsa20) РґР»СЏ С‚СЂР°РЅСЃРїРѕСЂС‚РЅРѕРіРѕ С€РёС„СЂРѕРІР°РЅРёСЏ.
-    // Р•СЃР»Рё WS РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” СЃРѕРѕР±С‰РµРЅРёРµ РѕСЃС‚Р°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ Р»РѕРєР°Р»СЊРЅРѕ (offline-first).
+    // Stage 5: если WebSocket подключён — отправляем сообщение получателю через сервер.
+    // apiService использует NaCl box (X25519+XSalsa20) для транспортного шифрования.
+    // Если WS недоступен — сообщение остаётся только локально (offline-first).
     // Phase 2: apiService.sendMessageSecure уже отправил зашифрованное сообщение через WS.
     // Здесь мы только обновляем encryptionType в чате для UI badge (🔒 PFS / 🔓 Legacy).
     if (encryptionType) {
-      setChats((prev) => {
+      setChats(prev => {
         const updated = { ...prev };
         if (!updated[chatId]) {
           updated[chatId] = { contactId: chatId, messages: [] };
@@ -542,12 +598,12 @@ const App: React.FC = () => {
   // v3.0 Phase 3: удаление сообщения из чата
   const handleDeleteMessage = (chatId: string, messageId: string) => {
     logger.info('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
-    setChats((prev) => {
+    setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
       updated[chatId] = {
         ...updated[chatId],
-        messages: updated[chatId].messages.filter((m) => m.id !== messageId),
+        messages: updated[chatId].messages.filter(m => m.id !== messageId),
       };
       return updated;
     });
@@ -555,12 +611,12 @@ const App: React.FC = () => {
   // v3.0 Phase 3: редактирование сообщения (локальное изменение текста)
   const handleEditMessage = (chatId: string, messageId: string, newText: string) => {
     logger.info('[PILIGRIM] handleEditMessage:', { chatId, messageId });
-    setChats((prev) => {
+    setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
       updated[chatId] = {
         ...updated[chatId],
-        messages: updated[chatId].messages.map((m) =>
+        messages: updated[chatId].messages.map(m =>
           m.id === messageId ? { ...m, text: newText, status: 'sent' } : m
         ),
       };
@@ -572,14 +628,18 @@ const App: React.FC = () => {
     setIdentity(null);
   };
 
-  // Phase 9.5 fix: СЃРЅР°С‡Р°Р»Р° РїРѕРєР°Р·С‹РІР°РµРј SeedPhraseModal, РїРѕС‚РѕРј identity
+  // Phase 9.5 fix: сначала показываем SeedPhraseModal, потом identity
   if (showSeedModal && pendingIdentity?.seedPhrase) {
     return (
       <div>
         {identity && (
           <div className="min-h-screen bg-slate-900 text-white p-8">
-            <h1 className="text-3xl font-bold mb-4">рџЋ‰ Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ, {identity.username}!</h1>
-            <p className="text-slate-400">Identity СЃРѕР·РґР°РЅР° СѓСЃРїРµС€РЅРѕ. Phase 9.5 minimal version.</p>
+            <h1 className="text-3xl font-bold mb-4">
+              рџЋ‰ Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ, {identity.username}!
+            </h1>
+            <p className="text-slate-400">
+              Identity СЃРѕР·РґР°РЅР° СѓСЃРїРµС€РЅРѕ. Phase 9.5 minimal version.
+            </p>
             <button
               onClick={() => {
                 localStorage.removeItem('piligrim-identity');
@@ -601,7 +661,6 @@ const App: React.FC = () => {
     );
   }
 
-    
   // v3.0 Phase 5: handleRestore через LoginPage (BIP39)
   const handleRestoreFromLoginPage = async (payload: { words: string[]; isBIP39: boolean }) => {
     logger.info('[PILIGRIM] LoginPage restore triggered, BIP39=', payload.isBIP39);
@@ -611,7 +670,7 @@ const App: React.FC = () => {
       try {
         const saved = localStorage.getItem('piligrim-identity');
         if (saved) {
-          const parsed = JSON.parse(saved);
+          const parsed = JSON.parse(saved) as { encryptedKeyPair?: string };
           encryptedKeyPair = parsed.encryptedKeyPair;
         }
       } catch {
@@ -649,8 +708,10 @@ const App: React.FC = () => {
     logger.info('[PILIGRIM] LoginPage rendered (Neuro-Minimalist UI)');
     return (
       <LoginPage
-        onLogin={handleCreateIdentity}
-        onRestore={handleRestoreFromLoginPage}
+        onLogin={() => void handleCreateIdentity()}
+        onRestore={(payload: { words: string[]; isBIP39: boolean }) =>
+          void handleRestoreFromLoginPage(payload)
+        }
       />
     );
   }
@@ -659,8 +720,17 @@ const App: React.FC = () => {
   // 3 breakpoints: mobile (<=640), tablet (641-1024), desktop (>1024).
   // On RT9 (800x1280) -> tablet — two-column 30%/70% layout.
   return (
-    <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--color-bg-primary)', color: 'var(--color-text-primary)', position: 'relative' }}>
-{/* Batch 5: language switcher (left top corner) */}
+    <div
+      style={{
+        display: 'flex',
+        height: '100%',
+        width: '100%',
+        background: 'var(--color-bg-primary)',
+        color: 'var(--color-text-primary)',
+        position: 'relative',
+      }}
+    >
+      {/* Batch 5: language switcher (left top corner) */}
       <div
         data-testid="language-switcher"
         style={{
@@ -670,7 +740,7 @@ const App: React.FC = () => {
           zIndex: 100,
           display: 'flex',
           gap: '8px',
-          alignItems: 'center'
+          alignItems: 'center',
         }}
       >
         <button
@@ -687,13 +757,13 @@ const App: React.FC = () => {
             borderRadius: '8px',
             fontSize: '12px',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           {language === 'ru' ? '🇷🇺 RU' : '🇬🇧 EN'}
         </button>
       </div>
-      {/* Stage 5: РёРЅРґРёРєР°С‚РѕСЂ СЃС‚Р°С‚СѓСЃР° WebSocket (РїСЂР°РІС‹Р№ РІРµСЂС…РЅРёР№ СѓРіРѕР») */}
+      {/* Stage 5: индикатор статуса WebSocket (правый верхний угол) */}
       <div
         data-testid="ws-status"
         title={`WebSocket: ${wsStatus}`}
@@ -706,12 +776,13 @@ const App: React.FC = () => {
           alignItems: 'center',
           gap: '6px',
           padding: '4px 10px',
-          backgroundColor: wsStatus === 'open' ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
+          backgroundColor:
+            wsStatus === 'open' ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
           border: `1px solid ${wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)'}`,
           borderRadius: '12px',
           color: wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)',
           fontSize: '11px',
-          fontWeight: 600
+          fontWeight: 600,
         }}
       >
         <span
@@ -720,7 +791,7 @@ const App: React.FC = () => {
             height: '8px',
             borderRadius: '50%',
             backgroundColor: wsStatus === 'open' ? 'var(--color-success)' : 'var(--color-danger)',
-            animation: wsStatus === 'connecting' ? 'pulse 1.5s ease-in-out infinite' : undefined
+            animation: wsStatus === 'connecting' ? 'pulse 1.5s ease-in-out infinite' : undefined,
           }}
         />
         <span>
@@ -734,186 +805,205 @@ const App: React.FC = () => {
 
       {/* v3.0 Phase 2B-1: ResponsiveShell - 3 breakpoints (mobile/tablet/desktop) */}
       {activeTab === 'chats' && (
-      <ResponsiveShell
-        leftPanel={
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-            {/* Phase 2B-2: LeftAppBar — burger + "Чаты" + search */}
-            <LeftAppBar
-              onMenuClick={() => setIsDrawerOpen(true)}
-              onSearchClick={() => setIsSearchOpen(true)}
-            />
-            {/* Scrollable ContactList area */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <ContactList
-                identity={identity}
-                contacts={contacts}
-                groups={groups}
-                chats={chats}
-                selectedChatId={selectedChatId}
-                onSelectChat={handleSelectChat}
-                onAddContact={handleAddContact}
-                onCreateGroup={handleCreateGroup}
-                onMuteChat={handleMuteChat}
-                onArchiveChat={handleArchiveChat}
-                onOpenProfile={handleOpenProfile}
-                onOpenStore={handleOpenStore}
-                onOpenBoards={handleOpenBoards}
+        <ResponsiveShell
+          leftPanel={
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+              {/* Phase 2B-2: LeftAppBar — burger + "Чаты" + search */}
+              <LeftAppBar
+                onMenuClick={() => setIsDrawerOpen(true)}
+                onSearchClick={() => setIsSearchOpen(true)}
               />
-            </div>
-          </div>
-        }
-        rightPanel={
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-            {/* Phase 2B-2: RightAppBar — avatar + name + status + 3 icons */}
-            <RightAppBar
-              contactName={(() => {
-                if (!selectedChatId) return undefined;
-                const c = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
-                if (c) return c.name;
-                const g = groups.find((g) => g.id === selectedChatId);
-                if (g) return g.name;
-                return undefined;
-              })()}
-              contactUid={selectedChatId || undefined}
-              isOnline={wsStatus === 'open'}
-              showBack={!!selectedChatId}
-              onBackClick={() => setSelectedChatId(null)}
-              onCallClick={() => {
-                const target = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
-                if (target && target.uid) {
-                  logger.info(`[PILIGRIM] Stage 6: audio call to ${target.name} (${target.uid})`);
-                  webrtcHook.startCall(target.uid);
-                } else {
-                  alert('Contact not found or has no UID');
-                }
-              }}
-              onVideoClick={() => logger.info('[PILIGRIM] Video call (Phase 2F)')}
-              onMenuClick={() => setShowLogoutModal(true)}
-              // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel
-              onAvatarClick={() => setIsProfileOpen(true)}
-            />
-            {/* Scrollable content area */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              {selectedChatId && chats[selectedChatId] ? (
-                <ChatWindow
-                  chatId={selectedChatId}
-                  messages={chats[selectedChatId]?.messages || []}
-                  onSendMessage={(text, attachments, replyTo) => handleSendMessage(selectedChatId, text, attachments, replyTo)}
-                  partner={(() => {
-                    const c = contacts.find((c) => c.id === selectedChatId);
-                    if (c) return c;
-                    const g = groups.find((g) => g.id === selectedChatId);
-                    if (g) return { name: g.name };
-                    return undefined;
-                  })()}
-                  currentUserUid={identity?.uid}
-                  onDeleteMessage={(messageId) => handleDeleteMessage(selectedChatId, messageId)}
-                  onEditMessage={(messageId, newText) => handleEditMessage(selectedChatId, messageId, newText)}
-                  onStartCall={() => {
-                    const target = contacts.find((c) => c.id === selectedChatId);
-                    if (target && target.uid) {
-                      logger.info(`[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`);
-                      webrtcHook.startCall(target.uid);
-                    } else {
-                      alert('Contact not found or has no UID');
-                    }
-                  }}
-                  callState={
-                    webrtcHook.isInCall
-                      ? 'in-call'
-                      : webrtcHook.isCalling
-                        ? 'calling'
-                      : webrtcHook.incomingCall
-                        ? 'incoming'
-                      : 'idle'
+              {/* Scrollable ContactList area */}
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                <ContactList
+                  identity={identity}
+                  contacts={contacts}
+                  groups={groups}
+                  chats={chats}
+                  selectedChatId={selectedChatId}
+                  onSelectChat={handleSelectChat}
+                  onAddContact={(name, uid, publicKey) =>
+                    void handleAddContact(name, uid, publicKey)
                   }
-                  mutedUntil={chats[selectedChatId]?.mutedUntil}
-                  onVerifyContact={() => setShowVerifyModal(true)}
-                  encryptionType={chats[selectedChatId]?.encryptionType}
+                  onCreateGroup={(name, type) => void handleCreateGroup(name, type)}
+                  onMuteChat={handleMuteChat}
+                  onArchiveChat={handleArchiveChat}
+                  onOpenProfile={handleOpenProfile}
+                  onOpenStore={handleOpenStore}
+                  onOpenBoards={handleOpenBoards}
                 />
-              ) : (
-            <div style={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--color-text-secondary)',
-                  padding: '24px'
-                }}>
-                  <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
-                    Добро пожаловать в PILIGRIM
-                  </p>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
-                    Выберите контакт слева или добавьте новый с помощью <strong>+</strong>
-                  </p>
-                  <button
-                    onClick={handleLogout}
-                    aria-label="Logout"
+              </div>
+            </div>
+          }
+          rightPanel={
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+              {/* Phase 2B-2: RightAppBar — avatar + name + status + 3 icons */}
+              <RightAppBar
+                contactName={(() => {
+                  if (!selectedChatId) return undefined;
+                  const c = contacts.find(c => c.id === selectedChatId || c.uid === selectedChatId);
+                  if (c) return c.name;
+                  const g = groups.find(g => g.id === selectedChatId);
+                  if (g) return g.name;
+                  return undefined;
+                })()}
+                contactUid={selectedChatId || undefined}
+                isOnline={wsStatus === 'open'}
+                showBack={!!selectedChatId}
+                onBackClick={() => setSelectedChatId(null)}
+                onCallClick={() => {
+                  const target = contacts.find(
+                    c => c.id === selectedChatId || c.uid === selectedChatId
+                  );
+                  if (target && target.uid) {
+                    logger.info(`[PILIGRIM] Stage 6: audio call to ${target.name} (${target.uid})`);
+                    void webrtcHook.startCall(target.uid);
+                  } else {
+                    alert('Contact not found or has no UID');
+                  }
+                }}
+                onVideoClick={() => logger.info('[PILIGRIM] Video call (Phase 2F)')}
+                onMenuClick={() => setShowLogoutModal(true)}
+                // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel
+                onAvatarClick={() => setIsProfileOpen(true)}
+              />
+              {/* Scrollable content area */}
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                {selectedChatId && chats[selectedChatId] ? (
+                  <ChatWindow
+                    chatId={selectedChatId}
+                    messages={chats[selectedChatId]?.messages || []}
+                    onSendMessage={(text, attachments, replyTo) => {
+                      void handleSendMessage(selectedChatId, text, attachments, replyTo);
+                    }}
+                    partner={(() => {
+                      const c = contacts.find(c => c.id === selectedChatId);
+                      if (c) return c;
+                      const g = groups.find(g => g.id === selectedChatId);
+                      if (g) return { name: g.name };
+                      return undefined;
+                    })()}
+                    currentUserUid={identity?.uid}
+                    onDeleteMessage={messageId => handleDeleteMessage(selectedChatId, messageId)}
+                    onEditMessage={(messageId, newText) =>
+                      handleEditMessage(selectedChatId, messageId, newText)
+                    }
+                    onStartCall={() => {
+                      const target = contacts.find(c => c.id === selectedChatId);
+                      if (target && target.uid) {
+                        logger.info(
+                          `[PILIGRIM] Stage 6: starting call to ${target.name} (${target.uid})`
+                        );
+                        void webrtcHook.startCall(target.uid);
+                      } else {
+                        alert('Contact not found or has no UID');
+                      }
+                    }}
+                    callState={
+                      webrtcHook.isInCall
+                        ? 'in-call'
+                        : webrtcHook.isCalling
+                          ? 'calling'
+                          : webrtcHook.incomingCall
+                            ? 'incoming'
+                            : 'idle'
+                    }
+                    mutedUntil={chats[selectedChatId]?.mutedUntil}
+                    onVerifyContact={() => setShowVerifyModal(true)}
+                    encryptionType={chats[selectedChatId]?.encryptionType}
+                  />
+                ) : (
+                  <div
                     style={{
-                      marginTop: '1rem',
-                      padding: '0.5rem 1rem',
-                      background: 'var(--color-danger)',
-                      color: 'var(--color-on-primary)',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.875rem',
-                      border: 'none',
-                      cursor: 'pointer'
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--color-text-secondary)',
+                      padding: '24px',
                     }}
                   >
-                    Logout
-                  </button>
-                </div>
-              )}
+                    <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
+                      Добро пожаловать в PILIGRIM
+                    </p>
+                    <p
+                      style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--color-text-secondary)',
+                        maxWidth: '280px',
+                        textAlign: 'center',
+                        margin: '0 0 24px',
+                      }}
+                    >
+                      Выберите контакт слева или добавьте новый с помощью <strong>+</strong>
+                    </p>
+                    <button
+                      onClick={handleLogout}
+                      aria-label="Logout"
+                      style={{
+                        marginTop: '1rem',
+                        padding: '0.5rem 1rem',
+                        background: 'var(--color-danger)',
+                        color: 'var(--color-on-primary)',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        }
-        tabBar={
-          <TabletTabBar
-            activeView={activeTab}
-            onViewChange={(view) => {
-              logger.info('[PILIGRIM] Tab changed to:', view);
-              setActiveTab(view);
-            }}
-          />
-        }
-        fab={
-          <FloatingActionButton
-            onClick={() => {
-              // v3.0 Phase 2C: FAB открывает AddContactModal через кастомное событие,
-              // которое слушает ContactList (он владеет модалкой внутри себя)
-              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              logger.info('[PILIGRIM] FAB clicked: requested AddContactModal open');
-            }}
-          />
-        }
-        // v3.0 Phase 2G: mobile floating circle nav (заменяет tabBar на ≤640px)
-        mobileNav={
-          <FloatingCircleNav
-            activeView={activeTab}
-            onViewChange={setActiveTab}
-            onCompose={() => {
-              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
-            }}
-          />
-        }
-        // v3.0 Phase 2H: desktop joystick (фиксированный слева)
-        desktopNav={
-          <DesktopJoystick
-            activeView={activeTab}
-            onViewChange={setActiveTab}
-            onCompose={() => {
-              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
-              logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
-            }}
-          />
-        }
-        // v3.0 Phase 2H: 3rd panel on desktop — открывается по клику на аватар в RightAppBar
-        profilePanel={
-          (() => {
+          }
+          tabBar={
+            <TabletTabBar
+              activeView={activeTab}
+              onViewChange={view => {
+                logger.info('[PILIGRIM] Tab changed to:', view);
+                setActiveTab(view);
+              }}
+            />
+          }
+          fab={
+            <FloatingActionButton
+              onClick={() => {
+                // v3.0 Phase 2C: FAB открывает AddContactModal через кастомное событие,
+                // которое слушает ContactList (он владеет модалкой внутри себя)
+                window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+                logger.info('[PILIGRIM] FAB clicked: requested AddContactModal open');
+              }}
+            />
+          }
+          // v3.0 Phase 2G: mobile floating circle nav (заменяет tabBar на ≤640px)
+          mobileNav={
+            <FloatingCircleNav
+              activeView={activeTab}
+              onViewChange={setActiveTab}
+              onCompose={() => {
+                window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+                logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
+              }}
+            />
+          }
+          // v3.0 Phase 2H: desktop joystick (фиксированный слева)
+          desktopNav={
+            <DesktopJoystick
+              activeView={activeTab}
+              onViewChange={setActiveTab}
+              onCompose={() => {
+                window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+                logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
+              }}
+            />
+          }
+          // v3.0 Phase 2H: 3rd panel on desktop — открывается по клику на аватар в RightAppBar
+          profilePanel={(() => {
             if (!isProfileOpen || !selectedChatId) return undefined;
-            const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+            const partner = contacts.find(c => c.id === selectedChatId || c.uid === selectedChatId);
             if (!partner) return undefined;
             return (
               <ProfilePanel
@@ -926,49 +1016,46 @@ const App: React.FC = () => {
                 onClose={() => setIsProfileOpen(false)}
               />
             );
-          })()
-        }
-      />
+          })()}
+        />
       )}
 
       {/* v3.0 Phase 2C: вкладка Звонки — CallsHistoryView с demo данными */}
-      {activeTab === 'calls' && (
-        <CallsHistoryView onViewChange={setActiveTab} />
-      )}
+      {activeTab === 'calls' && <CallsHistoryView onViewChange={setActiveTab} />}
 
       {/* v3.0 Phase 2C: вкладка Избранное — только verified контакты */}
       {activeTab === 'favorites' && (
         <FavoritesView
           contacts={contacts}
-          onSelectContact={(uid) => {
-            setActiveTab('chats');
-            handleSelectChat(uid);
+          onSelectContact={uid => {
+            void setActiveTab('chats');
+            void handleSelectChat(uid);
           }}
           onViewChange={setActiveTab}
         />
       )}
 
       {/* Telegram-like: вкладка Каналы */}
-      {activeTab === 'channels' && (
-        <ChannelsView />
-      )}
+      {activeTab === 'channels' && <ChannelsView />}
 
-      {/* Batch 4: РјРѕРґР°Р»РєР° РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */}
-      {showVerifyModal && selectedChatId && (() => {
-        const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
-        return (
-          <VerifyModal
-            partnerName={partner?.name || 'РљРѕРЅС‚Р°РєС‚'}
-            partnerPublicKey={partner?.publicKey}
-            myPublicKey={identity ? getPublicKey(identity) : undefined}
-            partnerFingerprint={partner?.keyFingerprint}
-            myFingerprint={identity?.keyFingerprint}
-            isVerified={!!partner?.verified}
-            onConfirm={() => handleVerifyContact(selectedChatId)}
-            onClose={() => setShowVerifyModal(false)}
-          />
-        );
-      })()}
+      {/* Batch 4: модалка верификации контакта */}
+      {showVerifyModal &&
+        selectedChatId &&
+        (() => {
+          const partner = contacts.find(c => c.id === selectedChatId || c.uid === selectedChatId);
+          return (
+            <VerifyModal
+              partnerName={partner?.name || 'РљРѕРЅС‚Р°РєС‚'}
+              partnerPublicKey={partner?.publicKey}
+              myPublicKey={identity ? getPublicKey(identity) : undefined}
+              partnerFingerprint={partner?.keyFingerprint}
+              myFingerprint={identity?.keyFingerprint}
+              isVerified={!!partner?.verified}
+              onConfirm={() => handleVerifyContact(selectedChatId)}
+              onClose={() => setShowVerifyModal(false)}
+            />
+          );
+        })()}
 
       {/* Batch 4: Toast notifications */}
       <Toasts toasts={toasts} onDismiss={dismissToast} />
@@ -982,7 +1069,7 @@ const App: React.FC = () => {
         onToggleLang={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
         // v3.0 Phase 2F: активная вкладка для индикатора в Drawer
         activeView={activeTab}
-        onNavigate={(view) => setActiveTab(view)}
+        onNavigate={view => setActiveTab(view)}
         onOpenAccount={() => {
           setIsDrawerOpen(false);
           setShowAccountPage(true);
@@ -1003,12 +1090,12 @@ const App: React.FC = () => {
           }}
           onBack={() => setShowAccountPage(false)}
           onLogout={() => {
-            setShowAccountPage(false);
-            setShowLogoutModal(true);
+            void setShowAccountPage(false);
+            void setShowLogoutModal(true);
           }}
           onBackupSeed={() => {
-            setShowAccountPage(false);
-            setShowSeedModal(true);
+            void setShowAccountPage(false);
+            void setShowSeedModal(true);
           }}
         />
       )}
@@ -1019,9 +1106,9 @@ const App: React.FC = () => {
         onClose={() => setIsSearchOpen(false)}
         contacts={searchableContacts}
         onContactSelect={(uid: string) => {
-          setIsSearchOpen(false);
-          setActiveTab('chats');
-          setSelectedChatId(uid);
+          void setIsSearchOpen(false);
+          void setActiveTab('chats');
+          void setSelectedChatId(uid);
         }}
       />
 
@@ -1031,8 +1118,8 @@ const App: React.FC = () => {
         identityUid={identity?.uid}
         onCancel={() => setShowLogoutModal(false)}
         onConfirm={() => {
-          setShowLogoutModal(false);
-          logout();
+          void setShowLogoutModal(false);
+          void logout();
         }}
       />
 
@@ -1051,7 +1138,7 @@ const App: React.FC = () => {
           fontSize: '11px',
           fontWeight: 600,
           zIndex: 100,
-          boxShadow: 'var(--shadow-sm)'
+          boxShadow: 'var(--shadow-sm)',
         }}
         title="Адаптивная тема по времени суток"
         aria-label="Текущая тема"
@@ -1070,29 +1157,29 @@ const App: React.FC = () => {
               ? 'in-call'
               : webrtcHook.isCalling
                 ? 'calling'
-              : webrtcHook.incomingCall
-                ? 'incoming'
-              : 'idle'
+                : webrtcHook.incomingCall
+                  ? 'incoming'
+                  : 'idle'
           }
           partnerName={(() => {
-            const target = contacts.find((c) => c.uid === webrtcHook.currentCallUid);
+            const target = contacts.find(c => c.uid === webrtcHook.currentCallUid);
             return target?.name || 'Контакт';
           })()}
           partnerUid={webrtcHook.currentCallUid || ''}
           localStream={webrtcHook.localStream}
           remoteStream={webrtcHook.remoteStream}
-          onAccept={webrtcHook.answerCall}
-          onDecline={webrtcHook.rejectCall}
-          onEnd={webrtcHook.endCall}
+          onAccept={() => void webrtcHook.answerCall()}
+          onDecline={() => void webrtcHook.rejectCall()}
+          onEnd={() => void webrtcHook.endCall()}
           onStartCall={() => {
-            const target = contacts.find((c) => c.uid === webrtcHook.currentCallUid);
+            const target = contacts.find(c => c.uid === webrtcHook.currentCallUid);
             if (target && target.uid) {
-              webrtcHook.startCall(target.uid);
+              void webrtcHook.startCall(target.uid);
             }
           }}
-          onToggleMute={webrtcHook.toggleAudio}
-          onToggleVideo={webrtcHook.toggleVideo}
-          onStartScreenShare={webrtcHook.toggleScreenShare}
+          onToggleMute={() => void webrtcHook.toggleAudio()}
+          onToggleVideo={() => void webrtcHook.toggleVideo()}
+          onStartScreenShare={() => void webrtcHook.toggleScreenShare()}
           isMuted={!webrtcHook.isAudioEnabled()}
           isVideoEnabled={webrtcHook.isVideoEnabled()}
           isScreenSharing={webrtcHook.isScreenSharing}

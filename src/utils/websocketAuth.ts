@@ -1,7 +1,7 @@
 import { logger } from '../services/logger';
-// v2.0 Stage 4: WebSocket URL builder с auto-register query params.
-// Передаёт uid + publicKey (base64url-encoded JWK) на этапе handshake,
-// чтобы сервер знал клиента ДО первого WS-сообщения.
+// Этап 4: формирует URL WebSocket с параметрами автоматической регистрации.
+// Передаёт uid и publicKey (JWK в формате base64url) во время рукопожатия,
+// чтобы сервер распознал клиента до первого сообщения WebSocket.
 
 /**
  * Минимальный интерфейс identity, нужный для построения auth URL.
@@ -11,20 +11,17 @@ export interface AuthIdentityLike {
   uid: string;
   /** JWK-строка или объект (cryptoService возвращает строку) */
   publicKey?: string | { kty?: string; n?: string; e?: string };
-  /** Transport NaCl box public key (base64) — preferred for WS handshake */
+  /** Публичный транспортный ключ NaCl box в base64 для аутентификации WebSocket. */
   transportPublicKey?: string;
 }
 
 /**
- * Строит WebSocket URL с auto-register query params.
- * @param baseUrl Базовый WS URL (например, wss://192.168.100.4:4443)
- * @param identity Identity пользователя или null (anonymous connect)
- * @returns URL с query-параметрами для handshake
+ * Строит URL WebSocket с параметрами аутентификации.
+ * @param baseUrl базовый URL WebSocket, например wss://192.168.100.4:4443
+ * @param identity данные identity или null для анонимного подключения
+ * @returns URL с параметрами для рукопожатия
  */
-export function buildWsAuthUrl(
-  baseUrl: string,
-  identity: AuthIdentityLike | null
-): string {
+export function buildWsAuthUrl(baseUrl: string, identity: AuthIdentityLike | null): string {
   if (!identity || !identity.uid) {
     logger.warn('[PILIGRIM WS] buildWsAuthUrl: no identity, connecting anonymously');
     return baseUrl;
@@ -34,7 +31,7 @@ export function buildWsAuthUrl(
     const url = new URL(baseUrl);
     url.searchParams.set('uid', identity.uid);
 
-    // Transport key (NaCl box base64) предпочтительнее identity publicKey.
+    // Транспортный ключ NaCl box в base64 предпочтительнее открытого ключа identity.
     let pkString: string | undefined = identity.transportPublicKey;
     if (!pkString && identity.publicKey) {
       if (typeof identity.publicKey === 'string') {
@@ -48,11 +45,8 @@ export function buildWsAuthUrl(
       return baseUrl;
     }
 
-    // base64url encoding: URL-safe (без +, /, =)
-    const pkBase64 = btoa(pkString)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    // Кодирование base64url безопасно для URL и не содержит символов +, / и =.
+    const pkBase64 = btoa(pkString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     url.searchParams.set('pk', pkBase64);
     url.searchParams.set('v', '2.0');

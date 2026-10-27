@@ -1,11 +1,11 @@
 import { logger } from '../services/logger';
-// v3.0 Phase 4: QRScannerModal — сканирование QR-кода через getUserMedia + jsQR.
+// Этап 4: QRScannerModal сканирует QR-коды через getUserMedia и jsQR.
 // Закрывает QR-петлю: Drawer показывает QR -> AddContact сканирует -> контакт с publicKey.
 // Безопасность: camera tracks останавливаются на unmount (battery + privacy).
 
-import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import jsQR from 'jsqr';
+import React, { useEffect, useRef, useState } from 'react';
 
 export interface ScannedIdentity {
   uid: string;
@@ -69,9 +69,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
     const startCamera = async () => {
       try {
         setError('');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+        });
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream.getTracks().forEach(t => t.stop());
           return;
         }
         streamRef.current = stream;
@@ -92,7 +94,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
       }
     };
@@ -109,19 +111,80 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
         exit={{ opacity: 0 }}
         onClick={onClose}
         data-testid="qr-scanner-modal"
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 110, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 } as React.CSSProperties}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          zIndex: 110,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
       >
-        <div data-testid="qr-scanner-viewport" style={{ position: 'relative', width: '100%', maxWidth: 400, aspectRatio: '1', borderRadius: 24, overflow: 'hidden', border: '2px solid var(--color-accent)', boxShadow: '0 0 40px var(--color-accent-glow, rgba(232, 106, 88, 0.5))' } as React.CSSProperties} onClick={(e) => e.stopPropagation()}>
-          <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' } as React.CSSProperties} />
+        <div
+          data-testid="qr-scanner-viewport"
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: 400,
+            aspectRatio: '1',
+            borderRadius: 24,
+            overflow: 'hidden',
+            border: '2px solid var(--color-accent)',
+            boxShadow: '0 0 40px var(--color-accent-glow, rgba(232, 106, 88, 0.5))',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div style={{ position: 'absolute', inset: '15%', border: '2px dashed rgba(255,255,255,0.6)', borderRadius: 16, pointerEvents: 'none' } as React.CSSProperties} />
+          <div
+            style={{
+              position: 'absolute',
+              inset: '15%',
+              border: '2px dashed rgba(255,255,255,0.6)',
+              borderRadius: 16,
+              pointerEvents: 'none',
+            }}
+          />
         </div>
 
-        <div data-testid="qr-scanner-status" style={{ marginTop: 20, color: 'white', fontSize: 15, textAlign: 'center', maxWidth: 320 } as React.CSSProperties}>
+        <div
+          data-testid="qr-scanner-status"
+          style={{
+            marginTop: 20,
+            color: 'white',
+            fontSize: 15,
+            textAlign: 'center',
+            maxWidth: 320,
+          }}
+        >
           {error || 'Point camera at peer QR code'}
         </div>
 
-        <button onClick={onClose} data-testid="qr-scanner-close" style={{ marginTop: 24, padding: '12px 32px', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', color: 'white', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' } as React.CSSProperties}>
+        <button
+          onClick={onClose}
+          data-testid="qr-scanner-close"
+          style={{
+            marginTop: 24,
+            padding: '12px 32px',
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 12,
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
           Close
         </button>
       </motion.div>

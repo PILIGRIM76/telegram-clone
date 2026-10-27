@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { voiceService } from '../services/voiceService';
-import { VoiceMessageMetadata } from '../types';
+import type { VoiceMessageMetadata } from '../types';
 
 interface VoiceRecorderProps {
   onVoiceRecorded: (encryptedBlob: Blob, metadata: VoiceMessageMetadata) => void;
@@ -22,9 +22,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const timerRef = useRef<number | null>(null);
   const levelAnimationRef = useRef<number | null>(null);
 
-  // Format time as MM:SS
-
-  // Start recording
   const handleStartRecording = useCallback(async () => {
     setError(null);
     setStatus('recording');
@@ -33,7 +30,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
     try {
       voiceService.setMaxDuration(maxDuration);
-      await voiceService.startRecording((level) => {
+      await voiceService.startRecording(level => {
         setAudioLevels(prev => {
           const newLevels = [...prev.slice(1), level];
           return newLevels;
@@ -50,7 +47,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }, 1000);
   }, [maxDuration]);
 
-  // Stop recording
   const handleStopRecording = useCallback(async () => {
     if (status !== 'recording') return;
 
@@ -63,7 +59,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
     try {
       const audioBlob = await voiceService.stopRecording();
-      const { encryptedBlob, metadata } = await voiceService.encryptVoiceMessage(audioBlob, privateKeyHex);
+      const { encryptedBlob, metadata } = await voiceService.encryptVoiceMessage(
+        audioBlob,
+        privateKeyHex
+      );
       onVoiceRecorded(encryptedBlob, metadata);
       setStatus('idle');
       setElapsedSeconds(0);
@@ -74,7 +73,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }
   }, [status, privateKeyHex]);
 
-  // Cancel recording
   const handleCancel = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -87,7 +85,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     onCancel?.();
   }, [onCancel]);
 
-  // Handle keyboard events (Escape to cancel)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && status === 'recording') {
@@ -102,14 +99,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [status, handleCancel]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
-  // Format time as MM:SS
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;

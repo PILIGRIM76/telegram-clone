@@ -1,11 +1,9 @@
-// v3.0 Phase 2B-2: LeftAppBar — верхний бар для левой панели (ContactList).
-// Pixel-perfect по HTML mockup пользователя:
+// Этап 2B-2: верхняя панель левого списка контактов.
+// Точное соответствие HTML-макету пользователя:
 //   - Высота: 64px
-//   - Padding: 0 16px
-//   - Иконки: 24x24 (line-art, lucide-style)
-//   - Border-bottom: 1px rgba(0,0,0,0.04)
-//   - Hover: rgba(0,0,0,0.04) background на кнопках
-// Inline styles + CSS-переменные (WebView-friendly).
+// - Иконки: 24x24, контурный стиль lucide.
+// - При наведении фон кнопок: rgba(0,0,0,0.04).
+// Встроенные стили и CSS-переменные совместимы с WebView.
 
 import React from 'react';
 
@@ -54,7 +52,7 @@ export const LeftAppBar: React.FC<LeftAppBarProps> = ({
         background: 'var(--color-bg-primary)',
         borderBottom: '1px solid rgba(0,0,0,0.04)',
         flexShrink: 0,
-      } as React.CSSProperties}
+      }}
     >
       <button
         onClick={onMenuClick}
@@ -63,7 +61,17 @@ export const LeftAppBar: React.FC<LeftAppBarProps> = ({
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="18" x2="21" y2="18" />
@@ -77,7 +85,7 @@ export const LeftAppBar: React.FC<LeftAppBarProps> = ({
           color: 'var(--color-text-primary)',
           margin: 0,
           letterSpacing: '-0.3px',
-        } as React.CSSProperties}
+        }}
       >
         {title}
       </h1>
@@ -89,7 +97,17 @@ export const LeftAppBar: React.FC<LeftAppBarProps> = ({
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>

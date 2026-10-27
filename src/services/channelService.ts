@@ -1,6 +1,6 @@
-// Клиентский сервис для Telegram-like фич: каналы, подарки.
-// Использует REST API основного сервера (F:\AntiPiry\server.js).
-// Базовый URL берётся из Vite env (с fallback на RT9 IP).
+// Клиентский сервис для каналов и подарков в стиле Telegram.
+// Использует REST API основного сервера.
+// Базовый URL берётся из настроек Vite; если их нет, используется адрес RT9.
 const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://192.168.100.4:4000';
 
 export interface PublicChannel {
@@ -51,15 +51,24 @@ async function postJSON<T>(url: string, body: unknown): Promise<T> {
 }
 
 export const channelService = {
-  listChannels: () => get<{ channels: PublicChannel[] }>(`${API_BASE}/channels`).then(d => d.channels),
+  listChannels: () =>
+    get<{ channels: PublicChannel[] }>(`${API_BASE}/channels`).then(d => d.channels),
   getChannel: (id: string) => get<PublicChannel>(`${API_BASE}/channels/${id}`),
-  getPosts: (id: string) => get<{ posts: ChannelPost[] }>(`${API_BASE}/channels/${id}/posts`).then(d => d.posts),
+  getPosts: (id: string) =>
+    get<{ posts: ChannelPost[] }>(`${API_BASE}/channels/${id}/posts`).then(d => d.posts),
   createChannel: (title: string, ownerId: string, description?: string) =>
-    postJSON<{ id: string; inviteToken: string }>(`${API_BASE}/channels/create`, { title, ownerId, description }),
+    postJSON<{ id: string; inviteToken: string }>(`${API_BASE}/channels/create`, {
+      title,
+      ownerId,
+      description,
+    }),
   subscribe: (channelId: string, uid: string, inviteToken?: string) =>
     postJSON(`${API_BASE}/channels/subscribe`, { uid, channelId, inviteToken }),
   post: (channelId: string, authorId: string, text: string) =>
-    postJSON<{ ok: boolean; post: ChannelPost }>(`${API_BASE}/channels/${channelId}/post`, { authorId, text }),
+    postJSON<{ ok: boolean; post: ChannelPost }>(`${API_BASE}/channels/${channelId}/post`, {
+      authorId,
+      text,
+    }),
   giftCatalog: () => get<{ gifts: GiftItem[] }>(`${API_BASE}/gifts/catalog`).then(d => d.gifts),
   sendGift: (giftId: string, fromUid: string, toUid: string, message?: string) =>
     postJSON(`${API_BASE}/gifts/send`, { giftId, fromUid, toUid, message }),

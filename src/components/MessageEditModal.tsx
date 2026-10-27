@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Message } from '../types';
 
 interface MessageEditModalProps {
@@ -10,7 +10,7 @@ interface MessageEditModalProps {
 export const MessageEditModal: React.FC<MessageEditModalProps> = ({
   message,
   onSave,
-  onCancel
+  onCancel,
 }) => {
   const [editedContent, setEditedContent] = useState(message.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,12 +38,14 @@ export const MessageEditModal: React.FC<MessageEditModalProps> = ({
       aria-labelledby="edit-modal-title"
     >
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
-        <h2 id="edit-modal-title" className="text-lg font-bold mb-4">Редактировать сообщение</h2>
+        <h2 id="edit-modal-title" className="text-lg font-bold mb-4">
+          Редактировать сообщение
+        </h2>
 
         <textarea
           ref={textareaRef}
           value={editedContent}
-          onChange={(e) => setEditedContent(e.target.value)}
+          onChange={e => setEditedContent(e.target.value)}
           onKeyDown={handleKeyDown}
           className="w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-black dark:text-white"
           rows={4}

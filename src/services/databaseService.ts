@@ -1,4 +1,5 @@
-import Dexie, { Table } from 'dexie';
+import type { Table } from 'dexie';
+import Dexie from 'dexie';
 
 // Типы для IndexedDB
 export interface StoredMessage {
@@ -37,7 +38,7 @@ class CipherLinkDatabase extends Dexie {
     this.version(1).stores({
       messages: 'id, chatId, timestamp, [chatId+timestamp]', // составной индекс
       cachedFiles: 'id, lastAccessed',
-      chatMetadata: 'chatId, lastMessageTimestamp'
+      chatMetadata: 'chatId, lastMessageTimestamp',
     });
   }
 
@@ -53,13 +54,11 @@ class CipherLinkDatabase extends Dexie {
 
   // Получить историю чата с пагинацией
   async getMessages(
-    chatId: string, 
+    chatId: string,
     before?: number, // timestamp для пагинации
     limit: number = 50
   ): Promise<StoredMessage[]> {
-    let query = this.messages
-      .where('chatId')
-      .equals(chatId);
+    let query = this.messages.where('chatId').equals(chatId);
 
     if (before) {
       query = query.and(msg => msg.timestamp < before);
@@ -87,7 +86,7 @@ class CipherLinkDatabase extends Dexie {
       id,
       encryptedBlob,
       metadata,
-      lastAccessed: Date.now()
+      lastAccessed: Date.now(),
     });
   }
 
@@ -104,10 +103,7 @@ class CipherLinkDatabase extends Dexie {
   // Очистить старые кэшированные файлы (старше 7 дней)
   async cleanupOldCache(): Promise<number> {
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const deleted = await this.cachedFiles
-      .where('lastAccessed')
-      .below(weekAgo)
-      .delete();
+    const deleted = await this.cachedFiles.where('lastAccessed').below(weekAgo).delete();
     return deleted;
   }
 
@@ -126,21 +122,18 @@ async function encryptForStorage(data: string, key: string): Promise<string> {
   // Используем Web Crypto API для AES-GCM шифрования
   const encoder = new TextEncoder();
   const keyBuffer = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
-  
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     cryptoKey,
     encoder.encode(data)
   );
-  
+
   // Возвращаем iv + encrypted data как base64
   const combined = new Uint8Array(iv.length + encrypted.byteLength);
   combined.set(iv);
@@ -150,25 +143,22 @@ async function encryptForStorage(data: string, key: string): Promise<string> {
 
 // Вспомогательная функция для расшифровки при чтении
 async function decryptFromStorage(encryptedData: string, key: string): Promise<string> {
-  const combined = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
+  const combined = new Uint8Array(
+    atob(encryptedData)
+      .split('')
+      .map(c => c.charCodeAt(0))
+  );
   const iv = combined.slice(0, 12);
   const encrypted = combined.slice(12);
-  
+
   const keyBuffer = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
-  
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    encrypted
-  );
-  
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, encrypted);
+
   return new TextDecoder().decode(decrypted);
 }
 
@@ -183,7 +173,7 @@ export async function migrateFromMemory(
     for (const msg of messages) {
       // Шифруем содержимое перед сохранением
       const encryptedContent = await encryptForStorage(msg.content || '', encryptionKey);
-      
+
       allMessages.push({
         id: msg.id,
         chatId,
@@ -193,7 +183,7 @@ export async function migrateFromMemory(
         type: msg.type || 'text',
         encryptedAttachments: msg.encryptedAttachments,
         voiceMetadata: msg.voiceMetadata,
-        reactions: msg.reactions
+        reactions: msg.reactions,
       });
     }
   }
@@ -205,4 +195,4 @@ export async function migrateFromMemory(
 }
 
 // Экспорт функций шифрования/расшифровки для использования в App.tsx
-export { encryptForStorage, decryptFromStorage };
+export { decryptFromStorage, encryptForStorage };

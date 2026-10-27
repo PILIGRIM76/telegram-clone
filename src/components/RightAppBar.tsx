@@ -1,6 +1,4 @@
-// v3.0 Phase 2B-2: RightAppBar — header для правой панели (ChatWindow).
-// 64px height, padding 0 20px, AnimatedAvatar (Phase 1.5) 36px,
-// 24x24 line-art icons, border-bottom 1px rgba(0,0,0,0.04),
+// Этап 2B-2: верхняя панель области чата.
 // статус "онлайн" с точкой #38A169, Back-кнопка для мобильного toggle.
 
 import React from 'react';
@@ -15,7 +13,7 @@ interface RightAppBarProps {
   onMenuClick?: () => void;
   onBackClick?: () => void;
   showBack?: boolean;
-  // v3.0 Phase 2H: клик по аватару/имени открывает 3rd profile panel (desktop)
+  // Этап 2H: нажатие на аватар или имя открывает третью панель профиля на настольном экране.
   onAvatarClick?: () => void;
 }
 
@@ -66,9 +64,17 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
         background: 'var(--color-surface)',
         borderBottom: '1px solid rgba(0,0,0,0.04)',
         flexShrink: 0,
-      } as React.CSSProperties}
+      }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 } as React.CSSProperties}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          minWidth: 0,
+          flex: 1,
+        }}
+      >
         {showBack && (
           <button
             onClick={onBackClick}
@@ -77,7 +83,17 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
             onMouseEnter={handleEnter}
             onMouseLeave={handleLeave}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -96,13 +112,20 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               cursor: 'pointer',
               borderRadius: '50%',
               flexShrink: 0,
-            } as React.CSSProperties}
+            }}
           >
             <AnimatedAvatar name={contactName} size={36} />
           </button>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } as React.CSSProperties}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
           <div
             data-testid="right-app-bar-name"
             onClick={onAvatarClick}
@@ -115,7 +138,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               cursor: onAvatarClick ? 'pointer' : 'default',
-            } as React.CSSProperties}
+            }}
           >
             {contactName}
           </div>
@@ -129,7 +152,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
                 alignItems: 'center',
                 gap: 6,
                 marginTop: 2,
-              } as React.CSSProperties}
+              }}
             >
               {isOnline && (
                 <span
@@ -139,7 +162,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
                     borderRadius: '50%',
                     background: 'var(--color-online)',
                     display: 'inline-block',
-                  } as React.CSSProperties}
+                  }}
                 />
               )}
               <span>{isOnline ? 'онлайн' : 'был(а) недавно'}</span>
@@ -148,7 +171,7 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexShrink: 0 } as React.CSSProperties}>
+      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
         {hasContact && (
           <>
             <button
@@ -158,7 +181,17 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               onMouseEnter={handleEnter}
               onMouseLeave={handleLeave}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.574 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </button>
@@ -169,7 +202,17 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               onMouseEnter={handleEnter}
               onMouseLeave={handleLeave}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <polygon points="23 7 16 12 23 17 23 7" />
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
@@ -181,7 +224,13 @@ export const RightAppBar: React.FC<RightAppBarProps> = ({
               onMouseEnter={handleEnter}
               onMouseLeave={handleLeave}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
                 <circle cx="12" cy="5" r="1.5" />
                 <circle cx="12" cy="12" r="1.5" />
                 <circle cx="12" cy="19" r="1.5" />

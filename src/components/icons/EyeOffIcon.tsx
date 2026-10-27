@@ -6,10 +6,10 @@ interface IconProps {
   className?: string;
 }
 
-export const EyeOffIcon: React.FC<IconProps> = ({ 
-  size = 22, 
-  color = 'currentColor', 
-  className 
+export const EyeOffIcon: React.FC<IconProps> = ({
+  size = 22,
+  color = 'currentColor',
+  className,
 }) => (
   <svg
     width={size}

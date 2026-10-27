@@ -1,27 +1,34 @@
-﻿import { logger } from './logger';
-import type { Message, Store, Group, NoticeBoard } from '../types';
-import { encryptMessage, decryptMessage } from '../crypto/encryption';
-import * as nacl from 'tweetnacl';
-import { buildWsAuthUrl, redactWsUrl } from '../utils/websocketAuth';
-import { hybridEncrypt, hybridDecrypt, type EncryptedPayload } from '../crypto/signal/SignalMessageLayer';
+﻿import * as nacl from 'tweetnacl';
+import { decryptMessage, encryptMessage } from '../crypto/encryption';
+import {
+  hybridDecrypt,
+  hybridEncrypt,
+  type EncryptedPayload,
+} from '../crypto/signal/SignalMessageLayer';
 import type { PreKeyBundle } from '../crypto/signal/types';
-// Phase 2: Metadata protection — traffic padding и Tor proxy.
-import { TrafficPadder, padMessage, unpadMessage, encodeConstantSizePacket, decodeConstantSizePacket } from './trafficPadding';
-import { torProxy } from './torProxy';
-// Phase 3: Dumb Server — клиентская офлайн-очередь в IndexedDB.
+import type { Message, Store } from '../types';
+import { buildWsAuthUrl } from '../utils/websocketAuth';
+import { logger } from './logger';
+// Этап 2: защита метаданных с помощью заполнения трафика и прокси Tor.
+import {
+  TrafficPadder,
+  decodeConstantSizePacket,
+  encodeConstantSizePacket,
+} from './trafficPadding';
+// Этап 3: клиентская офлайн-очередь в IndexedDB; сервер не хранит сообщения.
 import { offlineQueue, type QueuedMessage } from './offlineQueue';
 
-// v2.0 Stage 3-4: WebSocket через Nginx TLS (4443) для устранения Mixed Content
+// Этапы 3–4: WebSocket через Nginx TLS (4443) для устранения смешанного содержимого.
 // REST API остаётся на прямом HTTP (4000) для локального доступа.
-// FIX 2026-09-10: process.env вместо import.meta.env — ts-jest не понимает
-// import.meta (TS1343). Vite заменяет process.env.* на нужные значения через define.
+// process.env используется вместо import.meta.env, который не поддерживается в ts-jest (TS1343).
+// Во время сборки Vite подставляет нужные значения process.env.* через define.
 const BASE_URL = process.env.VITE_API_URL || 'http://192.168.100.4:4000';
 const API_URL = BASE_URL.replace(/\/+$/, '');
-// WS через Nginx TLS reverse proxy: wss://192.168.100.4:4443/?uid=...
+// WebSocket через обратный прокси Nginx с TLS: wss://192.168.100.4:4443/?uid=...
 // Для локальной разработки без nginx: VITE_WS_URL=ws://localhost:8080
 const WS_URL = process.env.VITE_WS_URL || 'wss://192.168.100.4:4443';
-// Fallback: если wss:// (nginx TLS) недоступен, шлём plain ws:// на тот же
-// хост:порт, что и REST API — Dumb Server поднимает WebSocket на том же порту (4000).
+// Если wss:// через TLS недоступен, используем ws:// на том же
+// хосте и порту, что и REST API: сервер принимает WebSocket на порту 4000.
 
 if (typeof console !== 'undefined') {
   logger.info('[apiService] BASE_URL =', BASE_URL, 'API_URL =', API_URL, 'WS_URL =', WS_URL);
@@ -34,13 +41,25 @@ class ApiService {
   private closeListeners: (() => void)[] = [];
   private errorListeners: ((error: any) => void)[] = [];
   private typingListeners: ((chatId: string) => void)[] = [];
-  private typingUpdateListeners: ((data: { uid: string; chatId: string; isTyping: boolean }) => void)[] = [];
-  private presenceUpdateListeners: ((data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void)[] = [];
-  private receiptUpdateListeners: ((data: { messageId: string; readerUid: string; timestamp: number }) => void)[] = [];
-  // Phase 2: TrafficPadder для отправки шумовых пакетов каждые 30-60 секунд.
+  private typingUpdateListeners: ((data: {
+    uid: string;
+    chatId: string;
+    isTyping: boolean;
+  }) => void)[] = [];
+  private presenceUpdateListeners: ((data: {
+    uid: string;
+    isOnline: boolean;
+    lastSeen: number | null;
+  }) => void)[] = [];
+  private receiptUpdateListeners: ((data: {
+    messageId: string;
+    readerUid: string;
+    timestamp: number;
+  }) => void)[] = [];
+  // Этап 2: TrafficPadder отправляет шумовые пакеты каждые 30–60 секунд.
   private trafficPadder: TrafficPadder = new TrafficPadder();
 
-  // E2EE Keys
+  // Ключи сквозного шифрования.
   private myKeyPair: { publicKey: Uint8Array; secretKey: Uint8Array } | null = null;
   private myPublicKeyBase64: string = '';
   private recipientPublicKey: Uint8Array | null = null;
@@ -66,10 +85,13 @@ class ApiService {
     this.myPublicKeyBase64 = btoa(String.fromCharCode(...this.myKeyPair.publicKey));
     if (uid) {
       try {
-        localStorage.setItem(`piligrim-box-${uid}`, JSON.stringify({
-          publicKey: Array.from(this.myKeyPair.publicKey),
-          secretKey: Array.from(this.myKeyPair.secretKey),
-        }));
+        localStorage.setItem(
+          `piligrim-box-${uid}`,
+          JSON.stringify({
+            publicKey: Array.from(this.myKeyPair.publicKey),
+            secretKey: Array.from(this.myKeyPair.secretKey),
+          })
+        );
       } catch (e) {
         logger.warn('[API] Failed to persist box keys:', e);
       }
@@ -95,7 +117,7 @@ class ApiService {
     const response = await fetch(API_URL + '/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, publicKey })
+      body: JSON.stringify({ uid, publicKey }),
     });
     if (!response.ok) throw new Error('Registration error');
   }
@@ -155,7 +177,7 @@ class ApiService {
     const response = await fetch(API_URL + '/store', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, store: store })
+      body: JSON.stringify({ uid, store: store }),
     });
     return response.json();
   }
@@ -167,7 +189,12 @@ class ApiService {
   }
 
   // === Groups ===
-  async createGroup(name: string, ownerId: string, type: 'public' | 'private', encryptedMembers?: string[]): Promise<{ id: string; token?: string }> {
+  async createGroup(
+    name: string,
+    ownerId: string,
+    type: 'public' | 'private',
+    encryptedMembers?: string[]
+  ): Promise<{ id: string; token?: string }> {
     const response = await fetch(API_URL + '/groups/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -188,7 +215,7 @@ class ApiService {
   }
 
   // === v3.14: Group Admin Tools ===
-  
+
   async kickGroupMember(groupId: string, actorUid: string, targetUid: string): Promise<void> {
     const response = await fetch(API_URL + '/groups/kick', {
       method: 'POST',
@@ -198,7 +225,12 @@ class ApiService {
     if (!response.ok) throw new Error('Kick failed');
   }
 
-  async banGroupMember(groupId: string, actorUid: string, targetUid: string, reason?: string): Promise<void> {
+  async banGroupMember(
+    groupId: string,
+    actorUid: string,
+    targetUid: string,
+    reason?: string
+  ): Promise<void> {
     const response = await fetch(API_URL + '/groups/ban', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -234,7 +266,11 @@ class ApiService {
     if (!response.ok) throw new Error('Demote failed');
   }
 
-  async transferGroupOwnership(groupId: string, actorUid: string, targetUid: string): Promise<void> {
+  async transferGroupOwnership(
+    groupId: string,
+    actorUid: string,
+    targetUid: string
+  ): Promise<void> {
     const response = await fetch(API_URL + '/groups/transfer-ownership', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -252,11 +288,18 @@ class ApiService {
     if (!response.ok) throw new Error('Delete group failed');
   }
 
-  async getGroupAuditLog(groupId: string, actorUid: string, limit?: number, offset?: number): Promise<any> {
+  async getGroupAuditLog(
+    groupId: string,
+    actorUid: string,
+    limit?: number,
+    offset?: number
+  ): Promise<any> {
     const params = new URLSearchParams({ actorUid });
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
-    const response = await fetch(API_URL + '/groups/' + groupId + '/audit-log?' + params.toString());
+    const response = await fetch(
+      API_URL + '/groups/' + groupId + '/audit-log?' + params.toString()
+    );
     if (!response.ok) throw new Error('Get audit log failed');
     return response.json();
   }
@@ -273,7 +316,11 @@ class ApiService {
     return response.json();
   }
 
-  async updateGroupSettings(groupId: string, actorUid: string, settings: { members_only?: boolean; admins_only?: boolean }): Promise<any> {
+  async updateGroupSettings(
+    groupId: string,
+    actorUid: string,
+    settings: { members_only?: boolean; admins_only?: boolean }
+  ): Promise<any> {
     const response = await fetch(API_URL + '/groups/' + groupId + '/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -287,15 +334,18 @@ class ApiService {
     const response = await fetch(API_URL + '/boards/' + boardId, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Error updating board');
   }
 
   async deleteAnnouncement(boardId: string, announcementId: string): Promise<void> {
-    const response = await fetch(API_URL + '/boards/' + boardId + '/announcements/' + announcementId, {
-      method: 'DELETE'
-    });
+    const response = await fetch(
+      API_URL + '/boards/' + boardId + '/announcements/' + announcementId,
+      {
+        method: 'DELETE',
+      }
+    );
     if (!response.ok) throw new Error('Error deleting announcement');
   }
 
@@ -303,16 +353,21 @@ class ApiService {
     const response = await fetch(API_URL + '/boards/' + boardId + '/announcements/' + data.id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ announcement: data })
+      body: JSON.stringify({ announcement: data }),
     });
     if (!response.ok) throw new Error('Error editing announcement');
   }
 
-  async addAnnouncement(uid: string, boardId: string, announcement: any, txid?: string): Promise<void> {
+  async addAnnouncement(
+    uid: string,
+    boardId: string,
+    announcement: any,
+    txid?: string
+  ): Promise<void> {
     const response = await fetch(API_URL + '/boards/' + boardId + '/announcements', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, announcement, txid })
+      body: JSON.stringify({ uid, announcement, txid }),
     });
     if (!response.ok) throw new Error('Error adding announcement');
   }
@@ -346,7 +401,7 @@ class ApiService {
       this.openListeners.forEach(cb => cb());
     };
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = event => {
       // Phase 2: constant-size padding unpadding.
       // Если сообщение padded (содержит null bytes в конце) — извлекаем payload.
       let rawData = event.data;
@@ -368,7 +423,10 @@ class ApiService {
       const data = JSON.parse(rawData);
 
       // WebRTC call signaling routing
-      if (data.type && ['call-offer', 'call-answer', 'call-signal', 'call-end'].includes(data.type)) {
+      if (
+        data.type &&
+        ['call-offer', 'call-answer', 'call-signal', 'call-end'].includes(data.type)
+      ) {
         const eventMap: Record<string, string> = {
           'call-offer': 'offer',
           'call-answer': 'answer',
@@ -401,7 +459,9 @@ class ApiService {
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
       if (data.type === 'error' && data.error === 'recipient_offline') {
-        logger.info(`[API] Recipient ${data.recipientUid} offline, queuing message ${data.messageId}`);
+        logger.info(
+          `[API] Recipient ${data.recipientUid} offline, queuing message ${data.messageId}`
+        );
         const queued: QueuedMessage = {
           id: data.messageId,
           recipientUid: data.recipientUid,
@@ -414,9 +474,11 @@ class ApiService {
           logger.warn('[API] Failed to enqueue offline message:', e);
         });
         // Сигнализируем processOfflineQueue (если ждёт) что recipient offline.
-        window.dispatchEvent(new CustomEvent('piligrim:recipient-offline', {
-          detail: { messageId: data.messageId, recipientUid: data.recipientUid },
-        }));
+        window.dispatchEvent(
+          new CustomEvent('piligrim:recipient-offline', {
+            detail: { messageId: data.messageId, recipientUid: data.recipientUid },
+          })
+        );
         return;
       }
 
@@ -467,7 +529,7 @@ class ApiService {
       this.closeListeners.forEach(cb => cb());
     };
 
-    this.ws.onerror = (error) => {
+    this.ws.onerror = error => {
       // FIX 2026-09-10: убран автоматический фоллбэк отсюда.
       // Раньше при ошибке соединение перезапускалось на fallback URL,
       // но это ломало тест onerror (done() не вызывался — timeout 5000ms).
@@ -486,10 +548,10 @@ class ApiService {
       type: data.type,
       payload: data.payload,
       disappearIn: data.disappearIn,
-      timerSetAt: data.timerSetAt
+      timerSetAt: data.timerSetAt,
     };
     this.messageListeners.forEach(cb => cb(message));
-    if (data.type === "typing") {
+    if (data.type === 'typing') {
       this.typingListeners.forEach(cb => cb(data.chatId));
     }
   }
@@ -497,7 +559,10 @@ class ApiService {
   disconnect() {
     // Phase 2: останавливаем traffic padder перед закрытием WS.
     this.trafficPadder.disconnect();
-    if (this.ws) { this.ws.close(); this.ws = null; }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   // Phase 3: Dumb Server — обрабатывает офлайн-очередь при reconnect.
@@ -535,22 +600,23 @@ class ApiService {
   }
 
   // E2EE: Отправка зашифрованных сообщений
-  sendMessage(to: string, content: string, recipientPublicKeyBase64: string, extraOptions: Partial<Message> = {}) {
+  sendMessage(
+    to: string,
+    content: string,
+    recipientPublicKeyBase64: string,
+    extraOptions: Partial<Message> = {}
+  ) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       if (recipientPublicKeyBase64 && this.myKeyPair) {
         const recipientKey = this.base64ToKey(recipientPublicKeyBase64);
-        const encrypted = encryptMessage(
-          content,
-          recipientKey,
-          this.myKeyPair.secretKey
-        );
+        const encrypted = encryptMessage(content, recipientKey, this.myKeyPair.secretKey);
 
         const legacyPayload = JSON.stringify({
           to,
           encryptedContent: btoa(String.fromCharCode(...encrypted.encrypted)),
           nonce: btoa(String.fromCharCode(...encrypted.nonce)),
           senderPublicKey: this.myPublicKeyBase64,
-          ...extraOptions
+          ...extraOptions,
         });
         // Phase 2: constant-size padding.
         this.ws.send(encodeConstantSizePacket(legacyPayload));
@@ -567,7 +633,7 @@ class ApiService {
     to: string,
     content: string,
     recipientPublicKeyBase64: string,
-    extraOptions: Partial<Message> = {},
+    extraOptions: Partial<Message> = {}
   ): Promise<{ type: 'signal' | 'nacl' } | null> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       logger.warn(`[API] sendMessageSecure: WS not open, message dropped`);
@@ -586,7 +652,9 @@ class ApiService {
     // this.myKeyPair гарантированно не null после lazy initKeys() выше.
     const mySecretKey = this.myKeyPair!.secretKey;
     const payload = await hybridEncrypt(to, content, mySecretKey, recipientKey);
-    logger.info(`[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`);
+    logger.info(
+      `[API] Message encrypted with ${payload.type === 'signal' ? 'Signal (PFS)' : 'NaCl (legacy)'} for ${to}`
+    );
     const jsonPayload = JSON.stringify({
       to,
       encryptionType: payload.type,
@@ -601,18 +669,28 @@ class ApiService {
     return { type: payload.type };
   }
 
-  onMessage(cb: (msg: Message) => void) { this.messageListeners.push(cb); }
+  onMessage(cb: (msg: Message) => void) {
+    this.messageListeners.push(cb);
+  }
   offMessage(cb: (msg: Message) => void) {
     this.messageListeners = this.messageListeners.filter(l => l !== cb);
   }
 
-  onOpen(cb: () => void) { this.openListeners.push(cb); }
-  onClose(cb: () => void) { this.closeListeners.push(cb); }
-  onError(cb: (error: any) => void) { this.errorListeners.push(cb); }
+  onOpen(cb: () => void) {
+    this.openListeners.push(cb);
+  }
+  onClose(cb: () => void) {
+    this.closeListeners.push(cb);
+  }
+  onError(cb: (error: any) => void) {
+    this.errorListeners.push(cb);
+  }
 
   // Get current user UID
   getCurrentUid(): string | undefined {
-    return localStorage.getItem('piligrim-uid') || localStorage.getItem('cipherlink-uid') || undefined;
+    return (
+      localStorage.getItem('piligrim-uid') || localStorage.getItem('cipherlink-uid') || undefined
+    );
   }
 
   // Подписка на события "печитает" (legacy - chatId only)
@@ -621,33 +699,41 @@ class ApiService {
   }
 
   // v3.11: Подписка на обновления статуса печати (новый формат)
-  onTypingUpdate(callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void): void {
+  onTypingUpdate(
+    callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void
+  ): void {
     this.typingUpdateListeners.push(callback);
   }
 
-  offTypingUpdate(callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void): void {
+  offTypingUpdate(
+    callback: (data: { uid: string; chatId: string; isTyping: boolean }) => void
+  ): void {
     this.typingUpdateListeners = this.typingUpdateListeners.filter(l => l !== callback);
   }
 
   // v3.11: Отправка события "начал печать"
   sendTypingStart(chatId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'typing_start',
-        chatId,
-        timestamp: Date.now()
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'typing_start',
+          chatId,
+          timestamp: Date.now(),
+        })
+      );
     }
   }
 
   // v3.11: Отправка события "перестал печатать"
   sendTypingStop(chatId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'typing_stop',
-        chatId,
-        timestamp: Date.now()
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'typing_stop',
+          chatId,
+          timestamp: Date.now(),
+        })
+      );
     }
   }
 
@@ -657,31 +743,41 @@ class ApiService {
   }
 
   // v3.11: Presence updates
-  onPresenceUpdate(callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void): void {
+  onPresenceUpdate(
+    callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void
+  ): void {
     this.presenceUpdateListeners.push(callback);
   }
 
-  offPresenceUpdate(callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void): void {
+  offPresenceUpdate(
+    callback: (data: { uid: string; isOnline: boolean; lastSeen: number | null }) => void
+  ): void {
     this.presenceUpdateListeners = this.presenceUpdateListeners.filter(l => l !== callback);
   }
 
   // v3.11: Receipt updates (read receipts)
-  onReceiptUpdate(callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void): void {
+  onReceiptUpdate(
+    callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void
+  ): void {
     this.receiptUpdateListeners.push(callback);
   }
 
-  offReceiptUpdate(callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void): void {
+  offReceiptUpdate(
+    callback: (data: { messageId: string; readerUid: string; timestamp: number }) => void
+  ): void {
     this.receiptUpdateListeners = this.receiptUpdateListeners.filter(l => l !== callback);
   }
 
   // v3.11: Send message read receipt
   sendMessageRead(messageId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: "message_read",
-        messageId,
-        timestamp: Date.now()
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'message_read',
+          messageId,
+          timestamp: Date.now(),
+        })
+      );
     }
   }
 
@@ -698,40 +794,48 @@ class ApiService {
 
   sendCallOffer(to: string, signal: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'call-offer',
-        to,
-        signal
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'call-offer',
+          to,
+          signal,
+        })
+      );
     }
   }
 
   sendCallAnswer(to: string, signal: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'call-answer',
-        to,
-        signal
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'call-answer',
+          to,
+          signal,
+        })
+      );
     }
   }
 
   sendCallSignal(to: string, signal: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'call-signal',
-        to,
-        signal
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'call-signal',
+          to,
+          signal,
+        })
+      );
     }
   }
 
   sendCallEnd(to: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'call-end',
-        to
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'call-end',
+          to,
+        })
+      );
     }
   }
 
@@ -744,7 +848,10 @@ class ApiService {
   // ============= Push Notifications (FCM) ============
 
   /** Register FCM push token with the server */
-  async registerPushToken(token: string, platform: 'web' | 'android' | 'ios' = 'web'): Promise<boolean> {
+  async registerPushToken(
+    token: string,
+    platform: 'web' | 'android' | 'ios' = 'web'
+  ): Promise<boolean> {
     try {
       // Get current user UID from localStorage or session
       const uid = localStorage.getItem('piligrim-uid') || localStorage.getItem('cipherlink-uid');
@@ -791,4 +898,3 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
-

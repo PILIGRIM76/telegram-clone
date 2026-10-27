@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
-import { initPushNotifications, requestNotificationPermission, isFCMSupported } from '../services/pushService';
+import { useEffect, useState } from 'react';
+import {
+  initPushNotifications,
+  isFCMSupported,
+  requestNotificationPermission,
+} from '../services/pushService';
 
 export const NotificationSettings: React.FC = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -22,7 +26,7 @@ export const NotificationSettings: React.FC = () => {
     try {
       const newPermission = await requestNotificationPermission();
       setPermission(newPermission);
-      
+
       if (newPermission === 'granted' && supported) {
         const fcmToken = await initPushNotifications();
         setToken(fcmToken);
@@ -37,8 +41,7 @@ export const NotificationSettings: React.FC = () => {
   const handleDisable = async () => {
     setLoading(true);
     try {
-      // Note: In a real implementation, you'd want to unregister the token from server
-      // await apiService.unregisterPushToken(token);
+      // В полноценной реализации при отключении уведомлений следует удалить токен на сервере.
       console.log('[NotificationSettings] Notifications disabled');
     } catch (error) {
       console.error('[NotificationSettings] Error disabling notifications:', error);
@@ -51,9 +54,7 @@ export const NotificationSettings: React.FC = () => {
     return (
       <div className="p-4 border rounded-lg bg-gray-50">
         <h3 className="font-bold mb-2">Push-уведомления</h3>
-        <p className="text-sm text-gray-600">
-          Ваш браузер не поддерживает push-уведомления (FCM).
-        </p>
+        <p className="text-sm text-gray-600">Ваш браузер не поддерживает push-уведомления (FCM).</p>
       </div>
     );
   }
@@ -68,7 +69,7 @@ export const NotificationSettings: React.FC = () => {
           В уведомлении НЕ будет текста сообщения (E2EE).
         </span>
       </p>
-      
+
       {permission === 'granted' ? (
         <div className="space-y-2">
           <div className="text-green-600 flex items-center gap-2">
@@ -81,7 +82,7 @@ export const NotificationSettings: React.FC = () => {
               <code className="block mt-1 break-all bg-gray-100 p-2 rounded">{token}</code>
             </details>
           )}
-          <button 
+          <button
             onClick={handleDisable}
             disabled={loading}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
@@ -96,11 +97,12 @@ export const NotificationSettings: React.FC = () => {
             <span>Уведомления заблокированы в браузере</span>
           </div>
           <p className="text-sm text-gray-600">
-            Разрешите уведомления в настройках браузера (значок замка в адресной строке), затем обновите страницу.
+            Разрешите уведомления в настройках браузера (значок замка в адресной строке), затем
+            обновите страницу.
           </p>
         </div>
       ) : (
-        <button 
+        <button
           onClick={handleEnable}
           disabled={loading}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"

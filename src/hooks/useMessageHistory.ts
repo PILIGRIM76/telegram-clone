@@ -1,5 +1,5 @@
+import { useCallback, useEffect, useState } from 'react';
 import { logger } from '../services/logger';
-import { useState, useEffect, useCallback } from 'react';
 import { sqliteStorage } from '../services/sqliteStorage';
 import type { Message } from '../types';
 
@@ -12,9 +12,10 @@ export function useMessageHistory(chatId: string, initialLimit: number = 50) {
   // Загрузка первой порции сообщений
   useEffect(() => {
     if (!chatId) return;
-    
+
     setLoading(true);
-    sqliteStorage.loadMessages(chatId, initialLimit, 0)
+    sqliteStorage
+      .loadMessages(chatId, initialLimit, 0)
       .then(msgs => {
         setMessages(msgs);
         setOffset(initialLimit);
@@ -30,7 +31,7 @@ export function useMessageHistory(chatId: string, initialLimit: number = 50) {
   // Загрузка следующей порции (infinite scroll)
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) return;
-    
+
     setLoading(true);
     try {
       const moreMessages = await sqliteStorage.loadMessages(chatId, initialLimit, offset);

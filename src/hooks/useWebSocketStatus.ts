@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 
 type WebSocketStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
@@ -16,7 +16,7 @@ export function useWebSocketStatus() {
     apiService.onError(handleError);
 
     return () => {
-      // cleanup
+      // Здесь можно добавить очистку при появлении подписок.
     };
   }, []);
 
@@ -24,7 +24,7 @@ export function useWebSocketStatus() {
     connected: 'Подключено',
     connecting: 'Подключаюсь...',
     disconnected: 'Отключено',
-    error: 'Ошибка'
+    error: 'Ошибка',
   }[status];
 
   return { status, statusText };

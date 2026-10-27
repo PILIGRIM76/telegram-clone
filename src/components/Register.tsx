@@ -1,7 +1,7 @@
 import { logger } from '../services/logger';
-// Register page with 2FA support
+
 import React, { useState } from 'react';
-import { authenticateWith2FA, setup2FA, verifyTOTP } from '../services/auth';
+import { setup2FA, verifyTOTP } from '../services/auth';
 import type { AuthResult } from '../types';
 
 interface RegisterProps {
@@ -23,7 +23,9 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
       const setup = await setup2FA(email);
       setOtpSecret(setup.secret);
       setQrCode(setup.qrCode);
-      const codes = Array.from({length: 10}, () => Math.random().toString(36).substring(2, 8).toUpperCase());
+      const codes = Array.from({ length: 10 }, () =>
+        Math.random().toString(36).substring(2, 8).toUpperCase()
+      );
       setBackupCodes(codes);
       setShow2FASetup(true);
     } catch (error) {
@@ -51,7 +53,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
   return (
     <div className="p-4 max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-4">Register</h1>
-      
+
       {!show2FASetup ? (
         <div className="space-y-4">
           <div>
@@ -59,23 +61,23 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 rounded text-white"
               placeholder="user@example.com"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm mb-1">Password</label>
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 rounded text-white"
               placeholder="••••••••"
             />
           </div>
-          
+
           <button
             onClick={handleRegister}
             disabled={!email || !password}
@@ -88,23 +90,21 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm mb-1">Scan QR Code with Authenticator</label>
-            {qrCode && (
-              <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
-            )}
+            {qrCode && <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />}
           </div>
-          
+
           <div>
             <label className="block text-sm mb-1">Enter TOTP code</label>
             <input
               type="text"
               value={totpCode}
-              onChange={(e) => setTotpCode(e.target.value)}
+              onChange={e => setTotpCode(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 rounded text-white"
               placeholder="123456"
               maxLength={6}
             />
           </div>
-          
+
           <div>
             <label className="block text-sm mb-1 font-semibold">Backup Codes (Save this!)</label>
             <div className="grid grid-cols-2 gap-2">
@@ -115,12 +115,9 @@ export const Register: React.FC<RegisterProps> = ({ onRegister }) => {
               ))}
             </div>
           </div>
-          
+
           <div className="flex gap-2">
-            <button
-              onClick={handleRegister}
-              className="flex-1 py-2 bg-red-600 rounded text-white"
-            >
+            <button onClick={handleRegister} className="flex-1 py-2 bg-red-600 rounded text-white">
               Verify & Register
             </button>
             <button

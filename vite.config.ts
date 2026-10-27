@@ -9,72 +9,6 @@ import fs from 'fs';
 
 
 /**
- * BufferPolyfillPlugin: injects inline Buffer polyfill into index.html BEFORE bundle loads.
- * Fixes ReferenceError: Buffer is not defined on Android WebView (RT9).
- * Vite hoisting may reorder imports, so polyfill must be inline-<script>.
- */
-function bufferPolyfillPlugin(): Plugin {
-  const polyfill = `
-<script>
-  // CRITICAL: Buffer polyfill BEFORE bundle loads (RT9 white screen fix)
-  // Vite hoisting may reorder imports, so polyfill must be inline.
-  if (typeof window.Buffer === 'undefined') {
-    console.log('[PILIGRIM] Installing inline Buffer polyfill');
-    window.Buffer = function(data, encoding) {
-      if (typeof data === 'string') {
-        const arr = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i) & 0xff;
-        return arr;
-      }
-      if (data instanceof ArrayBuffer) return new Uint8Array(data);
-      if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-      return new Uint8Array(0);
-    };
-    window.Buffer.from = function(data, encoding) {
-      if (typeof data === 'string') {
-        const arr = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i) & 0xff;
-        return arr;
-      }
-      if (data instanceof ArrayBuffer) return new Uint8Array(data);
-      if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-      return new Uint8Array(0);
-    };
-    window.Buffer.alloc = function(size, fill) {
-      const arr = new Uint8Array(size);
-      if (fill !== undefined) arr.fill(fill);
-      return arr;
-    };
-    window.Buffer.isBuffer = function() { return false; };
-    window.Buffer.isView = ArrayBuffer.isView;
-    window.Buffer.byteLength = function(str) {
-      if (typeof str === 'string') return str.length;
-      if (str instanceof ArrayBuffer) return str.byteLength;
-      if (ArrayBuffer.isView(str)) return str.byteLength;
-      return 0;
-    };
-    window.Buffer.concat = function(list, totalLength) {
-      if (!list.length) return new Uint8Array(0);
-      const len = totalLength || list.reduce((s, b) => s + b.length, 0);
-      const result = new Uint8Array(len);
-      let pos = 0;
-      for (const b of list) { result.set(b, pos); pos += b.length; }
-      return result;
-    };
-    window.Buffer.prototype = Uint8Array.prototype;
-  }
-</script>`;
-
-  return {
-    name: 'buffer-polyfill-plugin',
-    enforce: 'pre',
-    transformIndexHtml(html) {
-      return html.replace('<head>', '<head>' + polyfill);
-    },
-  };
-}
-
-/**
  * RelativeAssetsPlugin: rewrites absolute asset paths in index.html to relative for Electron.
  * Uses generateBundle hook to modify the generated HTML file.
  */
@@ -125,12 +59,11 @@ export default defineConfig(({ mode }) => {
             port: 5173,
             host: '0.0.0.0',
         },
-        plugins: [react(), bufferPolyfillPlugin(), relativeAssetsPlugin(), electron({
+        plugins: [react(), relativeAssetsPlugin(), electron({
             main: {
                 entry: 'electron/main.ts',
             },
-            renderer: {},
-        })],
+            })],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),

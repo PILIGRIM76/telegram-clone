@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useCallTimer(isActive: boolean) {
   const [seconds, setSeconds] = useState(0);
@@ -33,9 +33,9 @@ export function useCallTimer(isActive: boolean) {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     const pad = (n: number) => n.toString().padStart(2, '0');
-    
+
     if (hrs > 0) {
       return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
     }

@@ -1,15 +1,14 @@
 import { logger } from '../../services/logger';
-// PreKeyManager: generates and stores 100 pre-keys + 1 signed pre-key.
-// Phase 1: Perfect Forward Secrecy via Signal Protocol Double Ratchet.
+// Создаёт и хранит 100 одноразовых ключей и один подписанный ключ.
+// Ключи используются протоколом Signal с алгоритмом Double Ratchet для прямой секретности.
 //
-// Note on libsignal v6.0.0 API: this package does not export KeyHelper
-// (the older libsignal-protocol-javascript did). Pre-key generation here
-// uses Web Crypto P-256 key pairs as a portable stand-in so the storage
-// layer can be exercised in both browser and Node test environments.
-// In production, swap generateIdentityKeyPair for a libsignal-native
-// or WASM build that produces Curve25519 pre-keys.
-import { SignalStorage } from './SignalStorage';
+// В libsignal v6.0.0 отсутствует KeyHelper, доступный в старом пакете
+// libsignal-protocol-javascript. Поэтому ключи создаются через Web Crypto P-256,
+// что позволяет тестировать хранилище в браузере и Node.js.
+// Для боевой среды следует заменить генератор на реализацию libsignal или WASM,
+// создающую ключи Curve25519.
 import { SessionStore } from './SessionStore';
+import type { SignalStorage } from './SignalStorage';
 import type { PreKeyBundle, StoredPreKey, StoredSignedPreKey } from './types';
 
 export class PreKeyManager {
@@ -30,15 +29,19 @@ export class PreKeyManager {
       await this.storage.setRegistrationId(regId);
     }
     const existing = await SessionStore.listPreKeys();
-    const existingIds = existing.map((k) => k.id);
-    const startId = existing.length === 0 ? 1 : (existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1);
+    const existingIds = existing.map(k => k.id);
+    const startId =
+      existing.length === 0 ? 1 : existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
     const toGenerate = this.PRE_KEY_COUNT - existing.length;
     let preKeysAdded = 0;
     for (let i = 0; i < toGenerate; i++) {
       const id = startId + i;
       const kp = await this.generateIdentityKeyPair();
       const record: StoredPreKey = {
-        id, publicKey: kp.publicKey, privateKey: kp.privateKey, createdAt: Date.now()
+        id,
+        publicKey: kp.publicKey,
+        privateKey: kp.privateKey,
+        createdAt: Date.now(),
       };
       await SessionStore.savePreKey(record);
       this.storage['preKeyCache'].set(id, {
@@ -60,10 +63,14 @@ export class PreKeyManager {
         createdAt: Date.now(),
       };
       await SessionStore.saveSignedPreKey(record);
-      await this.storage.setSignedPreKey(this.SIGNED_PRE_KEY_ID, {
-        privKey: Buffer.from(kp.privateKey, 'hex'),
-        pubKey: Buffer.from(kp.publicKey, 'hex'),
-      }, Buffer.from(sig));
+      await this.storage.setSignedPreKey(
+        this.SIGNED_PRE_KEY_ID,
+        {
+          privKey: Buffer.from(kp.privateKey, 'hex'),
+          pubKey: Buffer.from(kp.publicKey, 'hex'),
+        },
+        Buffer.from(sig)
+      );
     }
     await this.storage.warmCacheFromStorage();
     logger.info(`[SIGNAL] PreKeyManager: ${preKeysAdded} new pre-keys + signed pre-key ready`);
@@ -103,9 +110,10 @@ export class PreKeyManager {
   }
 
   private async generateIdentityKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
-    const kp = await crypto.subtle.generateKey(
-      { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']
-    );
+    const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, [
+      'deriveKey',
+      'deriveBits',
+    ]);
     const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
     const priv = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
     return {
@@ -115,8 +123,8 @@ export class PreKeyManager {
   }
 
   private async signWithIdentity(_identityPrivKey: Buffer, _dataToSign: Buffer): Promise<Buffer> {
-    // Production: Ed25519 over (identityKey || signedPreKey).
-    // Phase 1: deterministic SHA-256 placeholder so tests can verify the flow.
+    // Временная заглушка для тестирования потока: детерминированный SHA-256.
+    // В production здесь должна использоваться подпись Ed25519 над identityKey и signedPreKey.
     const bytes = new Uint8Array(_dataToSign.length);
     for (let i = 0; i < _dataToSign.length; i++) bytes[i] = _dataToSign[i];
     const hash = await crypto.subtle.digest('SHA-256', bytes);

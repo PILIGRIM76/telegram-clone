@@ -1,62 +1,56 @@
-// src/crypto/bip39Derivation.ts
-// v3.0 Phase 5: BIP39 детерминированная деривация ключей.
+// Этап 5: детерминированное получение ключей BIP39.
 //
 // Проблема: Web Crypto API (ECDSA P-256) генерирует случайные ключи —
-// их нельзя восстановить из seed. Это блокирует multi-device E2EE:
-// одно устройство шифрует сообщение своим publicKey, после restore на
-// другом устройстве privateKey уже другой → сообщение не расшифровать.
+// их нельзя восстановить из seed. Из-за этого сквозное шифрование между устройствами
+// не работает: после восстановления на другом устройстве publicKey и privateKey не совпадают.
 //
 // Решение (гибридный подход):
-//   1. BIP39 mnemonic (12 слов из 2048-словного словаря) → seed
-//   2. BIP32 HDKey derivation m/44'/1987'/0'/0/0 → secp256k1 privKey (32 байта)
-//   3. Web Crypto API генерирует СЛУЧАЙНУЮ ECDSA P-256 пару (JWK)
-//   4. ВСЯ пара (publicKeyJWK + privateKeyJWK) шифруется AES-GCM
-//      с ключом, derived из SHA-256(secp256k1_privKey)
-//   5. publicKey хранится в открытом виде, privateKey — в encrypted blob
+//   1. Из 12 слов BIP39 (словарь из 2048 слов) получается seed.
+//   2. По пути BIP32 m/44'/1987'/0'/0/0 получается приватный ключ secp256k1 (32 байта).
+//   3. Web Crypto API создаёт случайную пару ECDSA P-256 (JWK).
+//   4. Пара publicKeyJWK + privateKeyJWK шифруется AES-GCM ключом,
+//      полученным из SHA-256(secp256k1_privKey).
+//   5. publicKey хранится открыто, privateKey — в зашифрованном блоке.
 //
-// При restore на другом устройстве:
-//   - secp256k1 privKey идентичен (BIP39 → BIP32 детерминирован)
-//   - SHA-256 даёт тот же AES-GCM ключ
-//   - encrypted blob расшифровывается → та же ECDSA пара
-//   - publicKey и privateKey совпадают битово-идентично
+// При восстановлении на другом устройстве:
+//   - приватный ключ secp256k1 совпадает благодаря BIP39 и BIP32;
+//   - SHA-256 даёт тот же ключ AES-GCM;
+//   - зашифрованный блок восстанавливает ту же пару ECDSA;
+//   - publicKey и privateKey совпадают побитово.
 //
 // E2EE работает между устройствами без сервера.
 //
-// Backwards compatibility: legacy identity (PBKDF2) помечается isBIP39: false
+// Для совместимости старая identity (PBKDF2) помечается isBIP39: false
 // и обрабатывается legacyRestoreFromSeed() в cryptoService.
 
-import {
-  generateMnemonic,
-  mnemonicToSeedSync,
-  validateMnemonic,
-} from '@scure/bip39';
-// @scure/bip39 wordlist: runtime-импорт через .js, типы в .d.ts
-import { wordlist } from '@scure/bip39/wordlists/english.js';
+import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
+// Словарь @scure/bip39 импортируется во время выполнения из .js; типы берутся из .d.ts.
 import { HDKey } from '@scure/bip32';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
 export interface DerivedIdentity {
-  /** Уникальный идентификатор (16 hex chars из SHA-256(publicKeyJWK)) */
+  /** Уникальный идентификатор (16 шестнадцатеричных символов из SHA-256(publicKeyJWK)). */
   uid: string;
   /** 12-словная BIP39 фраза (через пробел) */
   seedPhrase: string;
-  /** Публичный ключ — ECDSA P-256 JWK JSON (для Web Crypto encrypt/decrypt) */
+  /** Публичный ключ ECDSA P-256 в формате JWK JSON для шифрования и расшифрования через Web Crypto. */
   publicKey: string;
-  /** Приватный ключ — ECDSA P-256 JWK JSON (расшифрованный, для Web Crypto) */
+  /** Расшифрованный приватный ключ ECDSA P-256 в формате JWK JSON для Web Crypto. */
   privateKey: string;
-  /** Зашифрованный AES-GCM blob всей ECDSA пары — для multi-device restore */
+  /** Зашифрованный блок с парой ECDSA для восстановления на другом устройстве. */
   encryptedKeyPair: string;
-  /** 8-hex-char отпечаток для визуальной верификации (SHA-256(publicKeyJWK)) */
+  /** Восьмизначный шестнадцатеричный отпечаток для проверки (SHA-256(publicKeyJWK)). */
   keyFingerprint: string;
-  /** Маркер новой identity (true для BIP39) */
+  /** Признак новой identity (true для BIP39). */
   isBIP39: true;
   /** Параметры деривации (для миграции/отладки) */
   derivationPath: string;
 }
 
 /**
- * Восстановленная identity из encrypted blob.
- * Используется при restore на новом устройстве: тот же 12-словный seed +
- * тот же encryptedKeyPair (из localStorage) → та же identity.
+ * Восстановленная identity из зашифрованного блока.
+ * Для восстановления на новом устройстве используются те же 12 слов seed-фразы
+ * и тот же encryptedKeyPair из localStorage.
  */
 export interface RestoredIdentity {
   uid: string;
@@ -66,15 +60,15 @@ export interface RestoredIdentity {
 }
 
 /**
- * PILIGRIM coin type для BIP44.
- * 1987 — произвольный номер (не занят в SLIP-0044), символизирует год основания.
+ * Номер монеты PILIGRIM для BIP44.
+ * 1987 — свободный номер в SLIP-0044, выбранный в честь года основания.
  */
 const PILIGRIM_COIN_TYPE = 1987;
 
 /**
- * Стандартный BIP44 derivation path для PILIGRIM:
+ * Стандартный путь BIP44 для PILIGRIM:
  *   m / 44' / <coin_type>' / 0' / 0 / 0
- *   44' = BIP44, 1987' = coin type, 0' = account, 0 = external chain, 0 = address index
+ *   44' = BIP44, 1987' = номер монеты, 0' = учётная запись, 0 = внешняя цепочка, 0 = индекс адреса.
  */
 const DEFAULT_DERIVATION_PATH = `m/44'/${PILIGRIM_COIN_TYPE}'/0'/0/0`;
 
@@ -207,9 +201,7 @@ export function isValidBIP39Mnemonic(words: string[] | string): boolean {
  * Нормализует массив слов: trim, lowercase, фильтр пустых.
  */
 export function normalizeMnemonicWords(words: string[]): string[] {
-  return (words || [])
-    .map((w) => (w || '').trim().toLowerCase())
-    .filter((w) => w.length > 0);
+  return (words || []).map(w => (w || '').trim().toLowerCase()).filter(w => w.length > 0);
 }
 
 // =============================================================
@@ -228,13 +220,10 @@ async function deriveAESKeyFromSeed(secp256k1PrivateKey: Uint8Array): Promise<Cr
       secp256k1PrivateKey.byteOffset + secp256k1PrivateKey.byteLength
     ) as ArrayBuffer
   );
-  return crypto.subtle.importKey(
-    'raw',
-    seedHash,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
+  return crypto.subtle.importKey('raw', seedHash, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 /**
@@ -262,11 +251,7 @@ async function finalizeDerivedIdentity(
   const keyPairBlob = { pub: publicKeyJwk, priv: privateKeyJwk };
   const blobBytes = new TextEncoder().encode(JSON.stringify(keyPairBlob));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encryptedBlob = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    aesKey,
-    blobBytes
-  );
+  const encryptedBlob = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, blobBytes);
 
   // 4. Сериализуем encrypted blob
   const storedBlob = {
@@ -337,7 +322,7 @@ async function generateFingerprintFromJWK(publicKeyJwk: JsonWebKey): Promise<str
 // Phase 7: Pure BIP39 + secp256k1 (требует @noble/secp256k1)
 // =============================================================
 
-import { Point, getPublicKey } from '@noble/secp256k1';
+import { getPublicKey } from '@noble/secp256k1';
 
 /**
  * Phase 7 Identity: чистая BIP39 + secp256k1 схема (без ECDSA wrapper).
@@ -438,9 +423,7 @@ export async function deriveIdentityFromMnemonicV7(
  *
  * @param mnemonic 12-словная BIP39 фраза (space-separated)
  */
-export async function restoreIdentityFromMnemonicV7(
-  mnemonic: string
-): Promise<IdentityV7> {
+export async function restoreIdentityFromMnemonicV7(mnemonic: string): Promise<IdentityV7> {
   return deriveIdentityFromMnemonicV7(mnemonic);
 }
 

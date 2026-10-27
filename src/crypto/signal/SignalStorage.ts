@@ -1,6 +1,6 @@
-// SignalStorage adapter for libsignal backed by IndexedDB
-import type { SignalStorage as LibSignalStorage, E2ESession } from 'libsignal';
-import { ProtocolAddress, SessionRecord } from 'libsignal';
+// Адаптер хранилища libsignal, использующий IndexedDB.
+import type { SignalStorage as LibSignalStorage } from 'libsignal';
+import { SessionRecord } from 'libsignal';
 import { SessionStore } from './SessionStore';
 import type { StoredIdentityKeyPair } from './types';
 
@@ -73,7 +73,11 @@ export class SignalStorage implements LibSignalStorage {
     throw new Error('No signed pre-key available. Call setSignedPreKey first.');
   }
 
-  async setSignedPreKey(id: number, keyPair: { privKey: Buffer; pubKey: Buffer }, signature: Buffer): Promise<void> {
+  async setSignedPreKey(
+    id: number,
+    keyPair: { privKey: Buffer; pubKey: Buffer },
+    signature: Buffer
+  ): Promise<void> {
     await SessionStore.saveSignedPreKey({
       id,
       publicKey: keyPair.pubKey.toString('hex'),
@@ -91,7 +95,7 @@ export class SignalStorage implements LibSignalStorage {
     const stored = await SessionStore.loadSession(uid, deviceId);
     if (!stored) return null;
     const bytes = new Uint8Array(
-      stored.serializedSession.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
+      stored.serializedSession.match(/.{1,2}/g)!.map(b => parseInt(b, 16))
     );
     const record = SessionRecord.deserialize(bytes);
     this.sessionCache.set(id, record);
@@ -101,7 +105,9 @@ export class SignalStorage implements LibSignalStorage {
   async storeSession(id: string, session: SessionRecord): Promise<void> {
     this.sessionCache.set(id, session);
     const serialized = session.serialize();
-    const hex = Array.from(serialized).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const hex = Array.from(serialized)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
     const [uid, deviceIdStr] = id.split('.');
     const deviceId = Number(deviceIdStr);
     await SessionStore.saveSession({
@@ -114,11 +120,7 @@ export class SignalStorage implements LibSignalStorage {
     });
   }
 
-  isTrustedIdentity(
-    _identifier: string,
-    _identityKey: Uint8Array,
-    _direction: number
-  ): boolean {
+  isTrustedIdentity(_identifier: string, _identityKey: Uint8Array, _direction: number): boolean {
     return true;
   }
 
@@ -143,7 +145,7 @@ export class SignalStorage implements LibSignalStorage {
   async getNextPreKeyId(): Promise<number> {
     const all = await SessionStore.listPreKeys();
     if (all.length === 0) return 1;
-    return Math.max(...all.map((k) => k.id)) + 1;
+    return Math.max(...all.map(k => k.id)) + 1;
   }
 
   async hasPreKey(id: number): Promise<boolean> {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type TimeOfDay = 'morning' | 'day' | 'evening' | 'night';
 
@@ -52,10 +52,8 @@ export function useAccentColor(): AccentTheme {
       setTheme(ACCENT_THEMES[getTimeOfDay()]);
     };
 
-    // Update every minute
     const interval = setInterval(updateTheme, 60000);
 
-    // Initial set
     updateTheme();
 
     return () => clearInterval(interval);
@@ -64,7 +62,4 @@ export function useAccentColor(): AccentTheme {
   return theme;
 }
 
-// v3.0 Phase 4: Re-export E2EEStatus type for convenient imports
 export type { E2EEStatus } from '../types';
-
-

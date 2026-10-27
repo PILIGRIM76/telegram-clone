@@ -1,9 +1,9 @@
-// v3.0 Phase 4: ChatList — список чатов с memo-оптимизацией и динамической темой
-import React, { useState, useMemo, memo } from 'react';
-import AnimatedAvatar from './AnimatedAvatar';
+// Этап 4: список чатов с оптимизацией React.memo и динамической темой.
+import React, { memo, useMemo, useState } from 'react';
 import { useAccentColor } from '../hooks/useAccentColor';
-import { SearchIcon, PlusCircleIcon } from './icons';
-import { E2EEStatus } from '../types';
+import type { E2EEStatus } from '../types';
+import AnimatedAvatar from './AnimatedAvatar';
+import { PlusCircleIcon, SearchIcon } from './icons';
 
 /**
  * Локальный интерфейс для элемента списка чатов.
@@ -42,7 +42,7 @@ const ChatRow = memo(function ChatRow({
       onClick={onSelect}
       role="button"
       tabIndex={0}
-      onKeyPress={(e) => e.key === 'Enter' && onSelect()}
+      onKeyPress={e => e.key === 'Enter' && onSelect()}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -53,10 +53,10 @@ const ChatRow = memo(function ChatRow({
         borderLeft: isActive ? `3px solid ${accentColor}` : '3px solid transparent',
         transition: 'background 0.2s ease',
       }}
-      onMouseEnter={(e) => {
+      onMouseEnter={e => {
         if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={e => {
         if (!isActive) e.currentTarget.style.background = 'transparent';
       }}
     >
@@ -70,19 +70,59 @@ const ChatRow = memo(function ChatRow({
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 500, color: '#FCF9F7', fontFamily: 'Inter, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 14,
+              fontWeight: 500,
+              color: '#FCF9F7',
+              fontFamily: 'Inter, sans-serif',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {chat.name}
           </h3>
-          <span style={{ fontSize: 12, color: 'rgba(252, 249, 247, 0.4)', fontFamily: 'Inter, sans-serif' }}>
+          <span
+            style={{
+              fontSize: 12,
+              color: 'rgba(252, 249, 247, 0.4)',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
             {chat.timestamp}
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ margin: 0, fontSize: 13, color: chat.isTyping ? accentColor : 'rgba(252, 249, 247, 0.6)', fontFamily: 'Inter, sans-serif', fontStyle: chat.isTyping ? 'italic' : 'normal', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: chat.isTyping ? accentColor : 'rgba(252, 249, 247, 0.6)',
+              fontFamily: 'Inter, sans-serif',
+              fontStyle: chat.isTyping ? 'italic' : 'normal',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+            }}
+          >
             {chat.isTyping ? 'печатает...' : chat.lastMessage}
           </p>
           {chat.unread > 0 && (
-            <div style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 12, background: accentColor, color: '#0D0C0B', fontSize: 11, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+            <div
+              style={{
+                marginLeft: 8,
+                padding: '2px 8px',
+                borderRadius: 12,
+                background: accentColor,
+                color: '#0D0C0B',
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
               {chat.unread}
             </div>
           )}
@@ -102,17 +142,35 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
     if (!searchQuery.trim()) return chats;
     const query = searchQuery.toLowerCase();
     return chats.filter(
-      (chat) =>
-        chat.name.toLowerCase().includes(query) ||
-        chat.lastMessage.toLowerCase().includes(query)
+      chat =>
+        chat.name.toLowerCase().includes(query) || chat.lastMessage.toLowerCase().includes(query)
     );
   }, [chats, searchQuery]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255, 255, 255, 0.01)', borderRight: '1px solid rgba(255, 255, 255, 0.08)' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        background: 'rgba(255, 255, 255, 0.01)',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+      }}
+    >
       <div style={{ padding: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <h2 style={{ flex: 1, margin: 0, fontSize: 20, fontWeight: 600, color: '#FCF9F7', fontFamily: 'Inter, sans-serif' }}>Chats</h2>
+          <h2
+            style={{
+              flex: 1,
+              margin: 0,
+              fontSize: 20,
+              fontWeight: 600,
+              color: '#FCF9F7',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            Chats
+          </h2>
           <button
             onClick={onNewChat}
             aria-label="New chat"
@@ -128,29 +186,38 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               e.currentTarget.style.background = theme.color + '30';
               e.currentTarget.style.transform = 'scale(1.05)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={e => {
               e.currentTarget.style.background = theme.color + '20';
               e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.color }}>
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: theme.color,
+              }}
+            >
               <PlusCircleIcon />
             </span>
           </button>
         </div>
         <div style={{ position: 'relative' }}>
-                              <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
+          <div
+            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+          >
             <SearchIcon size={18} color="rgba(252, 249, 247, 0.4)" />
           </div>
           <input
             type="text"
             placeholder="Search chats..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
               paddingLeft: 40,
@@ -166,10 +233,10 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
               outline: 'none',
               boxSizing: 'border-box',
             }}
-            onFocus={(e) => {
+            onFocus={e => {
               e.currentTarget.style.borderColor = theme.color + '80';
             }}
-            onBlur={(e) => {
+            onBlur={e => {
               e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
             }}
           />
@@ -177,7 +244,7 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {filteredChats.length > 0 ? (
-          filteredChats.map((chat) => (
+          filteredChats.map(chat => (
             <ChatRow
               key={chat.id}
               chat={chat}
@@ -187,7 +254,15 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
             />
           ))
         ) : (
-          <div style={{ padding: '16px', color: 'rgba(252, 249, 247, 0.4)', fontSize: 13, fontFamily: 'Inter, sans-serif', textAlign: 'center' }}>
+          <div
+            style={{
+              padding: '16px',
+              color: 'rgba(252, 249, 247, 0.4)',
+              fontSize: 13,
+              fontFamily: 'Inter, sans-serif',
+              textAlign: 'center',
+            }}
+          >
             No chats found
           </div>
         )}
@@ -197,4 +272,3 @@ const ChatList: React.FC<ChatListProps> = ({ chats, activeChatId, onChatSelect, 
 };
 
 export default ChatList;
-

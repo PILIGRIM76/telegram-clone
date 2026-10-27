@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { searchService } from '../services/searchService';
 import type { SearchResult } from '../types';
 
@@ -22,7 +22,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounced search
+  // Откладываем поиск, чтобы не выполнять его после каждого нажатия клавиши.
   const debouncedSearch = useCallback(
     debounce((searchQuery: string) => {
       setIsSearching(true);
@@ -44,14 +44,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [query, debouncedSearch]);
 
-  // Focus input on open
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
 
-  // Escape to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -67,19 +65,19 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={(e) => {
+      onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        {/* Header */}
+        {}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={e => setQuery(e.target.value)}
               placeholder="Поиск сообщений (минимум 2 символа)..."
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
@@ -94,18 +92,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({
           </div>
         </div>
 
-        {/* Results */}
+        {}
         <div className="flex-1 overflow-y-auto p-4">
-          {isSearching && (
-            <div className="text-center text-gray-500 py-8">
-              Поиск...
-            </div>
-          )}
+          {isSearching && <div className="text-center text-gray-500 py-8">Поиск...</div>}
 
           {!isSearching && results.length === 0 && query.length >= 2 && (
-            <div className="text-center text-gray-500 py-8">
-              Ничего не найдено для "{query}"
-            </div>
+            <div className="text-center text-gray-500 py-8">Ничего не найдено для "{query}"</div>
           )}
 
           {!isSearching && query.length < 2 && (
@@ -114,26 +106,23 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             </div>
           )}
 
-          {!isSearching && results.map((result) => (
-            <div
-              key={result.message.id}
-              onClick={() => {
-                onMessageSelect?.(result.message.id, result.contactUid);
-                onClose();
-              }}
-              className="p-4 hover:bg-blue-50 rounded-lg cursor-pointer border-b"
-            >
-              <div className="font-semibold text-sm text-gray-700 mb-1">
-                {result.contactName}
+          {!isSearching &&
+            results.map(result => (
+              <div
+                key={result.message.id}
+                onClick={() => {
+                  onMessageSelect?.(result.message.id, result.contactUid);
+                  onClose();
+                }}
+                className="p-4 hover:bg-blue-50 rounded-lg cursor-pointer border-b"
+              >
+                <div className="font-semibold text-sm text-gray-700 mb-1">{result.contactName}</div>
+                <div className="text-sm text-gray-600">{result.snippet}</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {new Date(result.message.timestamp).toLocaleString()}
+                </div>
               </div>
-              <div className="text-sm text-gray-600">
-                {result.snippet}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                {new Date(result.message.timestamp).toLocaleString()}
-              </div>
-            </div>
-          ))}
+            ))}
 
           {results.length > 0 && (
             <div className="text-xs text-gray-400 mt-4 text-center">
@@ -146,7 +135,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   );
 };
 
-// Утилита debounce
+// Откладывает вызов до завершения серии быстрых действий.
 function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number

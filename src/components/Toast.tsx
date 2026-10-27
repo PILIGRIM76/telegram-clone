@@ -1,5 +1,5 @@
-// v1.6 Batch 4: простой Toast для feedback (mute/archive/verify).
-// Само-скрывается через duration мс. Стек до 3 toast-ов.
+// Короткое уведомление для действий отключения звука, архивации и проверки.
+// Скрывается через заданное время; одновременно показывается не более трёх уведомлений.
 
 import React, { useEffect } from 'react';
 
@@ -14,14 +14,20 @@ interface ToastsProps {
   onDismiss: (id: string) => void;
 }
 
-const variantStyles: Record<NonNullable<ToastItem['variant']>, { bg: string; border: string; color: string; icon: string }> = {
+const variantStyles: Record<
+  NonNullable<ToastItem['variant']>,
+  { bg: string; border: string; color: string; icon: string }
+> = {
   success: { bg: 'rgba(34, 197, 94, 0.95)', border: '#22c55e', color: '#ffffff', icon: '✅' },
   info: { bg: 'rgba(59, 130, 246, 0.95)', border: '#3b82f6', color: '#ffffff', icon: 'ℹ️' },
   warn: { bg: 'rgba(245, 158, 11, 0.95)', border: '#f59e0b', color: '#1e293b', icon: '⚠️' },
-  error: { bg: 'rgba(239, 68, 68, 0.95)', border: '#ef4444', color: '#ffffff', icon: '❌' }
+  error: { bg: 'rgba(239, 68, 68, 0.95)', border: '#ef4444', color: '#ffffff', icon: '❌' },
 };
 
-const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void }> = ({ toast, onDismiss }) => {
+const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void }> = ({
+  toast,
+  onDismiss,
+}) => {
   useEffect(() => {
     const t = window.setTimeout(() => onDismiss(toast.id), 3000);
     return () => window.clearTimeout(t);
@@ -46,7 +52,7 @@ const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void 
         alignItems: 'center',
         gap: '8px',
         minWidth: '200px',
-        maxWidth: '360px'
+        maxWidth: '360px',
       }}
       onClick={() => onDismiss(toast.id)}
     >
@@ -55,7 +61,7 @@ const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void 
       <button
         type="button"
         aria-label="Закрыть"
-        onClick={(e) => {
+        onClick={e => {
           e.stopPropagation();
           onDismiss(toast.id);
         }}
@@ -66,7 +72,7 @@ const SingleToast: React.FC<{ toast: ToastItem; onDismiss: (id: string) => void 
           cursor: 'pointer',
           fontSize: '16px',
           padding: 0,
-          lineHeight: 1
+          lineHeight: 1,
         }}
       >
         ×
@@ -88,10 +94,10 @@ export const Toasts: React.FC<ToastsProps> = ({ toasts, onDismiss }) => {
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
       }}
     >
-      {toasts.slice(-3).map((toast) => (
+      {toasts.slice(-3).map(toast => (
         <div key={toast.id} style={{ pointerEvents: 'auto' }}>
           <SingleToast toast={toast} onDismiss={onDismiss} />
         </div>

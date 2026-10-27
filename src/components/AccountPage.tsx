@@ -1,12 +1,10 @@
-import { logger } from '../services/logger';
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 import { useAccentColor } from '../hooks/useAccentColor';
+import { logger } from '../services/logger';
 import AnimatedAvatar from './AnimatedAvatar';
-import {
-  ArrowLeftIcon, KeyIcon, CopyIcon, LogoutIcon, CheckIcon, ShieldIcon
-} from './icons';
-// Phase 2: Tor proxy toggle — анонимизация IP через Tor daemon.
+import { ArrowLeftIcon, CheckIcon, CopyIcon, KeyIcon, LogoutIcon, ShieldIcon } from './icons';
+// Этап 2: переключатель Tor для сокрытия IP-адреса через службу Tor.
 import { torProxy } from '../services/torProxy';
 
 interface AccountPageProps {
@@ -20,14 +18,157 @@ interface AccountPageProps {
   onBackupSeed: () => void;
 }
 
-const AccountPage: React.FC<AccountPageProps> = ({
-  user, onBack, onLogout, onBackupSeed,
-}) => {
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+const Section: React.FC<SectionProps> = ({ title, children }) => (
+  <div
+    style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 16,
+      padding: '20px',
+      marginBottom: 16,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+    }}
+  >
+    <h3
+      style={{
+        margin: '0 0 16px',
+        fontSize: 12,
+        fontWeight: 600,
+        color: 'rgba(252,249,247,0.5)',
+        fontFamily: 'Inter, sans-serif',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+      }}
+    >
+      {title}
+    </h3>
+    {children}
+  </div>
+);
+
+interface MenuItemProps {
+  icon: React.ReactNode;
+  label: string;
+  subLabel?: string;
+  onClick?: () => void;
+  danger?: boolean;
+  toggle?: boolean;
+  isOn?: boolean;
+  accentColor: string;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({
+  icon,
+  label,
+  subLabel,
+  onClick,
+  danger,
+  toggle,
+  isOn,
+  accentColor,
+}) => (
+  <div
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      padding: '12px 0',
+      cursor: onClick ? 'pointer' : 'default',
+      borderBottom: '1px solid rgba(255,255,255,0.05)',
+      transition: 'opacity 0.2s ease',
+    }}
+    onMouseEnter={e => {
+      if (onClick) e.currentTarget.style.opacity = '0.7';
+    }}
+    onMouseLeave={e => {
+      if (onClick) e.currentTarget.style.opacity = '1';
+    }}
+  >
+    <div
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: danger ? 'rgba(239,68,68,0.1)' : accentColor + '15',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: danger ? '#EF4444' : accentColor,
+        flexShrink: 0,
+      }}
+    >
+      {icon}
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: danger ? '#EF4444' : '#FCF9F7',
+          fontFamily: 'Inter, sans-serif',
+        }}
+      >
+        {label}
+      </div>
+      {subLabel && (
+        <div
+          style={{
+            fontSize: 12,
+            color: 'rgba(252,249,247,0.5)',
+            fontFamily: 'Inter, sans-serif',
+            marginTop: 2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {subLabel}
+        </div>
+      )}
+    </div>
+    {toggle && (
+      <div
+        style={{
+          width: 44,
+          height: 24,
+          borderRadius: 12,
+          background: isOn ? accentColor : 'rgba(255,255,255,0.1)',
+          position: 'relative',
+          transition: 'background 0.3s ease',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: isOn ? 22 : 2,
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            background: '#FFFFFF',
+            transition: 'left 0.3s ease',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          }}
+        />
+      </div>
+    )}
+  </div>
+);
+
+const AccountPage: React.FC<AccountPageProps> = ({ user, onBack, onLogout, onBackupSeed }) => {
   const theme = useAccentColor();
   const [copiedUid, setCopiedUid] = useState(false);
-  // Phase 2: Tor proxy toggle (загружается из localStorage).
+  // Этап 2: состояние переключателя Tor загружается из localStorage.
   const [torEnabled, setTorEnabled] = useState<boolean>(
-    () => localStorage.getItem('piligrim-tor-enabled') === 'true',
+    () => localStorage.getItem('piligrim-tor-enabled') === 'true'
   );
 
   const handleToggleTor = () => {
@@ -51,67 +192,6 @@ const AccountPage: React.FC<AccountPageProps> = ({
     }
   };
 
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 16, padding: '20px', marginBottom: 16,
-      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-    }}>
-      <h3 style={{
-        margin: '0 0 16px', fontSize: 12, fontWeight: 600,
-        color: 'rgba(252,249,247,0.5)', fontFamily: 'Inter, sans-serif',
-        textTransform: 'uppercase', letterSpacing: 1,
-      }}>{title}</h3>
-      {children}
-    </div>
-  );
-
-  const MenuItem = ({ icon, label, subLabel, onClick, danger, toggle, isOn }: any) => (
-    <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 16,
-      padding: '12px 0', cursor: onClick ? 'pointer' : 'default',
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
-      transition: 'opacity 0.2s ease',
-    }}
-    onMouseEnter={(e) => { if (onClick) e.currentTarget.style.opacity = '0.7'; }}
-    onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = '1'; }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10,
-        background: danger ? 'rgba(239,68,68,0.1)' : theme.color + '15',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: danger ? '#EF4444' : theme.color, flexShrink: 0,
-      }}>{icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 14, fontWeight: 500,
-          color: danger ? '#EF4444' : '#FCF9F7',
-          fontFamily: 'Inter, sans-serif',
-        }}>{label}</div>
-        {subLabel && (
-          <div style={{
-            fontSize: 12, color: 'rgba(252,249,247,0.5)',
-            fontFamily: 'Inter, sans-serif', marginTop: 2,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>{subLabel}</div>
-        )}
-      </div>
-      {toggle && (
-        <div style={{
-          width: 44, height: 24, borderRadius: 12,
-          background: isOn ? theme.color : 'rgba(255,255,255,0.1)',
-          position: 'relative', transition: 'background 0.3s ease', flexShrink: 0,
-        }}>
-          <div style={{
-            position: 'absolute', top: 2, left: isOn ? 22 : 2,
-            width: 20, height: 20, borderRadius: '50%', background: '#FFFFFF',
-            transition: 'left 0.3s ease', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          }} />
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -119,19 +199,31 @@ const AccountPage: React.FC<AccountPageProps> = ({
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.3 }}
       style={{
-        position: 'fixed', inset: 0, overflowY: 'auto',
-        padding: '24px 16px', background: '#0D0C0F',
-        boxSizing: 'border-box', zIndex: 100,
+        position: 'fixed',
+        inset: 0,
+        overflowY: 'auto',
+        padding: '24px 16px',
+        background: '#0D0C0F',
+        boxSizing: 'border-box',
+        zIndex: 100,
       }}
       data-testid="account-page"
     >
-      <button onClick={onBack} style={{
-        background: 'none', border: 'none',
-        color: 'rgba(252,249,247,0.6)', display: 'flex',
-        alignItems: 'center', gap: 8, fontSize: 14,
-        fontFamily: 'Inter, sans-serif', cursor: 'pointer',
-        padding: '0 0 24px 0',
-      }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'rgba(252,249,247,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 14,
+          fontFamily: 'Inter, sans-serif',
+          cursor: 'pointer',
+          padding: '0 0 24px 0',
+        }}
+      >
         <ArrowLeftIcon className="w-5 h-5" /> Назад
       </button>
 
@@ -144,23 +236,47 @@ const AccountPage: React.FC<AccountPageProps> = ({
             accentColor={theme.color}
           />
         </div>
-        <h1 style={{
-          margin: '0 0 8px', fontSize: 24, fontWeight: 600,
-          color: '#FCF9F7', fontFamily: 'Inter, sans-serif',
-        }}>{user.name}</h1>
-        <div onClick={handleCopyUid} data-testid="account-uid-copy" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '6px 12px', borderRadius: 8,
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          cursor: 'pointer', transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.color + '50'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
-          <span style={{
-            fontSize: 12, color: 'rgba(252,249,247,0.6)',
-            fontFamily: 'JetBrains Mono, monospace',
-          }}>{user.uid.slice(0, 16)}...</span>
+        <h1
+          style={{
+            margin: '0 0 8px',
+            fontSize: 24,
+            fontWeight: 600,
+            color: '#FCF9F7',
+            fontFamily: 'Inter, sans-serif',
+          }}
+        >
+          {user.name}
+        </h1>
+        <div
+          onClick={() => void handleCopyUid()}
+          data-testid="account-uid-copy"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 12px',
+            borderRadius: 8,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = theme.color + '50';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              color: 'rgba(252,249,247,0.6)',
+              fontFamily: 'JetBrains Mono, monospace',
+            }}
+          >
+            {user.uid.slice(0, 16)}...
+          </span>
           {copiedUid ? (
             <CheckIcon size={14} color="#4CAF50" />
           ) : (
@@ -170,11 +286,14 @@ const AccountPage: React.FC<AccountPageProps> = ({
       </div>
 
       <Section title="Безопасность">
-        <MenuItem icon={<KeyIcon size={20} />}
+        <MenuItem
+          icon={<KeyIcon size={20} />}
           label="Резервная копия Seed-фразы"
           subLabel="12 слов для восстановления"
-          onClick={onBackupSeed} />
-        {/* Phase 2: Tor proxy toggle — анонимизация IP через Tor daemon. */}
+          onClick={onBackupSeed}
+          accentColor={theme.color}
+        />
+        {/* Этап 2: переключатель Tor для сокрытия IP-адреса через службу Tor. */}
         <MenuItem
           icon={<ShieldIcon size={20} />}
           label="Использовать Tor"
@@ -182,29 +301,52 @@ const AccountPage: React.FC<AccountPageProps> = ({
           toggle
           isOn={torEnabled}
           onClick={handleToggleTor}
+          accentColor={theme.color}
         />
       </Section>
 
       <div style={{ marginTop: 32, paddingBottom: 32 }}>
-        <button onClick={onLogout} data-testid="account-logout" style={{
-          width: '100%', padding: '14px', borderRadius: 12,
-          background: 'rgba(239,68,68,0.1)',
-          border: '1px solid rgba(239,68,68,0.3)',
-          color: '#EF4444', fontSize: 14, fontWeight: 600,
-          fontFamily: 'Inter, sans-serif', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 8, transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}>
+        <button
+          onClick={onLogout}
+          data-testid="account-logout"
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: 12,
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#EF4444',
+            fontSize: 14,
+            fontWeight: 600,
+            fontFamily: 'Inter, sans-serif',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(239,68,68,0.2)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+          }}
+        >
           <LogoutIcon size={18} /> Выйти из аккаунта
         </button>
-        <p style={{
-          textAlign: 'center', fontSize: 11,
-          color: 'rgba(252,249,247,0.3)',
-          fontFamily: 'Inter, sans-serif', marginTop: 12, lineHeight: 1.4,
-        }}>
-          При выходе локальные ключи будут удалены.<br />
+        <p
+          style={{
+            textAlign: 'center',
+            fontSize: 11,
+            color: 'rgba(252,249,247,0.3)',
+            fontFamily: 'Inter, sans-serif',
+            marginTop: 12,
+            lineHeight: 1.4,
+          }}
+        >
+          При выходе локальные ключи будут удалены.
+          <br />
           Убедитесь, что вы сохранили Seed-фразу.
         </p>
       </div>
@@ -213,4 +355,3 @@ const AccountPage: React.FC<AccountPageProps> = ({
 };
 
 export default AccountPage;
-

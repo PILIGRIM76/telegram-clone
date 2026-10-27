@@ -1,8 +1,7 @@
-// v3.0 Phase 2B-1: Responsive Layout Shell — useBreakpoint hook
-// 3 breakpoints: mobile (≤640), tablet (641–1024), desktop (>1024)
-// RT9 (800×1280) попадает в tablet — левая панель ~30%, правая ~70%.
+// Определяет точку адаптивной ширины: мобильная (≤640), планшетная (641–1024) или компьютерная (>1024).
+// Устройство RT9 (800×1280) определяется как планшет: левая панель занимает около 30%, правая — 70%.
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
@@ -15,7 +14,7 @@ export function useBreakpoint(): Breakpoint {
   useEffect(() => {
     const onResize = () => setBp(getBreakpoint());
     window.addEventListener('resize', onResize);
-    // Initial sync на случай SSR-гидратации
+    // Сразу синхронизируем состояние после монтирования, в том числе при SSR-гидратации.
     onResize();
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -25,8 +24,8 @@ export function useBreakpoint(): Breakpoint {
 
 function getBreakpoint(): Breakpoint {
   const w = window.innerWidth;
-  // RT9 (800x1280): WebView innerWidth = 640 (system nav deducted).
-  // Mobile breakpoint lowered to 600 so 640 falls into tablet.
+  // На RT9 ширина WebView равна 640 пикселям после вычета системной панели.
+
   if (w <= 600) return 'mobile';
   if (w <= 1024) return 'tablet';
   return 'desktop';

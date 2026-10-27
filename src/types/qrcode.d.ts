@@ -1,4 +1,4 @@
-﻿// Module declaration for qrcode library (no @types/qrcode in package.json)
+﻿
 declare module 'qrcode' {
   export interface QRCodeToDataURLOptions {
     width?: number;

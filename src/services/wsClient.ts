@@ -1,12 +1,13 @@
-// src/services/wsClient.ts
-// WebSocket client with JWT authentication
-// Handles token refresh on 1008 (Unauthorized) and auto-reconnect
+// Клиент WebSocket.
+// Клиент WebSocket с аутентификацией через JWT.
+// Обновляет токен при коде 1008 (Unauthorized) и автоматически переподключается.
 
 import { authClient } from './authClient';
 
-const WS_URL = (typeof process !== 'undefined' && process.env && process.env.VITE_WS_URL)
-  ? process.env.VITE_WS_URL
-  : 'wss://192.168.100.4:4443';
+const WS_URL =
+  typeof process !== 'undefined' && process.env && process.env.VITE_WS_URL
+    ? process.env.VITE_WS_URL
+    : 'wss://192.168.100.4:4443';
 
 let ws: WebSocket | null = null;
 let reconnectAttempts = 0;
@@ -18,7 +19,8 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
   if (reconnectTimeout) {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
-  }  currentOnMessage = onMessage;
+  }
+  currentOnMessage = onMessage;
 
   const token = authClient.getAccessToken();
   if (!token) {
@@ -27,9 +29,10 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     return;
   }
 
-  const wsUrl = WS_URL.startsWith('ws://') || WS_URL.startsWith('wss://')
-    ? `${WS_URL}/?token=${encodeURIComponent(token)}`
-    : `${WS_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/?token=${encodeURIComponent(token)}`;
+  const wsUrl =
+    WS_URL.startsWith('ws://') || WS_URL.startsWith('wss://')
+      ? `${WS_URL}/?token=${encodeURIComponent(token)}`
+      : `${WS_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/?token=${encodeURIComponent(token)}`;
 
   ws = new WebSocket(wsUrl);
 
@@ -38,7 +41,7 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     reconnectAttempts = 0;
   };
 
-  ws.onmessage = (event) => {
+  ws.onmessage = event => {
     try {
       const data = JSON.parse(event.data);
       onMessage(data);
@@ -47,10 +50,11 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     }
   };
 
-  ws.onclose = (event) => {
+  ws.onclose = event => {
     console.log('[WS] Closed:', event.code);
     if (event.code === 1008) {
-      authClient.refresh()
+      authClient
+        .refresh()
         .then(() => {
           reconnectAttempts = 0;
           connectWebSocket(currentOnMessage);
@@ -67,7 +71,7 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     }
   };
 
-  ws.onerror = (err) => {
+  ws.onerror = err => {
     console.error('[WS] Error:', err);
   };
 }
@@ -90,4 +94,3 @@ export function sendWebSocketMessage(type: string, payload: any): void {
     console.error('[WS] Not connected');
   }
 }
-

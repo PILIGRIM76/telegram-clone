@@ -1,7 +1,7 @@
 import { logger } from '../services/logger';
 // v3.0: ErrorBoundary для защиты UI от JS ошибок
-// Если компонент крашится - показывает fallback вместо белого экрана
-// Production safety net: catches render-time errors, логирует, предлагает reload
+// При сбое компонента показывает запасной экран вместо пустой страницы.
+// В боевой сборке перехватывает ошибки рендеринга, записывает их в журнал и предлагает перезагрузить страницу.
 
 import React from 'react';
 

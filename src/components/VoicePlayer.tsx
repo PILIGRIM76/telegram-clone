@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { voiceService } from '../services/voiceService';
-import { VoiceMessageMetadata } from '../types';
+import type { VoiceMessageMetadata } from '../types';
 
 interface VoicePlayerProps {
   encryptedBlob: Blob;
@@ -13,7 +13,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   encryptedBlob,
   metadata,
   privateKeyHex,
-  isOwn
+  isOwn,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -23,7 +23,6 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Format time as MM:SS
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -98,9 +97,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   return (
     <div
       className={`voice-player flex items-center gap-3 p-3 rounded-xl transition-colors ${
-        isOwn
-          ? 'bg-blue-100 dark:bg-blue-900/30'
-          : 'bg-gray-100 dark:bg-gray-800/30'
+        isOwn ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800/30'
       }`}
       style={{ maxWidth: '100%', minWidth: 280 }}
     >
@@ -135,7 +132,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
         <div className="flex items-center gap-2">
           <div
             className="relative flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full cursor-pointer"
-            onClick={(e) => {
+            onClick={e => {
               if (audioRef.current && duration > 0) {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
@@ -159,9 +156,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
           </span>
         </div>
 
-        {error && (
-          <p className="text-xs text-red-500 mt-1">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       </div>
     </div>
   );
