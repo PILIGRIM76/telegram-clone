@@ -1,11 +1,11 @@
 // Phase 9.5 + Vite Build Fix: VitePWA plugin removed entirely.
 // Раньше он вызывал html-proxy баг при наличии inline CSS в index.html или @tailwind директив.
 // Phase 1.5 (premium design) использует CSS-переменные, PWA не нужен.
-import path from 'path';
+import path from 'node:path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
-import fs from 'fs';
+import fs from 'node:fs';
 
 
 /**
@@ -32,12 +32,12 @@ function relativeAssetsPlugin(): Plugin {
                 let source = fs.readFileSync(indexPath, 'utf-8');
                 const original = source;
                 source = source
-                    .replace(/href="\/assets\//g, 'href="./assets/')
-                    .replace(/src="\/assets\//g, 'src="./assets/')
-                    .replace(/href="\/icons\//g, 'href="./icons/')
-                    .replace(/href="\/favicon-/g, 'href="./favicon-')
-                    .replace(/href="\/pwa-/g, 'href="./pwa-')
-                    .replace(/src="\/src\//g, 'src="./src/');
+                    .replaceAll('href="/assets/', 'href="./assets/')
+                    .replaceAll('src="/assets/', 'src="./assets/')
+                    .replaceAll('href="/icons/', 'href="./icons/')
+                    .replaceAll('href="/favicon-', 'href="./favicon-')
+                    .replaceAll('href="/pwa-', 'href="./pwa-')
+                    .replaceAll('src="/src/', 'src="./src/');
                 if (source !== original) {
                     console.log('[relativeAssetsPlugin] Replacements applied, writing file...');
                     fs.writeFileSync(indexPath, source);
@@ -63,14 +63,14 @@ export default defineConfig(({ mode }) => {
             main: {
                 entry: 'electron/main.ts',
             },
-            })],
+        })],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         // FIX 2026-09-10: Vite инжектирует process.env.VITE_* из .env файлов.
         // Раньше apiService.ts использовал import.meta.env (Vite-специфичный),
         // что ломало ts-jest (TS1343). Теперь process.env — работает и в тестах, и в сборке.
-        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'http://192.168.100.4:4000'),
+        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://192.168.100.4:4000'),
         'process.env.VITE_WS_URL': JSON.stringify(env.VITE_WS_URL || 'wss://192.168.100.4:4443'),
         // Phase 9.5 fix: simple-peer ожидает `global` (Node.js) и `require` (CommonJS).
         // В браузере/Capacitor WebView их нет, поэтому перенаправляем на globalThis.
