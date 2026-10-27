@@ -1,5 +1,7 @@
 import type { Table } from 'dexie';
 import Dexie from 'dexie';
+import type { EncryptedAttachment, VoiceMessageMetadata } from '../types';
+import { logger } from './logger';
 
 // Типы для IndexedDB
 export interface StoredMessage {
@@ -9,15 +11,15 @@ export interface StoredMessage {
   content: string; // ЗАШИФРОВАННОЕ содержимое
   timestamp: number;
   type: 'text' | 'file' | 'voice';
-  encryptedAttachments?: any[]; // зашифрованные файлы
-  voiceMetadata?: any;
-  reactions?: any[];
+  encryptedAttachments?: EncryptedAttachment[];
+  voiceMetadata?: VoiceMessageMetadata;
+  reactions?: unknown[];
 }
 
 export interface CachedFile {
   id: string; // hash файла
   encryptedBlob: Blob;
-  metadata: any;
+  metadata: unknown;
   lastAccessed: number;
 }
 
@@ -81,7 +83,7 @@ class CipherLinkDatabase extends Dexie {
   }
 
   // Кэшировать файл
-  async cacheFile(id: string, encryptedBlob: Blob, metadata: any): Promise<void> {
+  async cacheFile(id: string, encryptedBlob: Blob, metadata: unknown): Promise<void> {
     await this.cachedFiles.put({
       id,
       encryptedBlob,
@@ -116,6 +118,17 @@ class CipherLinkDatabase extends Dexie {
 }
 
 export const db = new CipherLinkDatabase();
+
+interface MemoryMessage {
+  id: string;
+  content?: string;
+  senderUid: string;
+  timestamp: number;
+  type?: StoredMessage['type'];
+  encryptedAttachments?: EncryptedAttachment[];
+  voiceMetadata?: VoiceMessageMetadata;
+  reactions?: unknown[];
+}
 
 // Вспомогательная функция для шифрования при сохранении (использует Web Crypto API)
 async function encryptForStorage(data: string, key: string): Promise<string> {
@@ -164,7 +177,7 @@ async function decryptFromStorage(encryptedData: string, key: string): Promise<s
 
 // Миграция: перенос существующих данных из памяти в IndexedDB
 export async function migrateFromMemory(
-  memoryMessages: Map<string, any[]>,
+  memoryMessages: Map<string, MemoryMessage[]>,
   encryptionKey: string
 ): Promise<void> {
   const allMessages: StoredMessage[] = [];
@@ -190,7 +203,7 @@ export async function migrateFromMemory(
 
   if (allMessages.length > 0) {
     await db.saveMessages(allMessages);
-    console.log(`[Migration] Saved ${allMessages.length} messages to IndexedDB`);
+    logger.info(`[Migration] Saved ${allMessages.length} messages to IndexedDB`);
   }
 }
 

@@ -20,6 +20,7 @@ import { logger } from './services/logger';
 
 import { CallModal } from './components/CallModal';
 import { ChannelsView } from './components/ChannelsView';
+import { ContactsView } from './components/ContactsView';
 import { FloatingActionButton } from './components/FloatingActionButton';
 
 import { TabletTabBar, type TabView } from './components/TabletTabBar';
@@ -43,6 +44,7 @@ import type { Chat, Contact, EncryptedAttachment, Group, IdentityType, Message }
 // handleAddContact инициализирует Signal сессию через SignalProtocolManager.initSessionWithPreKeyBundle.
 import { PreKeyManager } from './crypto/signal/PreKeyManager';
 import { SignalProtocolManager } from './crypto/signal/SignalProtocolManager';
+import { SignalStorage } from './crypto/signal/SignalStorage';
 // FIX 2026-09-10: bundleToPreKeyBundle удалён — не используется в App.tsx
 // (он нужен только в SignalMessageLayer.ts для внутреннего conversion).
 
@@ -188,7 +190,6 @@ const App: React.FC = () => {
     if (!identity || preKeysPublished) return;
     void (async () => {
       try {
-        const { SignalStorage } = await import('./crypto/signal/SignalStorage');
         const storage = new SignalStorage();
         const signalManager = new SignalProtocolManager();
         await signalManager.initialize();
@@ -312,7 +313,6 @@ const App: React.FC = () => {
     try {
       const remoteBundle = await apiService.getPreKeyBundle(uid);
       if (remoteBundle) {
-        const { SignalStorage } = await import('./crypto/signal/SignalStorage');
         const storage = new SignalStorage();
         await storage.warmCacheFromStorage();
         const signalManager = new SignalProtocolManager();
@@ -463,6 +463,11 @@ const App: React.FC = () => {
   const handleSelectChat = (id: string) => {
     logger.info('[PILIGRIM] handleSelectChat:', id);
     setSelectedChatId(id);
+  };
+
+  const handleTabChange = (view: TabView) => {
+    setActiveTab(view);
+    setShowAccountPage(view === 'settings');
   };
   // v1.5.2 Stage 4: handleSendMessage — шифрует сообщение публичным ключом контакта
   // (RSA-OAEP) перед сохранением в localStorage. Если publicKey отсутствует —
@@ -730,39 +735,6 @@ const App: React.FC = () => {
         position: 'relative',
       }}
     >
-      {/* Batch 5: language switcher (left top corner) */}
-      <div
-        data-testid="language-switcher"
-        style={{
-          position: 'absolute',
-          top: '8px',
-          left: '12px',
-          zIndex: 100,
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
-          data-testid="lang-toggle"
-          title={language === 'ru' ? 'Switch to English' : 'Переключить на русский'}
-          aria-label="Change language"
-          style={{
-            padding: '4px 12px',
-            backgroundColor: 'var(--color-surface-2)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          {language === 'ru' ? '🇷🇺 RU' : '🇬🇧 EN'}
-        </button>
-      </div>
       {/* Stage 5: индикатор статуса WebSocket (правый верхний угол) */}
       <div
         data-testid="ws-status"
@@ -964,7 +936,7 @@ const App: React.FC = () => {
               activeView={activeTab}
               onViewChange={view => {
                 logger.info('[PILIGRIM] Tab changed to:', view);
-                setActiveTab(view);
+                handleTabChange(view);
               }}
             />
           }
@@ -982,7 +954,7 @@ const App: React.FC = () => {
           mobileNav={
             <FloatingCircleNav
               activeView={activeTab}
-              onViewChange={setActiveTab}
+              onViewChange={handleTabChange}
               onCompose={() => {
                 window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
                 logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
@@ -993,7 +965,7 @@ const App: React.FC = () => {
           desktopNav={
             <DesktopJoystick
               activeView={activeTab}
-              onViewChange={setActiveTab}
+              onViewChange={handleTabChange}
               onCompose={() => {
                 window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
                 logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
@@ -1020,23 +992,60 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* v3.0 Phase 2C: вкладка Звонки — CallsHistoryView с demo данными */}
-      {activeTab === 'calls' && <CallsHistoryView onViewChange={setActiveTab} />}
+      {activeTab === 'contacts' && (
+        <ContactsView
+          contacts={contacts.filter(contact => contact.uid !== 'system')}
+          onBack={() => handleTabChange('chats')}
+          onSelectContact={uid => {
+            handleTabChange('chats');
+            handleSelectChat(uid);
+          }}
+        />
+      )}
+
+      {activeTab === 'calls' && <CallsHistoryView />}
 
       {/* v3.0 Phase 2C: вкладка Избранное — только verified контакты */}
       {activeTab === 'favorites' && (
         <FavoritesView
           contacts={contacts}
           onSelectContact={uid => {
-            void setActiveTab('chats');
+            handleTabChange('chats');
             void handleSelectChat(uid);
           }}
-          onViewChange={setActiveTab}
         />
       )}
 
       {/* Telegram-like: вкладка Каналы */}
-      {activeTab === 'channels' && <ChannelsView />}
+      {activeTab === 'channels' && <ChannelsView onBack={() => handleTabChange('chats')} />}
+
+      {activeTab !== 'chats' && activeTab !== 'settings' && (
+        <>
+          <div className="app-mobile-nav">
+            <FloatingCircleNav
+              activeView={activeTab}
+              onViewChange={handleTabChange}
+              onCompose={() => {
+                window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+                logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
+              }}
+            />
+          </div>
+          <div className="app-tablet-nav">
+            <TabletTabBar activeView={activeTab} onViewChange={handleTabChange} />
+          </div>
+          <div className="app-desktop-nav">
+            <DesktopJoystick
+              activeView={activeTab}
+              onViewChange={handleTabChange}
+              onCompose={() => {
+                window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+                logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
+              }}
+            />
+          </div>
+        </>
+      )}
 
       {/* Batch 4: модалка верификации контакта */}
       {showVerifyModal &&
@@ -1045,7 +1054,7 @@ const App: React.FC = () => {
           const partner = contacts.find(c => c.id === selectedChatId || c.uid === selectedChatId);
           return (
             <VerifyModal
-              partnerName={partner?.name || 'РљРѕРЅС‚Р°РєС‚'}
+              partnerName={partner?.name || 'Контакт'}
               partnerPublicKey={partner?.publicKey}
               myPublicKey={identity ? getPublicKey(identity) : undefined}
               partnerFingerprint={partner?.keyFingerprint}
@@ -1069,9 +1078,10 @@ const App: React.FC = () => {
         onToggleLang={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
         // v3.0 Phase 2F: активная вкладка для индикатора в Drawer
         activeView={activeTab}
-        onNavigate={view => setActiveTab(view)}
+        onNavigate={handleTabChange}
         onOpenAccount={() => {
           setIsDrawerOpen(false);
+          setActiveTab('settings');
           setShowAccountPage(true);
         }}
         onLogout={() => {
@@ -1086,16 +1096,33 @@ const App: React.FC = () => {
           user={{
             name: identity.username || 'Пилигрим',
             uid: identity.uid,
-            e2eeStatus: identity.isBIP39 ? 'verified' : 'pending',
+            keyFingerprint: identity.keyFingerprint,
+            usesSeedPhrase: identity.isBIP39 === true && !!identity.seedPhrase,
           }}
-          onBack={() => setShowAccountPage(false)}
+          onBack={() => {
+            setShowAccountPage(false);
+            setActiveTab('chats');
+          }}
           onLogout={() => {
             void setShowAccountPage(false);
             void setShowLogoutModal(true);
           }}
           onBackupSeed={() => {
+            if (!identity.seedPhrase) return;
+            setPendingIdentity(identity);
             void setShowAccountPage(false);
             void setShowSeedModal(true);
+          }}
+          onUpdateName={name => {
+            const updatedIdentity = { ...identity, username: name };
+            try {
+              localStorage.setItem('piligrim-identity', JSON.stringify(updatedIdentity));
+              setIdentity(updatedIdentity);
+              return true;
+            } catch (error) {
+              logger.error('[PILIGRIM] Failed to save profile name:', error);
+              return false;
+            }
           }}
         />
       )}
@@ -1125,10 +1152,11 @@ const App: React.FC = () => {
 
       {/* v3.0 Phase 1: theme indicator (правый нижний угол) */}
       <div
+        className="theme-indicator"
         data-testid="theme-indicator"
         style={{
           position: 'fixed',
-          bottom: '12px',
+          bottom: 'var(--theme-indicator-bottom, 12px)',
           right: '12px',
           padding: '4px 10px',
           backgroundColor: 'var(--color-bg-elevated)',
@@ -1139,6 +1167,7 @@ const App: React.FC = () => {
           fontWeight: 600,
           zIndex: 100,
           boxShadow: 'var(--shadow-sm)',
+          pointerEvents: 'none',
         }}
         title="Адаптивная тема по времени суток"
         aria-label="Текущая тема"

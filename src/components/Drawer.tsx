@@ -24,7 +24,7 @@ interface DrawerProps {
   lang: 'ru' | 'en';
   onToggleLang: () => void;
   activeView?: string;
-  onNavigate?: (view: 'chats' | 'contacts' | 'calls' | 'favorites') => void;
+  onNavigate?: (view: 'chats' | 'contacts' | 'calls' | 'favorites' | 'channels') => void;
   onOpenAccount?: () => void; // Открывает параметры безопасности.
 }
 
@@ -49,6 +49,13 @@ const CFG: Record<Breakpoint, DrawerCfg> = {
 
 // Контуры значков Lucide заменяют эмодзи в меню.
 const ICONS: Record<string, React.ReactNode> = {
+  'new-group': (
+    <>
+      <circle cx="9" cy="8" r="4" />
+      <path d="M3 21v-2a6 6 0 0 1 12 0v2" />
+      <path d="M19 8v6M16 11h6" />
+    </>
+  ),
   chats: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   contacts: (
     <>
@@ -166,6 +173,15 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   const menuItems: { id: string; label: string; onClick: () => void }[] = [
     {
+      id: 'new-group',
+      label: lang === 'ru' ? 'Новая группа' : 'New group',
+      onClick: () => {
+        onNavigate?.('contacts');
+        window.dispatchEvent(new Event('piligrim:open-create-group'));
+        onClose();
+      },
+    },
+    {
       id: 'chats',
       label: 'Чаты',
       onClick: () => {
@@ -178,6 +194,14 @@ export const Drawer: React.FC<DrawerProps> = ({
       label: 'Контакты',
       onClick: () => {
         onNavigate?.('contacts');
+        onClose();
+      },
+    },
+    {
+      id: 'channels',
+      label: 'Каналы',
+      onClick: () => {
+        onNavigate?.('channels');
         onClose();
       },
     },

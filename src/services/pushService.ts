@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { deleteToken, getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { apiService } from './apiService';
+import { logger } from './logger';
 
 // Для совместимости с ts-jest используем process.env вместо import.meta.env.
 // Vite подставляет значения process.env.VITE_* при сборке через define.
@@ -33,7 +34,7 @@ export const initPushNotifications = async (): Promise<string | null> => {
     // Проверяем, поддерживается ли FCM в этом браузере.
     const supported = await isSupported();
     if (!supported) {
-      console.log('[Push] FCM not supported in this browser');
+      logger.info('[Push] FCM not supported in this browser');
       return null;
     }
 
@@ -41,7 +42,7 @@ export const initPushNotifications = async (): Promise<string | null> => {
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.log('[Push] Notification permission not granted');
+      logger.info('[Push] Notification permission not granted');
       return null;
     }
 
@@ -52,17 +53,17 @@ export const initPushNotifications = async (): Promise<string | null> => {
     });
 
     if (token) {
-      console.log('[Push] FCM Token obtained:', token.substring(0, 20) + '...');
+      logger.info('[Push] FCM token obtained');
 
       // Регистрируем токен на сервере.
       await apiService.registerPushToken(token, 'web');
       return token;
     } else {
-      console.warn('[Push] No FCM token received');
+      logger.warn('[Push] No FCM token received');
       return null;
     }
   } catch (error) {
-    console.error('[Push] Initialization error:', error);
+    logger.error('[Push] Initialization error:', error);
     return null;
   }
 };
@@ -102,10 +103,10 @@ export const deleteFCMToken = async (): Promise<boolean> => {
 
   try {
     await deleteToken(messaging);
-    console.log('[Push] FCM token deleted');
+    logger.info('[Push] FCM token deleted');
     return true;
   } catch (error) {
-    console.error('[Push] Error deleting token:', error);
+    logger.error('[Push] Error deleting token:', error);
     return false;
   }
 };

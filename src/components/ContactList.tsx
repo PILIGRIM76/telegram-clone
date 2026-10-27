@@ -74,6 +74,12 @@ const ContactList: React.FC<ContactListProps> = ({
     return () => window.removeEventListener('piligrim:open-add-contact', handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setIsGroupModalOpen(true);
+    window.addEventListener('piligrim:open-create-group', handler);
+    return () => window.removeEventListener('piligrim:open-create-group', handler);
+  }, []);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,6 +126,14 @@ const ContactList: React.FC<ContactListProps> = ({
   const systemChat = contacts.find(c => c.uid === 'system');
 
   const displayedContacts = showArchive ? archivedContacts : activeContacts;
+  const formatChatTime = (timestamp?: string): string => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toDateString() === new Date().toDateString()
+      ? date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  };
 
   // Фиксируем время один раз за рендер, чтобы не вызывать Date.now() в JSX.
   // eslint-disable-next-line react-hooks/purity
@@ -221,7 +235,7 @@ const ContactList: React.FC<ContactListProps> = ({
               onClick={onOpenProfile}
               className="pg-icon-btn"
               style={{ minWidth: 36, minHeight: 36 }}
-              title="Settings"
+              title="Настройки"
             >
               <SettingsIcon className="w-5 h-5" />
             </button>
@@ -239,8 +253,8 @@ const ContactList: React.FC<ContactListProps> = ({
             >
               <div
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 54,
+                  height: 54,
                   borderRadius: '50%',
                   background: 'var(--color-danger-soft)',
                   display: 'flex',
@@ -280,8 +294,8 @@ const ContactList: React.FC<ContactListProps> = ({
             >
               <div
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 54,
+                  height: 54,
                   borderRadius: '50%',
                   background: 'var(--color-surface-variant)',
                   display: 'flex',
@@ -317,8 +331,8 @@ const ContactList: React.FC<ContactListProps> = ({
                 >
                   <div
                     style={{
-                      width: 48,
-                      height: 48,
+                      width: 54,
+                      height: 54,
                       borderRadius: '50%',
                       background: 'var(--color-accent-soft)',
                       display: 'flex',
@@ -408,8 +422,9 @@ const ContactList: React.FC<ContactListProps> = ({
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <AnimatedAvatar
                           name={contact.name}
-                          size={48}
+                          size={54}
                           accentColor={theme.color}
+                          isOnline={contact.isOnline}
                           e2eeStatus={
                             contact.e2eeStatus || (contact.verified ? 'verified' : 'unverified')
                           }
@@ -449,6 +464,12 @@ const ContactList: React.FC<ContactListProps> = ({
                           >
                             {contact.name}
                           </p>
+                          <span
+                            className="ml-2 flex-shrink-0 text-xs"
+                            style={{ color: 'var(--color-text-tertiary)' }}
+                          >
+                            {formatChatTime(lastMessage?.timestamp)}
+                          </span>
                           {isMuted && (
                             <span
                               style={{

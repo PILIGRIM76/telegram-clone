@@ -22,6 +22,12 @@ const ITEMS: JoystickItem[] = [
     icon: '\u{1F464}',
     label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B',
   },
+  { view: 'channels', icon: '\u{1F4E2}', label: '\u041A\u0430\u043D\u0430\u043B\u044B' },
+  {
+    view: 'settings',
+    icon: '\u2699\uFE0F',
+    label: '\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438',
+  },
   { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438' },
   {
     view: 'favorites',

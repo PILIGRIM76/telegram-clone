@@ -3,12 +3,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListImperativeAPI } from 'react-window';
-import { logger } from '../services/logger';
 import type { Contact, EncryptedAttachment, Identity, IdentityType, Message } from '../types';
 import AnimatedAvatar from './AnimatedAvatar';
-import { ContextMenu } from './ContextMenu';
 import { type EncryptionType } from './EncryptionBadge';
-import { MessageEditModal } from './MessageEditModal';
 import MessageItem from './MessageItem';
 import {
   CallIcon,
@@ -196,6 +193,9 @@ interface MessageListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  onDeleteMessage?: (messageId: string) => void;
+  onEditMessage?: (messageId: string, newText: string) => void;
+  onReplyMessage?: (message: Message) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -206,6 +206,9 @@ const MessageList: React.FC<MessageListProps> = ({
   onLoadMore,
   hasMore,
   isLoadingMore,
+  onDeleteMessage,
+  onEditMessage,
+  onReplyMessage,
 }) => {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -277,6 +280,9 @@ const MessageList: React.FC<MessageListProps> = ({
               message={msg}
               currentIdentity={currentIdentity!}
               currentUserUid={currentUserUid}
+              onDelete={onDeleteMessage}
+              onEdit={onEditMessage}
+              onReply={onReplyMessage}
               showAvatar={!isOwn && showAvatar}
               partner={partner}
             />
@@ -408,7 +414,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const hasContent = draft.trim() || mediaFile || encryptedAttachments.length > 0;
 
   return (
-    <div className="flex items-center px-4 py-3 border-t border-tg-border dark:border-tg-dark-border bg-tg-sidebar dark:bg-tg-dark-sidebar mt-auto flex-shrink-0">
+    <div className="flex items-end px-4 py-3 border-t border-tg-border dark:border-tg-dark-border bg-tg-sidebar dark:bg-tg-dark-sidebar mt-auto flex-shrink-0">
       <div className="flex items-center space-x-2 mr-3 flex-shrink-0">
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -427,9 +433,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 min-w-0 relative">
+      <div className="relative min-w-0 flex-1 rounded-2xl bg-tg-background dark:bg-tg-dark-background focus-within:ring-2 focus-within:ring-tg-primary">
         {replyTo && (
-          <div className="bg-tg-textSecondary dark:bg-tg-dark-textSecondary text-tg-text dark:text-tg-dark-text rounded-lg px-2 py-1 text-xs mb-2 flex justify-between items-center">
+          <div className="bg-tg-hover dark:bg-tg-dark-hover text-tg-text dark:text-tg-dark-text rounded-lg px-2 py-1 text-xs mb-2 flex justify-between items-center">
             <span className="truncate">Ответ: {replyTo.text}</span>
             <button
               onClick={() => setReplyTo(null)}
@@ -441,21 +447,40 @@ const MessageInput: React.FC<MessageInputProps> = ({
           </div>
         )}
 
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            encryptedAttachments.length > 0
-              ? `${encryptedAttachments.length} зашифрованных файла(ов) прикреплено`
-              : mediaFile
-                ? 'Добавить подпись…'
-                : 'Написать сообщение…'
-          }
-          className="flex-1 w-full bg-transparent outline-none text-tg-text dark:text-tg-dark-text placeholder:text-tg-textSecondary dark:placeholder:text-tg-dark-textSecondary resize-none py-1 px-2 max-h-[200px] overflow-y-auto"
-          rows={1}
-        />
+        <div className="flex items-end">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              encryptedAttachments.length > 0
+                ? `${encryptedAttachments.length} зашифрованных файла(ов) прикреплено`
+                : mediaFile
+                  ? 'Добавить подпись…'
+                  : 'Написать сообщение…'
+            }
+            className="min-w-0 flex-1 bg-transparent outline-none text-tg-text dark:text-tg-dark-text placeholder:text-tg-textSecondary dark:placeholder:text-tg-dark-textSecondary resize-none py-2 px-2 max-h-[200px] overflow-y-auto"
+            rows={1}
+          />
+          <button
+            onClick={send}
+            disabled={!hasContent}
+            className={`m-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-opacity duration-200 ${
+              hasContent
+                ? 'bg-tg-primary dark:bg-tg-dark-primary text-white hover:opacity-80'
+                : 'bg-tg-textSecondary dark:bg-tg-dark-textSecondary text-white opacity-50 cursor-not-allowed'
+            }`}
+            aria-label="Отправить"
+            title="Отправить"
+          >
+            {hasContent ? (
+              <PaperAirplaneIcon className="w-5 h-5" />
+            ) : (
+              <MicrophoneIcon className="w-5 h-5" />
+            )}
+          </button>
+        </div>
 
         {fileError && <p className="text-[10px] text-red-400 mt-1">{fileError}</p>}
 
@@ -503,25 +528,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
         />
       </div>
 
-      <button
-        onClick={send}
-        disabled={!hasContent}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-opacity duration-200 flex-shrink-0 ml-2
-          ${
-            hasContent
-              ? 'bg-tg-primary dark:bg-tg-dark-primary text-white hover:opacity-80'
-              : 'bg-tg-textSecondary dark:bg-tg-dark-textSecondary text-tg-textSecondary dark:text-tg-dark-textSecondary opacity-50 cursor-not-allowed'
-          }`}
-        aria-label="Send"
-        title="Отправить"
-      >
-        {hasContent ? (
-          <PaperAirplaneIcon className="w-5 h-5" />
-        ) : (
-          <MicrophoneIcon className="w-5 h-5" />
-        )}
-      </button>
-
       <div className="text-[10px] text-tg-textSecondary dark:text-tg-dark-textSecondary mt-1 text-center hidden md:block ml-4">
         Enter — отправить, Shift+Enter — новая строка
       </div>
@@ -557,9 +563,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const [draft, setDraft] = useState<string>('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editModalMessage, setEditModalMessage] = useState<Message | null>(null);
-  const [ctx, setCtx] = useState<{ x: number; y: number; messageId: string } | null>(null);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [encryptedAttachments, setEncryptedAttachments] = useState<
@@ -590,24 +593,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     [onSendMessage]
   );
 
-  const handleSaveEdit = useCallback(
-    (newText: string) => {
-      if (editingId && onEditMessage) {
-        onEditMessage(editingId, newText);
-      }
-      setEditingId(null);
-      setEditModalMessage(null);
-    },
-    [editingId, onEditMessage]
-  );
-
-  const handleCloseEditModal = useCallback(() => {
-    setEditModalMessage(null);
-    setEditingId(null);
-  }, []);
-
-  const isOwn = (msg: Message) => msg.senderId === currentUserUid;
-
   return (
     <div className="flex flex-col h-full bg-tg-background dark:bg-tg-dark-background">
       <ChatHeader
@@ -628,6 +613,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         onLoadMore={onLoadMore}
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
+        onDeleteMessage={onDeleteMessage}
+        onEditMessage={onEditMessage}
+        onReplyMessage={setReplyTo}
       />
 
       <MessageInput
@@ -639,80 +627,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         setReplyTo={setReplyTo}
         onInputChange={() => {}}
       />
-
-      {ctx && (
-        <ContextMenu
-          isOpen={!!ctx}
-          x={ctx.x}
-          y={ctx.y}
-          items={[
-            {
-              id: 'reply',
-              icon: '↩️',
-              label: 'Ответить',
-              onClick: () => {
-                const msg = messages.find(m => m.id === ctx.messageId);
-                if (msg) {
-                  setReplyTo(msg);
-                  setEditingId(null);
-                }
-                setCtx(null);
-              },
-            },
-            {
-              id: 'copy',
-              icon: '📋',
-              label: 'Копировать',
-              onClick: () => {
-                const msg = messages.find(m => m.id === ctx.messageId);
-                if (msg?.text && typeof navigator !== 'undefined' && navigator.clipboard) {
-                  navigator.clipboard
-                    .writeText(msg.text)
-                    .catch((err: unknown) =>
-                      logger.warn('[PILIGRIM] Clipboard write failed:', err)
-                    );
-                }
-              },
-            },
-            {
-              id: 'edit',
-              icon: '✏️',
-              label: 'Редактировать',
-              onClick: () => {
-                const msg = messages.find(m => m.id === ctx.messageId);
-                if (msg && onEditMessage) {
-                  setEditingId(msg.id);
-                  setDraft(msg.text);
-                  setReplyTo(null);
-                  setCtx(null);
-                }
-              },
-            },
-            {
-              id: 'delete',
-              icon: '🗑️',
-              label: 'Удалить',
-              dangerous: true,
-              onClick: () => {
-                logger.info('[PILIGRIM] Delete message:', ctx.messageId);
-                if (onDeleteMessage) {
-                  onDeleteMessage(ctx.messageId);
-                }
-                setCtx(null);
-              },
-            },
-          ]}
-          onClose={() => setCtx(null)}
-        />
-      )}
-
-      {editModalMessage && (
-        <MessageEditModal
-          message={editModalMessage}
-          onSave={handleSaveEdit}
-          onCancel={handleCloseEditModal}
-        />
-      )}
     </div>
   );
 };

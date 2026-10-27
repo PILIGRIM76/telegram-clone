@@ -1,7 +1,7 @@
 // Этап 2B-3: нижняя панель навигации для планшетной ширины экрана.
 // Точное соответствие спецификации пользователя:
 //   - Высота: 56px
-//   - 4 таба: Чаты / Контакты / Звонки / Избранное
+//   - Навигация: Чаты / Контакты / Каналы / Избранное / Настройки / Звонки
 // Встроенные стили и CSS-переменные для совместимости с WebView.
 
 import React from 'react';
@@ -113,6 +113,7 @@ const TABS: TabConfig[] = [
   { id: 'contacts', icon: contactsIcon, label: 'Контакты' },
   { id: 'chats', icon: chatsIcon, label: 'Чаты' },
   { id: 'channels', icon: channelsIcon, label: 'Каналы' },
+  { id: 'favorites', icon: '\u2B50', label: 'Избранное' },
   { id: 'settings', icon: settingsIcon, label: 'Настройки' },
   { id: 'calls', icon: callsIcon, label: 'Звонки' },
 ];
@@ -139,7 +140,7 @@ export const TabletTabBar: React.FC<TabletTabBarProps> = ({ activeView, onViewCh
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
-        padding: '0 16px',
+        padding: '0 4px',
         flexShrink: 0,
         position: 'fixed',
         bottom: 0,
@@ -164,7 +165,7 @@ export const TabletTabBar: React.FC<TabletTabBarProps> = ({ activeView, onViewCh
             flexDirection: 'column',
             alignItems: 'center',
             gap: 2,
-            padding: '4px 12px',
+            padding: '4px 8px',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',

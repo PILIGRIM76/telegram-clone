@@ -8,40 +8,65 @@ import { ChannelView } from './ChannelView';
 function getMyUid(): string {
   try {
     const raw = localStorage.getItem('piligrim-identity');
-    if (raw) return JSON.parse(raw).uid || 'local-user';
-  } catch {}
+    if (raw) {
+      const identity = JSON.parse(raw) as { uid?: unknown };
+      return typeof identity.uid === 'string' ? identity.uid : 'local-user';
+    }
+  } catch (error) {
+    logger.warn('[ChannelsView] failed to read local identity', error);
+  }
   return 'local-user';
 }
 
-export const ChannelsView: React.FC = () => {
+interface ChannelsViewProps {
+  onBack: () => void;
+}
+
+export const ChannelsView: React.FC<ChannelsViewProps> = ({ onBack }) => {
   const [channels, setChannels] = useState<PublicChannel[]>([]);
   const [open, setOpen] = useState<PublicChannel | null>(null);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const myUid = getMyUid();
 
-  const load = () =>
-    channelService
+  const load = async () => {
+    try {
+      setChannels(await channelService.listChannels());
+      setError(null);
+    } catch (loadError) {
+      logger.warn('[ChannelsView] failed to load channels', loadError);
+      setError('Не удалось загрузить каналы. Проверьте подключение и повторите попытку.');
+    }
+  };
+  useEffect(() => {
+    void channelService
       .listChannels()
       .then(setChannels)
-      .catch(() => setChannels([]));
-  useEffect(() => {
-    load();
+      .catch(loadError => {
+        logger.warn('[ChannelsView] failed to load channels', loadError);
+        setError('Не удалось загрузить каналы. Проверьте подключение и повторите попытку.');
+      });
   }, []);
 
   const create = async () => {
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setError('Введите название канала.');
+      return;
+    }
     setBusy(true);
+    setError(null);
     try {
       await channelService.createChannel(title.trim(), myUid, desc.trim());
       setTitle('');
       setDesc('');
       setCreating(false);
-      load();
-    } catch (e) {
-      logger.warn('[ChannelsView] create failed', e);
+      await load();
+    } catch (createError) {
+      logger.warn('[ChannelsView] create failed', createError);
+      setError('Не удалось создать канал. Проверьте подключение и повторите попытку.');
     } finally {
       setBusy(false);
     }
@@ -54,7 +79,7 @@ export const ChannelsView: React.FC = () => {
         myUid={myUid}
         onBack={() => {
           setOpen(null);
-          load();
+          void load();
         }}
       />
     );
@@ -62,29 +87,60 @@ export const ChannelsView: React.FC = () => {
   return (
     <div style={wrap}>
       <div style={appbar}>
-        <strong style={{ fontSize: 16 }}>📺 Каналы</strong>
+        <button onClick={onBack} aria-label="Назад к чатам" style={backBtn}>
+          ‹
+        </button>
+        <strong style={{ flex: 1, fontSize: 16 }}>📺 Каналы</strong>
         <button onClick={() => setCreating(v => !v)} style={createBtn}>
           + Создать
         </button>
       </div>
 
       {creating && (
-        <div style={createBox}>
+        <form
+          style={createBox}
+          onSubmit={event => {
+            event.preventDefault();
+            void create();
+          }}
+        >
           <input
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={event => {
+              setTitle(event.target.value);
+              if (error) setError(null);
+            }}
             placeholder="Название канала"
+            aria-label="Название канала"
+            aria-invalid={error === 'Введите название канала.'}
             style={input}
           />
           <input
             value={desc}
-            onChange={e => setDesc(e.target.value)}
+            onChange={event => setDesc(event.target.value)}
             placeholder="Описание (необязательно)"
+            aria-label="Описание (необязательно)"
             style={input}
           />
-          <button onClick={create} disabled={busy || !title.trim()} style={primaryBtn}>
-            Создать канал
-          </button>
+          <div style={formActions}>
+            <button type="button" onClick={() => setCreating(false)} style={cancelBtn}>
+              Отмена
+            </button>
+            <button type="submit" disabled={busy} style={primaryBtn}>
+              {busy ? 'Создание…' : 'Создать канал'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && (
+        <div role="alert" style={errorMessage}>
+          {error}
+          {!creating && error.startsWith('Не удалось загрузить') && (
+            <button onClick={() => void load()} style={retryBtn}>
+              Повторить
+            </button>
+          )}
         </div>
       )}
 
@@ -141,8 +197,18 @@ const appbar: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+  gap: 8,
   padding: '12px 14px',
   borderBottom: '1px solid rgba(0,0,0,0.05)',
+};
+const backBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  color: 'var(--color-accent)',
+  cursor: 'pointer',
+  fontSize: 26,
+  lineHeight: 1,
+  padding: '0 4px',
 };
 const createBtn: React.CSSProperties = {
   padding: '6px 12px',
@@ -160,6 +226,11 @@ const createBox: React.CSSProperties = {
   flexDirection: 'column',
   gap: 8,
 };
+const formActions: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 8,
+};
 const input: React.CSSProperties = {
   padding: '10px 12px',
   borderRadius: 10,
@@ -175,6 +246,20 @@ const primaryBtn: React.CSSProperties = {
   color: '#fff',
   fontSize: 14,
   cursor: 'pointer',
+};
+const cancelBtn: React.CSSProperties = {
+  ...primaryBtn,
+  background: 'transparent',
+  color: 'var(--color-text-primary)',
+};
+const retryBtn: React.CSSProperties = {
+  ...primaryBtn,
+  marginLeft: 8,
+};
+const errorMessage: React.CSSProperties = {
+  color: 'var(--color-danger)',
+  fontSize: 13,
+  padding: '8px 14px',
 };
 const list: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12, minHeight: 0 };
 const empty: React.CSSProperties = {

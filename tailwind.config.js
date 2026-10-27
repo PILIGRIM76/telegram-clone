@@ -10,31 +10,41 @@ module.exports = {
       colors: {
         // ===== СВЕТЛАЯ ТЕМА (Telegram Desktop) =====
         tg: {
-          primary: '#3390EC',      // акцент / исходящие пузыри
+          primary: '#3390EC',      // акцент Telegram
           primaryHover: '#2579D1',
           background: '#FFFFFF',   // фон приложения
-          sidebar: '#FFFFFF',      // фон сайдбара
+          sidebar: '#F4F4F5',      // фон сайдбара
           sidebarBorder: '#DADCE0',
           incoming: '#FFFFFF',     // фон входящего сообщения
-          outgoing: '#EEFFDE',     // фон исходящего сообщения
+          outgoing: '#EFFDDE',     // фон исходящего сообщения
           text: '#000000',         // основной текст
           textSecondary: '#707579',// время, статус
           border: '#DADCE0',       // разделители
           hover: '#F0F2F5',        // hover элементов
+          menuBg: '#FFFFFF',
+          menuHover: '#F0F2F5',
+          menuText: '#000000',
+          danger: '#E5484D',
+          success: '#2E9E6B',
         },
         // ===== ТЁМНАЯ ТЕМА (Telegram Desktop) =====
         'tg-dark': {
-          primary: '#8774E1',      // акцент (тёмная)
-          primaryHover: '#6F5DD3',
-          background: '#17212B',   // фон приложения
+          primary: '#3390EC',      // акцент Telegram
+          primaryHover: '#2579D1',
+          background: '#0E1621',   // фон приложения
           sidebar: '#17212B',      // фон сайдбара
           sidebarBorder: '#0E1621',
           incoming: '#182533',     // фон входящего сообщения
           outgoing: '#2B5278',     // фон исходящего сообщения
-          text: '#F5F5F5',         // основной текст
-          textSecondary: '#6C7883',// время, статус
+          text: '#FFFFFF',         // основной текст
+          textSecondary: '#AAAAAA',// время, статус
           border: '#0E1621',       // разделители
           hover: '#232E3C',        // hover элементов
+          menuBg: '#2B5278',
+          menuHover: '#3A6EA5',
+          menuText: '#FFFFFF',
+          danger: '#FF6B6B',
+          success: '#4CC38A',
         },
       },
       borderRadius: {

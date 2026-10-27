@@ -5,7 +5,6 @@ import { logger } from '../services/logger'; // Этап 2C: отображаю�
 import React from 'react';
 import { AnimatedAvatar } from './AnimatedAvatar';
 import { LeftAppBar } from './LeftAppBar';
-import { TabletTabBar, type TabView } from './TabletTabBar';
 
 interface Contact {
   uid: string;
@@ -16,7 +15,6 @@ interface Contact {
 interface FavoritesViewProps {
   contacts: Contact[];
   onSelectContact: (uid: string) => void;
-  onViewChange: (view: TabView) => void;
 }
 
 const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -26,11 +24,7 @@ const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
   e.currentTarget.style.background = 'transparent';
 };
 
-export const FavoritesView: React.FC<FavoritesViewProps> = ({
-  contacts,
-  onSelectContact,
-  onViewChange,
-}) => {
+export const FavoritesView: React.FC<FavoritesViewProps> = ({ contacts, onSelectContact }) => {
   const favorites = contacts.filter(c => c.verified);
 
   return (
@@ -44,7 +38,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
       }}
     >
       <LeftAppBar
-        title="РР·Р±СЂР°РЅРЅРѕРµ"
+        title="Избранное"
         onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))}
         onSearchClick={() => logger.info('[PILIGRIM] Search (Phase 2E)')}
       />
@@ -64,11 +58,10 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
             }}
           >
             <div style={{ fontSize: 48 }}>{'\u2B50'}</div>
-            <div style={{ fontSize: 16, fontWeight: 500 }}>РџРѕРєР° РЅРµС‚ РёР·Р±СЂР°РЅРЅС‹С…</div>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>Пока нет избранных</div>
             <div style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 320 }}>
-              Р’РµСЂРёС„РёС†РёСЂСѓР№С‚Рµ РєРѕРЅС‚Р°РєС‚ (CheckCircleIcon РІ С‡Р°С‚Рµ), С‡С‚РѕР±С‹
-              РґРѕР±Р°РІРёС‚СЊ РµРіРѕ РІ РёР·Р±СЂР°РЅРЅРѕРµ. Р­С‚Рѕ Р·Р°С‰РёС‰Р°РµС‚ РѕС‚
-              MITM-Р°С‚Р°Рє.
+              Верифицируйте контакт (значок CheckCircle в чате), чтобы добавить его в избранное. Это
+              защищает от MITM-атак.
             </div>
           </div>
         ) : (
@@ -111,7 +104,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
                     marginTop: 2,
                   }}
                 >
-                  Р’РµСЂРёС„РёС†РёСЂРѕРІР°РЅ
+                  Верифицирован
                 </div>
               </div>
               <div style={{ fontSize: 18, color: 'var(--color-text-secondary)' }}>{'\u2B50'}</div>
@@ -119,7 +112,6 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
           ))
         )}
       </div>
-      <TabletTabBar activeView="favorites" onViewChange={onViewChange} />
     </div>
   );
 };

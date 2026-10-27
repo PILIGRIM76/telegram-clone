@@ -1,13 +1,14 @@
 // Этап 2F: контекстное меню открывается правой кнопкой мыши или долгим нажатием.
 
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
 export interface MenuItem {
   id: string;
   icon: string;
   label: string;
   dangerous?: boolean;
+  dividerBefore?: boolean;
   onClick: () => void;
 }
 
@@ -21,28 +22,21 @@ interface ContextMenuProps {
 
 const MENU_W = 240;
 const MENU_ITEM_H = 40;
-const MENU_PADDING = 16;
+const MENU_PADDING = 8;
+const MENU_DIVIDER_H = 9;
 const MENU_INSET = 16;
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, x, y, items, onClose }) => {
-  const [pos, setPos] = useState({ x, y });
-
-  // Адаптивное позиционирование: не выходить за пределы экрана
-  useEffect(() => {
-    if (!isOpen) return;
-    const menuH = items.length * MENU_ITEM_H + MENU_PADDING;
-    let nx = x;
-    let ny = y;
-    if (typeof window !== 'undefined') {
-      if (nx + MENU_W > window.innerWidth - MENU_INSET)
-        nx = window.innerWidth - MENU_W - MENU_INSET;
-      if (ny + menuH > window.innerHeight - MENU_INSET)
-        ny = window.innerHeight - menuH - MENU_INSET;
-      if (nx < MENU_INSET) nx = MENU_INSET;
-      if (ny < MENU_INSET) ny = MENU_INSET;
-    }
-    setPos({ x: nx, y: ny });
-  }, [isOpen, x, y, items.length]);
+  const menuH =
+    items.length * MENU_ITEM_H +
+    items.filter(item => item.dividerBefore).length * MENU_DIVIDER_H +
+    MENU_PADDING;
+  let menuX = x;
+  let menuY = y;
+  if (typeof window !== 'undefined') {
+    menuX = Math.max(MENU_INSET, Math.min(menuX, window.innerWidth - MENU_W - MENU_INSET));
+    menuY = Math.max(MENU_INSET, Math.min(menuY, window.innerHeight - menuH - MENU_INSET));
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -60,13 +54,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, x, y, items, o
 
   if (!isOpen) return null;
 
-  const handleEnter = (e: React.MouseEvent<HTMLButtonElement>, dangerous?: boolean) => {
-    e.currentTarget.style.background = dangerous ? 'rgba(229,72,77,0.10)' : 'rgba(232,106,88,0.08)';
-  };
-  const handleLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.background = 'transparent';
-  };
-
   return (
     <AnimatePresence>
       <motion.div
@@ -75,24 +62,28 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, x, y, items, o
         exit={{ opacity: 0, scale: 0.92 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
         role="menu"
-        aria-label="Context menu"
+        aria-label="Контекстное меню"
         data-testid="context-menu"
         onClick={e => e.stopPropagation()}
         style={{
           position: 'fixed',
-          left: pos.x,
-          top: pos.y,
+          left: menuX,
+          top: menuY,
           width: MENU_W,
-          background: 'var(--color-surface)',
-          borderRadius: 16,
-          padding: 8,
-          boxShadow: '0 12px 48px rgba(232,106,88,0.15)',
-          border: '0.5px solid rgba(255,255,255,0.3)',
+          maxHeight: `calc(100vh - ${MENU_INSET * 2}px)`,
+          overflowY: 'auto',
           zIndex: 110,
         }}
+        className="rounded-lg border-none bg-tg-menuBg p-1 shadow-xl dark:bg-tg-dark-menuBg"
       >
-        {items.map((item, i) => (
+        {items.map(item => (
           <React.Fragment key={item.id}>
+            {item.dividerBefore && (
+              <div
+                role="separator"
+                className="mx-2 my-1 border-b border-tg-border dark:border-tg-dark-border"
+              />
+            )}
             <button
               role="menuitem"
               data-testid={'context-item-' + item.id}
@@ -100,37 +91,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, x, y, items, o
                 item.onClick();
                 onClose();
               }}
-              onMouseEnter={e => handleEnter(e, item.dangerous)}
-              onMouseLeave={handleLeave}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                width: '100%',
-                height: MENU_ITEM_H,
-                padding: '0 16px',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 15,
-                color: item.dangerous ? '#E5484D' : 'var(--color-text-primary)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'background 100ms ease-out',
-              }}
+              className={`flex min-h-10 w-full items-center gap-3 rounded-md px-4 py-2 text-left text-sm transition-colors duration-150 ${
+                item.dangerous
+                  ? 'text-tg-danger'
+                  : 'text-tg-menuText hover:bg-tg-menuHover dark:text-tg-dark-menuText dark:hover:bg-tg-dark-menuHover'
+              }`}
             >
-              <span style={{ fontSize: 16, width: 18, textAlign: 'center' }}>{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <span className="w-[18px] flex-shrink-0 text-center text-base">{item.icon}</span>
+              <span className="flex-1">{item.label}</span>
             </button>
-            {i < items.length - 1 && (
-              <div
-                style={{
-                  height: 1,
-                  background: 'rgba(0,0,0,0.06)',
-                  margin: '2px 8px',
-                }}
-              />
-            )}
           </React.Fragment>
         ))}
       </motion.div>

@@ -16,6 +16,7 @@ interface MessageItemProps {
   currentUserUid?: string;
   isAdmin?: boolean;
   onEdit?: (messageId: string, newText: string) => void;
+  onReply?: (message: Message) => void;
   showAvatar?: boolean;
   partner?: (Contact | { name: string }) & {
     isOnline?: boolean;
@@ -86,7 +87,7 @@ const MessageStatusIcons: React.FC<{
         </span>
       )}
       <span className="text-[10px] opacity-70 whitespace-nowrap">{time}</span>
-      {sentByMe && message.status && (
+      {sentByMe && message.status && message.status !== 'received' && (
         <span
           className={`text-[10px] ${message.status === 'read' ? 'text-blue-500 dark:text-blue-400' : 'text-tg-textSecondary dark:text-tg-dark-textSecondary'}`}
           title={
@@ -112,6 +113,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   currentUserUid,
   isAdmin = false,
   onEdit,
+  onReply,
   showAvatar = false,
   partner,
 }) => {
@@ -253,6 +255,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   };
 
   const handleReply = () => {
+    onReply?.(message);
     handleCloseContextMenu();
   };
 
@@ -279,6 +282,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
       id: 'delete_me',
       icon: '🗑️',
       label: 'Удалить для себя',
+      dividerBefore: true,
       dangerous: true,
       onClick: handleDeleteForMe,
     });
@@ -329,8 +333,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
         <div
           className={`max-w-[65%] px-3 py-2 rounded-2xl shadow-sm ${
             isOwn
-              ? 'bg-tg-outgoing dark:bg-tg-dark-outgoing text-tg-text dark:text-tg-dark-text rounded-tr-sm'
-              : 'bg-tg-incoming dark:bg-tg-dark-incoming text-tg-text dark:text-tg-dark-text rounded-tl-sm'
+              ? 'bg-tg-outgoing dark:bg-tg-dark-outgoing text-tg-text dark:text-tg-dark-text rounded-tr-none'
+              : 'bg-tg-incoming dark:bg-tg-dark-incoming text-tg-text dark:text-tg-dark-text rounded-tl-none'
           }`}
         >
           {isEditing && (

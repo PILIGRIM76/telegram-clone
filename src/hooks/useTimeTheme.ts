@@ -44,6 +44,29 @@ export function useTimeTheme(): TimeTheme {
     logger.info(`[PILIGRIM v3.0] theme switched to: ${theme}`);
   }, [theme]);
 
+  useEffect(() => {
+    const applyPreference = (mode: string | null) => {
+      const isDark = mode === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      document.body.classList.toggle('theme-dark', isDark);
+    };
+    const handlePreferenceChange = (event: Event) => {
+      applyPreference((event as CustomEvent<string>).detail);
+    };
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'cipherlink-theme') applyPreference(event.newValue);
+    };
+
+    applyPreference(localStorage.getItem('cipherlink-theme'));
+    window.addEventListener('cipherlink:theme-change', handlePreferenceChange);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('cipherlink:theme-change', handlePreferenceChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   return theme;
 }
 

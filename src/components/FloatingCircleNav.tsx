@@ -21,23 +21,35 @@ interface Satellite {
 }
 
 const SATELLITES: Satellite[] = [
-  { view: 'chats', icon: '\u{1F4AC}', label: '\u0427\u0430\u0442\u044B', angle: -60 },
+  { view: 'chats', icon: '\u{1F4AC}', label: '\u0427\u0430\u0442\u044B', angle: -72 },
   {
     view: 'contacts',
     icon: '\u{1F464}',
     label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B',
-    angle: -20,
+    angle: -45,
   },
-  { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438', angle: 20 },
+  {
+    view: 'channels',
+    icon: '\u{1F4E2}',
+    label: '\u041A\u0430\u043D\u0430\u043B\u044B',
+    angle: -15,
+  },
+  {
+    view: 'settings',
+    icon: '\u2699\uFE0F',
+    label: '\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438',
+    angle: 15,
+  },
+  { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438', angle: 45 },
   {
     view: 'favorites',
     icon: '\u2B50',
     label: '\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435',
-    angle: 60,
+    angle: 75,
   },
 ];
 
-const ARC_RADIUS = 80;
+const ARC_RADIUS = 90;
 
 export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
   activeView,

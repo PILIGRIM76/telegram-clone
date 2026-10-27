@@ -4,7 +4,6 @@ import { logger } from '../services/logger'; // Этап 2C: история зв
 import React from 'react';
 import { AnimatedAvatar } from './AnimatedAvatar';
 import { LeftAppBar } from './LeftAppBar';
-import { TabletTabBar, type TabView } from './TabletTabBar';
 
 interface CallRecord {
   id: string;
@@ -15,47 +14,43 @@ interface CallRecord {
   duration?: number;
 }
 
-interface CallsHistoryViewProps {
-  onViewChange: (view: TabView) => void;
-}
-
 const DEMO_CALLS: CallRecord[] = [
   {
     id: '1',
-    contactName: 'РђРЅРґСЂРµР№ РџРµС‚СЂРѕРІ',
+    contactName: 'Андрей Петров',
     type: 'outgoing',
     isVideo: true,
-    timestamp: 'РЎРµРіРѕРґРЅСЏ, 14:30',
+    timestamp: 'Сегодня, 14:30',
     duration: 320,
   },
   {
     id: '2',
-    contactName: 'РњР°СЂРёСЏ РљРѕР·Р»РѕРІР°',
+    contactName: 'Мария Козлова',
     type: 'missed',
     isVideo: false,
-    timestamp: 'РЎРµРіРѕРґРЅСЏ, 11:15',
+    timestamp: 'Сегодня, 11:15',
   },
   {
     id: '3',
-    contactName: 'РРІР°РЅ Р“СЂРѕРјРѕРІ',
+    contactName: 'Иван Громов',
     type: 'incoming',
     isVideo: true,
-    timestamp: 'Р’С‡РµСЂР°, 19:42',
+    timestamp: 'Вчера, 19:42',
     duration: 1245,
   },
   {
     id: '4',
-    contactName: 'РћР»СЊРіР° РЎРµСЂРѕРІР°',
+    contactName: 'Ольга Серова',
     type: 'missed',
     isVideo: true,
-    timestamp: 'Р’С‡РµСЂР°, 16:20',
+    timestamp: 'Вчера, 16:20',
   },
   {
     id: '5',
-    contactName: 'Р”РјРёС‚СЂРёР№ РќРѕСЃРѕРІ',
+    contactName: 'Дмитрий Носов',
     type: 'outgoing',
     isVideo: false,
-    timestamp: '2 РґРЅСЏ РЅР°Р·Р°Рґ',
+    timestamp: '2 дня назад',
     duration: 67,
   },
 ];
@@ -73,7 +68,7 @@ const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
   e.currentTarget.style.background = 'transparent';
 };
 
-export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange }) => {
+export const CallsHistoryView: React.FC = () => {
   return (
     <div
       data-testid="calls-history-view"
@@ -85,7 +80,7 @@ export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange
       }}
     >
       <LeftAppBar
-        title="Р—РІРѕРЅРєРё"
+        title="Звонки"
         onMenuClick={() => window.dispatchEvent(new CustomEvent('piligrim:open-drawer'))}
         onSearchClick={() => logger.info('[PILIGRIM] Search (Phase 2E)')}
       />
@@ -105,10 +100,8 @@ export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange
             }}
           >
             <div style={{ fontSize: 48 }}>{'\u{1F4DE}'}</div>
-            <div style={{ fontSize: 16, fontWeight: 500 }}>РќРµС‚ Р·РІРѕРЅРєРѕРІ</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-              РќР°С‡РЅРёС‚Рµ РїРµСЂРІС‹Р№ Р·РІРѕРЅРѕРє РёР· С‡Р°С‚Р°
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>Нет звонков</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>Начните первый звонок из чата</div>
           </div>
         ) : (
           DEMO_CALLS.map(call => (
@@ -168,7 +161,7 @@ export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange
                         ? '\u2199'
                         : '\u2715'}
                   </span>
-                  <span>{call.isVideo ? 'Р’РёРґРµРѕ' : 'РђСѓРґРёРѕ'}</span>
+                  <span>{call.isVideo ? 'Видео' : 'Аудио'}</span>
                   {call.duration ? <span>{'\u00B7 ' + formatDuration(call.duration)}</span> : null}
                 </div>
               </div>
@@ -185,7 +178,6 @@ export const CallsHistoryView: React.FC<CallsHistoryViewProps> = ({ onViewChange
           ))
         )}
       </div>
-      <TabletTabBar activeView="calls" onViewChange={onViewChange} />
     </div>
   );
 };
