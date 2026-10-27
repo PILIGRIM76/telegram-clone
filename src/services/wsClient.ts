@@ -3,6 +3,7 @@
 // Обновляет токен при коде 1008 (Unauthorized) и автоматически переподключается.
 
 import { authClient } from './authClient';
+import { logger } from './logger';
 
 const WS_URL =
   typeof process !== 'undefined' && process.env && process.env.VITE_WS_URL
@@ -24,7 +25,7 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
 
   const token = authClient.getAccessToken();
   if (!token) {
-    console.error('[WS] No access token - redirect to login');
+    logger.error('[WS] No access token - redirect to login');
     window.location.href = '/login';
     return;
   }
@@ -37,7 +38,7 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    console.log('[WS] Connected');
+    logger.info('[WS] Connected');
     reconnectAttempts = 0;
   };
 
@@ -46,12 +47,12 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
       const data = JSON.parse(event.data);
       onMessage(data);
     } catch (e) {
-      console.error('[WS] Parse error:', e);
+      logger.error('[WS] Parse error:', e);
     }
   };
 
   ws.onclose = event => {
-    console.log('[WS] Closed:', event.code);
+    logger.info('[WS] Closed:', event.code);
     if (event.code === 1008) {
       authClient
         .refresh()
@@ -66,13 +67,13 @@ export function connectWebSocket(onMessage: (data: any) => void): void {
     } else if (reconnectAttempts < MAX_RECONNECT) {
       reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-      console.log('[WS] Reconnecting in', delay, 'ms (attempt', reconnectAttempts, ')');
+      logger.info('[WS] Reconnecting in', delay, 'ms (attempt', reconnectAttempts, ')');
       reconnectTimeout = setTimeout(() => connectWebSocket(currentOnMessage), delay);
     }
   };
 
   ws.onerror = err => {
-    console.error('[WS] Error:', err);
+    logger.error('[WS] Error:', err);
   };
 }
 
@@ -91,6 +92,6 @@ export function sendWebSocketMessage(type: string, payload: any): void {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type, payload }));
   } else {
-    console.error('[WS] Not connected');
+    logger.error('[WS] Not connected');
   }
 }

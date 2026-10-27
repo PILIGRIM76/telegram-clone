@@ -6,6 +6,11 @@
     "piligrim",
     "PILIGRIM",
     "CipherLink",
+    "cipherlink",
+    "signal",
+    "sqlite",
+    "typescript",
+    "react",
     "signtool",
     "electron",
     "vite",
@@ -73,7 +78,15 @@
     "ciphertext",
     "appbar",
     "joystick",
-    "toasts"
+    "toasts",
+    "зашифрованных",
+    "сообщений",
+    "логирование",
+    "архив",
+    "мут",
+    "настройки",
+    "уведомления",
+    "приватность"
   ],
   "ignoreRegExpList": ["/['\"`][^'\"`\\n]*['\"`]/g", "/\\/\\/.*$/gm", "/\\/\\*[\\s\\S]*?\\*\\//g", "/>[^<]*</g"],
   "ignorePaths": [
