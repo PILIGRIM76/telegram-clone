@@ -499,6 +499,70 @@ const App: React.FC = () => {
     return () => apiService.offReactionUpdate(handleReactionUpdate);
   }, [identity]);
 
+  // v3.16: Subscribe to message edit/delete events from WebSocket
+  useEffect(() => {
+    if (!identity) return;
+    const handleMessageEdited = (data: {
+      messageId: string;
+      newContent: string;
+      editedAt: number;
+    }) => {
+      logger.info('[PILIGRIM] Message edited:', data);
+      setChats(prev => {
+        const updated = { ...prev };
+        for (const [chatId, chat] of Object.entries(updated)) {
+          const messageIndex = chat.messages?.findIndex(m => m.id === data.messageId);
+          if (messageIndex !== undefined && messageIndex >= 0) {
+            updated[chatId] = {
+              ...chat,
+              messages: chat.messages.map((m, idx) =>
+                idx === messageIndex
+                  ? { ...m, text: data.newContent, editedAt: data.editedAt, isEdited: true }
+                  : m
+              ),
+            };
+            break;
+          }
+        }
+        return updated;
+      });
+    };
+    const handleMessageDeleted = (data: { messageId: string; deleteForAll?: boolean }) => {
+      logger.info('[PILIGRIM] Message deleted:', data);
+      setChats(prev => {
+        const updated = { ...prev };
+        for (const [chatId, chat] of Object.entries(updated)) {
+          const messageIndex = chat.messages?.findIndex(m => m.id === data.messageId);
+          if (messageIndex !== undefined && messageIndex >= 0) {
+            if (data.deleteForAll) {
+              // Hard delete - remove message completely
+              updated[chatId] = {
+                ...chat,
+                messages: chat.messages.filter(m => m.id !== data.messageId),
+              };
+            } else {
+              // Soft delete - mark as deleted
+              updated[chatId] = {
+                ...chat,
+                messages: chat.messages.map((m, idx) =>
+                  idx === messageIndex ? { ...m, isDeleted: true } : m
+                ),
+              };
+            }
+            break;
+          }
+        }
+        return updated;
+      });
+    };
+    apiService.onMessageEdited(handleMessageEdited);
+    apiService.onMessageDeleted(handleMessageDeleted);
+    return () => {
+      apiService.offMessageEdited(handleMessageEdited);
+      apiService.offMessageDeleted(handleMessageDeleted);
+    };
+  }, [identity]);
+
   // v1.5.2 Stage 6: WebRTC hook — для звонков и демонстрации экрана.
   const webrtcHook = useWebRTC(identity?.uid || '');
   // v3.0 Phase 1: time-based theme (morning/day/evening/night)
@@ -661,12 +725,17 @@ const App: React.FC = () => {
   // v3.0 Phase 3: удаление сообщения из чата
   const handleDeleteMessage = (chatId: string, messageId: string) => {
     logger.info('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
+    // Send delete request via WebSocket (delete for all = false by default)
+    apiService.sendMessageDelete(messageId, false);
+    // Optimistic update - local state will be synced via WS event
     setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
       updated[chatId] = {
         ...updated[chatId],
-        messages: updated[chatId].messages.filter(m => m.id !== messageId),
+        messages: updated[chatId].messages.map(m =>
+          m.id === messageId ? { ...m, isDeleted: true } : m
+        ),
       };
       return updated;
     });
@@ -674,13 +743,16 @@ const App: React.FC = () => {
   // v3.0 Phase 3: редактирование сообщения (локальное изменение текста)
   const handleEditMessage = (chatId: string, messageId: string, newText: string) => {
     logger.info('[PILIGRIM] handleEditMessage:', { chatId, messageId });
+    // Send edit request via WebSocket
+    apiService.sendMessageEdit(messageId, newText);
+    // Optimistic update - local state will be synced via WS event
     setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
       updated[chatId] = {
         ...updated[chatId],
         messages: updated[chatId].messages.map(m =>
-          m.id === messageId ? { ...m, text: newText, status: 'sent' } : m
+          m.id === messageId ? { ...m, text: newText, isEdited: true } : m
         ),
       };
       return updated;
@@ -914,22 +986,15 @@ const App: React.FC = () => {
                     chatId={selectedChatId}
                     messages={chats[selectedChatId]?.messages || []}
                     showHeader={false}
-                    onSendMessage={(
-                      text,
-                      attachments,
-                      replyTo,
-                      encryptedAttachments,
-                      voiceMetadata,
-                      messageType
-                    ) => {
+                    onSendMessage={(text, options) => {
                       void handleSendMessage(
                         selectedChatId,
                         text,
-                        attachments,
-                        replyTo,
-                        encryptedAttachments,
-                        voiceMetadata,
-                        messageType
+                        options?.attachments,
+                        options?.replyTo,
+                        options?.encryptedAttachments,
+                        options?.voiceMetadata,
+                        options?.messageType
                       );
                     }}
                     currentIdentity={identity ?? undefined}

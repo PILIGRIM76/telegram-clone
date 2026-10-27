@@ -63,6 +63,16 @@ class ApiService {
     action: 'add' | 'remove';
     reactions: Reaction[];
   }) => void)[] = [];
+  // v3.16: Message edit/delete listeners
+  private messageEditedListeners: ((data: {
+    messageId: string;
+    newContent: string;
+    editedAt: number;
+  }) => void)[] = [];
+  private messageDeletedListeners: ((data: {
+    messageId: string;
+    deleteForAll?: boolean;
+  }) => void)[] = [];
   // Этап 2: TrafficPadder отправляет шумовые пакеты каждые 30–60 секунд.
   private trafficPadder: TrafficPadder = new TrafficPadder();
 
@@ -468,6 +478,18 @@ class ApiService {
         return;
       }
 
+      // v3.16: Handle message edited
+      if (data.type === 'message_edited') {
+        this.messageEditedListeners.forEach(cb => cb(data));
+        return;
+      }
+
+      // v3.16: Handle message deleted
+      if (data.type === 'message_deleted') {
+        this.messageDeletedListeners.forEach(cb => cb(data));
+        return;
+      }
+
       // Phase 3: Dumb Server — обработка ошибки recipient_offline.
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
@@ -806,6 +828,27 @@ class ApiService {
     this.reactionUpdateListeners = this.reactionUpdateListeners.filter(l => l !== callback);
   }
 
+  // v3.16: Message edit/delete updates
+  onMessageEdited(
+    callback: (data: { messageId: string; newContent: string; editedAt: number }) => void
+  ): void {
+    this.messageEditedListeners.push(callback);
+  }
+
+  offMessageEdited(
+    callback: (data: { messageId: string; newContent: string; editedAt: number }) => void
+  ): void {
+    this.messageEditedListeners = this.messageEditedListeners.filter(l => l !== callback);
+  }
+
+  onMessageDeleted(callback: (data: { messageId: string; deleteForAll?: boolean }) => void): void {
+    this.messageDeletedListeners.push(callback);
+  }
+
+  offMessageDeleted(callback: (data: { messageId: string; deleteForAll?: boolean }) => void): void {
+    this.messageDeletedListeners = this.messageDeletedListeners.filter(l => l !== callback);
+  }
+
   // v3.11: Send message read receipt
   sendMessageRead(messageId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -814,6 +857,32 @@ class ApiService {
           type: 'message_read',
           messageId,
           timestamp: Date.now(),
+        })
+      );
+    }
+  }
+
+  // v3.16: Send message edit via WebSocket
+  sendMessageEdit(messageId: string, newContent: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'message_edit',
+          messageId,
+          content: newContent,
+        })
+      );
+    }
+  }
+
+  // v3.16: Send message delete via WebSocket
+  sendMessageDelete(messageId: string, deleteForAll: boolean = false): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'message_delete',
+          messageId,
+          deleteForAll,
         })
       );
     }

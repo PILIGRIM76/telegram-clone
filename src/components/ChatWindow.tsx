@@ -38,11 +38,14 @@ interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (
     text: string,
-    attachments?: { id: string; dataUrl: string; name: string }[],
-    replyTo?: string,
-    encryptedAttachments?: EncryptedAttachment[],
-    voiceMetadata?: VoiceMessageMetadata,
-    messageType?: Message['type']
+    options?: {
+      replyTo?: string;
+      messageType?: Message['type'];
+      editingMessageId?: string;
+      encryptedAttachments?: EncryptedAttachment[];
+      voiceMetadata?: VoiceMessageMetadata;
+      attachments?: { id: string; dataUrl: string; name: string }[];
+    }
   ) => void;
   // Дополнительные данные собеседника, включая статус присутствия и сведения о группе.
   partner?: ChatPartner;
@@ -333,11 +336,13 @@ const MessageList: React.FC<MessageListProps> = ({
 interface MessageInputProps {
   onSendMessage: (
     text: string,
-    attachments?: { id: string; dataUrl: string; name: string }[],
-    replyTo?: string,
-    encryptedAttachments?: EncryptedAttachment[],
-    voiceMetadata?: VoiceMessageMetadata,
-    messageType?: Message['type']
+    options?: {
+      replyTo?: string;
+      messageType?: Message['type'];
+      editingMessageId?: string;
+      encryptedAttachments?: EncryptedAttachment[];
+      voiceMetadata?: VoiceMessageMetadata;
+    }
   ) => void;
   identity: IdentityType | null;
   draft: string;
@@ -345,6 +350,8 @@ interface MessageInputProps {
   replyTo: Message | null;
   setReplyTo: (msg: Message | null) => void;
   onInputChange: (isTyping: boolean) => void;
+  editingMessageId?: string | null;
+  onCancelEdit?: () => void;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -355,6 +362,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   replyTo,
   setReplyTo,
   onInputChange,
+  editingMessageId,
+  onCancelEdit,
 }) => {
   const [mediaFile, setMediaFile] = useState<{ base64: string; type: 'image' | 'video' } | null>(
     null
@@ -402,7 +411,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
               name: enc.name,
             }))
           : undefined;
-      onSendMessage(draft.trim(), attachments, replyTo?.id, encryptedAttachments);
+      onSendMessage(draft.trim(), {
+        replyTo: replyTo?.id,
+        encryptedAttachments,
+        editingMessageId: editingMessageId ?? undefined,
+      });
       setDraft('');
       setEncryptedAttachments([]);
       setMediaFile(null);
@@ -485,7 +498,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
       key: voice.key,
     };
 
-    onSendMessage('', undefined, replyTo?.id, [attachment], voiceMetadata, 'voice');
+    onSendMessage('', {
+      replyTo: replyTo?.id,
+      encryptedAttachments: [attachment],
+      voiceMetadata,
+      messageType: 'voice',
+    });
     setReplyTo(null);
   };
 
@@ -625,6 +643,22 @@ const MessageInput: React.FC<MessageInputProps> = ({
           </div>
         )}
 
+        {/* Editing mode indicator */}
+        {editingMessageId && (
+          <div className="flex items-center gap-2 mt-2 p-2 bg-tg-primary/10 dark:bg-tg-dark-primary/10 border border-tg-primary/30 dark:border-tg-dark-primary/30 rounded-lg">
+            <span className="text-xs font-medium text-tg-primary dark:text-tg-dark-primary">
+              ✏️ Редактирование сообщения...
+            </span>
+            <button
+              onClick={onCancelEdit}
+              className="ml-auto px-3 py-1 text-xs font-medium text-tg-primary dark:text-tg-dark-primary bg-tg-primary/10 dark:bg-tg-dark-primary/10 rounded hover:bg-tg-primary/20 dark:hover:bg-tg-dark-primary/20 transition-colors"
+              aria-label="Отменить редактирование"
+            >
+              Отмена
+            </button>
+          </div>
+        )}
+
         <input
           type="file"
           ref={fileInputRef}
@@ -687,6 +721,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   >([]);
   const [fileError, setFileError] = useState<string>('');
   const [hasContent, setHasContent] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageListRef = useRef<ListImperativeAPI>(null);
@@ -694,15 +729,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleSend = useCallback(
     (
       text: string,
-      attachments?: { id: string; dataUrl: string; name: string }[],
-      replyToId?: string,
-      encryptedAttachments?: EncryptedAttachment[],
-      voiceMetadata?: VoiceMessageMetadata,
-      messageType?: Message['type']
+      options?: {
+        replyToId?: string;
+        encryptedAttachments?: EncryptedAttachment[];
+        voiceMetadata?: VoiceMessageMetadata;
+        messageType?: Message['type'];
+        editingMessageId?: string;
+      }
     ) => {
-      onSendMessage(text, attachments, replyToId, encryptedAttachments, voiceMetadata, messageType);
+      const { replyToId, encryptedAttachments, voiceMetadata, messageType, editingMessageId } =
+        options || {};
+      onSendMessage(text, {
+        replyTo: replyToId,
+        encryptedAttachments,
+        voiceMetadata,
+        messageType,
+        editingMessageId,
+      });
+      // Clear editing mode after sending
+      if (editingMessageId) {
+        setEditingMessageId(null);
+      }
     },
     [onSendMessage]
+  );
+
+  // Handle starting edit mode from MessageList
+  const handleStartEdit = useCallback(
+    (messageId: string, newText?: string) => {
+      const message = messages.find(m => m.id === messageId);
+      if (message) {
+        setEditingMessageId(message.id);
+        setDraft(message.text || '');
+      }
+    },
+    [messages]
   );
 
   return (
@@ -730,7 +791,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
         onDeleteMessage={onDeleteMessage}
-        onEditMessage={onEditMessage}
+        onEditMessage={handleStartEdit}
         onReplyMessage={setReplyTo}
       />
 
@@ -742,6 +803,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         replyTo={replyTo}
         setReplyTo={setReplyTo}
         onInputChange={() => {}}
+        editingMessageId={editingMessageId}
+        onCancelEdit={() => {
+          setEditingMessageId(null);
+          setDraft('');
+        }}
       />
     </div>
   );
