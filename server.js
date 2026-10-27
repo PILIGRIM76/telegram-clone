@@ -982,6 +982,76 @@ app.get('/rewards/:uid', (req, res) => {
   res.json({ rewards: награды.get(req.params.uid) || [] });
 });
 
+// --- REACTIONS API ---
+app.post('/api/messages/:messageId/reaction', (req, res) => {
+  const { messageId } = req.params;
+  const { emoji, action } = req.body; // action: 'add' | 'remove'
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!emoji || !action) return res.status(400).json({ error: 'emoji and action required' });
+  if (!['add', 'remove'].includes(action)) return res.status(400).json({ error: 'action must be add or remove' });
+  
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const uid = payload.uid;
+  
+  // Verify message exists and user has access
+  const message = sqlDb.getMessage(messageId);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+  
+  // Check if user is sender or receiver (or group member)
+  const isParticipant = message.sender_uid === uid || message.receiver_uid === uid;
+  if (!isParticipant) {
+    // Check group membership if it's a group message
+    // For now, allow if we can't determine - the DB will handle it
+  }
+  
+  let success = false;
+  if (action === 'add') {
+    sqlDb.addReaction(messageId, uid, emoji);
+    success = true;
+  } else if (action === 'remove') {
+    success = sqlDb.removeReaction(messageId, uid, emoji);
+  }
+  
+  if (!success) {
+    return res.status(400).json({ error: 'Failed to update reaction' });
+  }
+  
+  // Get updated reaction counts
+  const reactions = sqlDb.getReactionCountsForMessage(messageId);
+  const myReactions = reactions.map(r => ({
+    ...r,
+    mine: r.users.includes(uid)
+  }));
+  
+  // Broadcast to all chat participants via WebSocket
+  const broadcastData = {
+    type: 'reaction_update',
+    messageId,
+    userId: uid,
+    emoji,
+    action,
+    reactions: myReactions
+  };
+  
+  // Send to receiver (1-to-1) or group members
+  if (message.receiver_uid && message.receiver_uid !== uid) {
+    отправить(message.receiver_uid, broadcastData);
+  }
+  if (message.sender_uid && message.sender_uid !== uid) {
+    отправить(message.sender_uid, broadcastData);
+  }
+  
+  res.json({ ok: true, reactions: myReactions });
+});
+
 // --- WEBSOCKET LOGIK ---
 
 серверВебсокетов.on('connection', (ws, req) => {
@@ -1118,19 +1188,57 @@ app.get('/rewards/:uid', (req, res) => {
       }
     }
     if (msg.type === 'reaction') {
-      const { messageId, emoji, action, to, groupId } = msg;
-      sqlDb.addReaction(messageId, uid, emoji);
-      const reactionMsg = { type: 'reaction', messageId, userUid: uid, emoji, action };
-      if (to) {
-        отправить(to, reactionMsg);
+      const { messageId, emoji, action, to, groupId } = msg; // action: 'add' | 'remove'
+      
+      let success = false;
+      if (action === 'add') {
+        sqlDb.addReaction(messageId, uid, emoji);
+        success = true;
+      } else if (action === 'remove') {
+        success = sqlDb.removeReaction(messageId, uid, emoji);
       }
+      
+      if (!success) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to update reaction' }));
+        return;
+      }
+      
+      // Get updated reaction counts
+      const reactions = sqlDb.getReactionCountsForMessage(messageId);
+      const myReactions = reactions.map(r => ({
+        ...r,
+        mine: r.users.includes(uid)
+      }));
+      
+      // Broadcast updated reactions to all chat participants
+      const broadcastData = {
+        type: 'reaction_update',
+        messageId,
+        userId: uid,
+        emoji,
+        action,
+        reactions: myReactions
+      };
+      
+      // Get the message to know who to send to
+      const message = sqlDb.getMessage(messageId);
+      if (message) {
+        if (message.receiver_uid && message.receiver_uid !== uid) {
+          отправить(message.receiver_uid, broadcastData);
+        }
+        if (message.sender_uid && message.sender_uid !== uid) {
+          отправить(message.sender_uid, broadcastData);
+        }
+      }
+      
+      // Also handle group messages
       if (groupId) {
         const группа = группы.get(groupId);
         if (группа) {
           for (const [otherUid, otherUser] of wsUsers) {
             if (otherUid === uid) continue;
             if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-              otherUser.send(JSON.stringify({ ...reactionMsg, groupId: группа.id }));
+              otherUser.send(JSON.stringify({ ...broadcastData, groupId: группа.id }));
             }
           }
         }

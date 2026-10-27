@@ -45,6 +45,7 @@ import type {
   Group,
   IdentityType,
   Message,
+  Reaction,
   VoiceMessageMetadata,
 } from './types';
 // Signal Protocol обеспечивает прямую секретность через Double Ratchet.
@@ -465,6 +466,38 @@ const App: React.FC = () => {
       setWsStatus(status);
     },
   });
+
+  // v3.15: Subscribe to reaction updates from WebSocket
+  useEffect(() => {
+    if (!identity) return;
+    const handleReactionUpdate = (data: {
+      messageId: string;
+      userId: string;
+      emoji: string;
+      action: 'add' | 'remove';
+      reactions: Reaction[];
+    }) => {
+      logger.info('[PILIGRIM] Reaction update:', data);
+      setChats(prev => {
+        const updated = { ...prev };
+        for (const [chatId, chat] of Object.entries(updated)) {
+          const messageIndex = chat.messages?.findIndex(m => m.id === data.messageId);
+          if (messageIndex !== undefined && messageIndex >= 0) {
+            updated[chatId] = {
+              ...chat,
+              messages: chat.messages.map((m, idx) =>
+                idx === messageIndex ? { ...m, reactions: data.reactions } : m
+              ),
+            };
+            break; // Message found, no need to check other chats
+          }
+        }
+        return updated;
+      });
+    };
+    apiService.onReactionUpdate(handleReactionUpdate);
+    return () => apiService.offReactionUpdate(handleReactionUpdate);
+  }, [identity]);
 
   // v1.5.2 Stage 6: WebRTC hook — для звонков и демонстрации экрана.
   const webrtcHook = useWebRTC(identity?.uid || '');

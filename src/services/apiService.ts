@@ -6,7 +6,7 @@ import {
   type EncryptedPayload,
 } from '../crypto/signal/SignalMessageLayer';
 import type { PreKeyBundle } from '../crypto/signal/types';
-import type { Message, Store } from '../types';
+import type { Message, Reaction, Store } from '../types';
 import { buildWsAuthUrl } from '../utils/websocketAuth';
 import { logger } from './logger';
 // Этап 2: защита метаданных с помощью заполнения трафика и прокси Tor.
@@ -55,6 +55,13 @@ class ApiService {
     messageId: string;
     readerUid: string;
     timestamp: number;
+  }) => void)[] = [];
+  private reactionUpdateListeners: ((data: {
+    messageId: string;
+    userId: string;
+    emoji: string;
+    action: 'add' | 'remove';
+    reactions: Reaction[];
   }) => void)[] = [];
   // Этап 2: TrafficPadder отправляет шумовые пакеты каждые 30–60 секунд.
   private trafficPadder: TrafficPadder = new TrafficPadder();
@@ -455,6 +462,12 @@ class ApiService {
         return;
       }
 
+      // v3.15: Handle reaction updates
+      if (data.type === 'reaction_update') {
+        this.reactionUpdateListeners.forEach(cb => cb(data));
+        return;
+      }
+
       // Phase 3: Dumb Server — обработка ошибки recipient_offline.
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
@@ -768,6 +781,31 @@ class ApiService {
     this.receiptUpdateListeners = this.receiptUpdateListeners.filter(l => l !== callback);
   }
 
+  // v3.15: Reaction updates
+  onReactionUpdate(
+    callback: (data: {
+      messageId: string;
+      userId: string;
+      emoji: string;
+      action: 'add' | 'remove';
+      reactions: Reaction[];
+    }) => void
+  ): void {
+    this.reactionUpdateListeners.push(callback);
+  }
+
+  offReactionUpdate(
+    callback: (data: {
+      messageId: string;
+      userId: string;
+      emoji: string;
+      action: 'add' | 'remove';
+      reactions: Reaction[];
+    }) => void
+  ): void {
+    this.reactionUpdateListeners = this.reactionUpdateListeners.filter(l => l !== callback);
+  }
+
   // v3.11: Send message read receipt
   sendMessageRead(messageId: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -893,6 +931,32 @@ class ApiService {
     } catch (e) {
       logger.error('[API] unregisterPushToken error:', e);
       return false;
+    }
+  }
+
+  /** Add or remove a reaction on a message */
+  async addReaction(messageId: string, emoji: string, action: 'add' | 'remove'): Promise<void> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] addReaction: no access token');
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/messages/${messageId}/reaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ emoji, action }),
+      });
+      if (!response.ok) {
+        logger.warn('[API] addReaction failed:', response.status);
+      }
+    } catch (e) {
+      logger.error('[API] addReaction error:', e);
     }
   }
 }

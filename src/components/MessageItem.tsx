@@ -1,6 +1,7 @@
 ﻿import { logger } from '../services/logger';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { apiService } from '../services/apiService';
 import { decryptAESGCM, decryptFile, getPrivateKey } from '../services/cryptoService';
 import type { Contact, IdentityType, Message } from '../types';
 import type { MenuItem } from './ContextMenu';
@@ -265,6 +266,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
     handleCloseContextMenu();
   };
 
+  const handleReactionClick = (emoji: string) => {
+    const existingReaction = message.reactions?.find(r => r.emoji === emoji);
+    const userReacted = existingReaction?.users?.includes(currentUid) || false;
+    const action = userReacted ? 'remove' : 'add';
+
+    // Send to server - WebSocket event will update the UI
+    void apiService.addReaction(message.id, emoji, action);
+  };
+
   const isOwn = message.senderId === currentUid;
   const canEdit = isOwn && message.type === 'user' && !message.isDeleted;
   const canDelete = isOwn || isAdmin;
@@ -398,6 +408,38 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 sentByMe={isOwn}
                 disappearTimer={disappearTimer}
               />
+
+              {/* Reactions */}
+              {message.reactions && message.reactions.length > 0 && (
+                <div
+                  className={`flex gap-1 mt-1 ${isOwn ? 'ml-auto' : 'mr-auto'} max-w-[65%]`}
+                  role="group"
+                  aria-label="Message reactions"
+                >
+                  {message.reactions.map(reaction => (
+                    <button
+                      key={`${reaction.emoji}-${reaction.count}`}
+                      type="button"
+                      onClick={() => handleReactionClick(reaction.emoji)}
+                      className={`
+                        bg-tg-reaction-bg dark:bg-tg-dark-reaction-bg
+                        rounded-full px-2 py-0.5 text-xs font-medium
+                        cursor-pointer hover:bg-tg-reaction-hover
+                        transition-colors
+                        ${
+                          reaction.mine
+                            ? 'ring-1 ring-tg-primary bg-tg-primary/10 text-tg-primary'
+                            : 'text-tg-text dark:text-tg-dark-text'
+                        }
+                      `}
+                      aria-pressed={reaction.mine}
+                      aria-label={`${reaction.emoji} ${reaction.count} ${reaction.mine ? '(ваша реакция)' : ''}`}
+                    >
+                      {reaction.emoji} {reaction.count > 1 ? reaction.count : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>

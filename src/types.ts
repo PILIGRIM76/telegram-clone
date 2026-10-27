@@ -177,6 +177,18 @@ export interface Message {
   // Отметки о прочтении.
   /** Массив объектов {uid, timestamp} для отслеживания прочтения. */
   readBy?: { uid: string; timestamp: number }[];
+
+  // Реакции (эмодзи).
+  /** Массив реакций: { emoji: string; count: number; users: string[]; mine?: boolean }. */
+  reactions?: Reaction[];
+}
+
+/** Реакция на сообщение (эмодзи + количество + список пользователей). */
+export interface Reaction {
+  emoji: string;
+  count: number;
+  users: string[]; // UID пользователей, поставивших эту реакцию
+  mine?: boolean; // Поставил ли текущий пользователь эту реакцию
 }
 
 /**
