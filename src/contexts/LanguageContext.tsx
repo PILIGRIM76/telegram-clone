@@ -1,18 +1,19 @@
 import { logger } from '../services/logger';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { resources, Language } from '../translations';
+import React, { createContext, useContext, useState } from 'react';
+import type { Language } from '../translations';
+import { resources } from '../translations';
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: keyof typeof resources['en']) => string;
+  t: (key: keyof (typeof resources)['en']) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // v2.0 Batch 5: Russian как дефолтный язык (offline-first для русскоязычных пользователей).
+  // Этап 5: русский язык выбран по умолчанию для работы без сети.
   // Сохраняем выбор в localStorage для сохранения между сессиями.
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('cipherlink-lang');
@@ -26,7 +27,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     logger.info(`[PILIGRIM] Language switched to: ${lang}`);
   };
 
-  const t = (key: keyof typeof resources['en']): string => {
+  const t = (key: keyof (typeof resources)['en']): string => {
     return resources[language][key] || resources['en'][key];
   };
 

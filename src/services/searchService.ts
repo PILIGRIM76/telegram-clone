@@ -1,14 +1,14 @@
-import { Message, SearchResult, SearchOptions } from '../types';
+import type { Message, SearchOptions, SearchResult } from '../types';
 
 /**
- * Client-side search service.
+ * Сервис поиска на стороне клиента.
  *
  * Архитектурное решение: поиск выполняется НА КЛИЕНТЕ, чтобы сохранить E2EE безопасность.
  * Сервер НЕ ИМЕЕТ доступа к содержимому сообщений, поэтому полнотекстовый поиск на сервере
  * невозможен. Клиент загружает расшифрованную историю и индексирует её локально.
  */
 class SearchService {
-  private index: Map<string, Message[]> = new Map(); // contactUid (user UID) -> messages
+  private index: Map<string, Message[]> = new Map(); // Связывает UID контакта с его сообщениями.
 
   /**
    * Индексировать сообщения для быстрого поиска.
@@ -55,12 +55,10 @@ class SearchService {
 
           results.push({
             message: msg,
-            contactUid: cUid, // This IS the contact's UID (user UID)
+            contactUid: cUid, // UID контакта, то есть идентификатор пользователя.
             contactName: this.getContactName(cUid),
             snippet,
-            matchPositions: [
-              { start: matchIndex, end: matchIndex + query.length },
-            ],
+            matchPositions: [{ start: matchIndex, end: matchIndex + query.length }],
           });
 
           // Поиск следующего совпадения в том же сообщении
@@ -79,11 +77,7 @@ class SearchService {
   /**
    * Создаёт сниппет с контекстом вокруг совпадения.
    */
-  private createSnippet(
-    content: string,
-    matchIndex: number,
-    queryLength: number
-  ): string {
+  private createSnippet(content: string, matchIndex: number, queryLength: number): string {
     const contextLength = 30; // символов до и после совпадения
     const start = Math.max(0, matchIndex - contextLength);
     const end = Math.min(content.length, matchIndex + queryLength + contextLength);
@@ -107,7 +101,7 @@ class SearchService {
         if (contactsStr) {
           const contacts: { uid: string; имя: string; id: string; проверен: boolean }[] =
             JSON.parse(contactsStr);
-          const contact = contacts.find((c) => c.uid === uid);
+          const contact = contacts.find(c => c.uid === uid);
           return contact?.имя || uid;
         }
       } catch (e) {
@@ -115,7 +109,7 @@ class SearchService {
         console.warn('Failed to parse contacts from localStorage:', e);
       }
     }
-    return uid; // Fallback: возвращаем UID как имя
+    return uid; // Если имя найти не удалось, возвращаем UID.
   }
 
   /**

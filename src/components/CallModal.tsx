@@ -1,12 +1,11 @@
+import React, { useEffect, useRef } from 'react';
 import { logger } from '../services/logger';
-import React, { useRef, useEffect } from 'react';
 import { webrtcService } from '../services/webrtcService';
-import { playRingtone, stopRingtone, playConnectSound, playEndCallSound } from '../utils/callSounds';
+import { playEndCallSound, playRingtone, stopRingtone } from '../utils/callSounds';
 
 interface CallModalProps {
   callState: 'idle' | 'calling' | 'in-call' | 'incoming';
   partnerName: string;
-  partnerUid: string;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   onAccept: () => void;
@@ -25,7 +24,6 @@ interface CallModalProps {
 export const CallModal: React.FC<CallModalProps> = ({
   callState,
   partnerName,
-  partnerUid,
   localStream,
   remoteStream,
   onAccept,
@@ -38,7 +36,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   isMuted,
   isVideoEnabled,
   isScreenSharing,
-  callDuration
+  callDuration,
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -83,40 +81,52 @@ export const CallModal: React.FC<CallModalProps> = ({
   // Incoming call UI
   if (callState === 'incoming') {
     return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(20px)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}>
-        <h2 style={{ color: '#FCF9F7', fontSize: 24, marginTop: 16 }}>
-          {partnerName}
-        </h2>
-        <p style={{ color: 'rgba(252,249,247,0.6)', fontSize: 14 }}>
-          Входящий звонок...
-        </p>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(20px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+      >
+        <h2 style={{ color: '#FCF9F7', fontSize: 24, marginTop: 16 }}>{partnerName}</h2>
+        <p style={{ color: 'rgba(252,249,247,0.6)', fontSize: 14 }}>Входящий звонок...</p>
         <div style={{ display: 'flex', gap: 32, marginTop: 32 }}>
           <button
             onClick={onDecline}
+            aria-label="Отклонить звонок"
             style={{
-              width: 64, height: 64, borderRadius: '50%',
-              background: '#EF4444', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#EF4444',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <span style={{ fontSize: 24 }}>✕</span>
           </button>
           <button
             onClick={onAccept}
+            aria-label="Ответить на звонок"
             style={{
-              width: 64, height: 64, borderRadius: '50%',
-              background: '#38A169', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#38A169',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               animation: 'pulse 1.5s infinite',
             }}
           >
@@ -130,32 +140,36 @@ export const CallModal: React.FC<CallModalProps> = ({
   // Активный звонок
   if (callState === 'in-call') {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: '#1f2937',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 9999
-      }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: '#1f2937',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 9999,
+        }}
+      >
         {/* Таймер длительности звонка */}
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.6)',
-          padding: '8px 20px',
-          borderRadius: '20px',
-          color: 'white',
-          fontSize: '18px',
-          fontWeight: 600,
-          zIndex: 10
-        }}>
-          ⏱️ {callDuration}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.6)',
+            padding: '8px 20px',
+            borderRadius: '20px',
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: 600,
+            zIndex: 10,
+          }}
+        >
+          ⏱️ {formatTime(callDuration)}
         </div>
         <div style={{ flex: 1, position: 'relative' }}>
           <video
@@ -165,7 +179,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover'
+              objectFit: 'cover',
             }}
           />
           <video
@@ -181,7 +195,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               height: '200px',
               borderRadius: '12px',
               border: '3px solid white',
-              objectFit: 'cover'
+              objectFit: 'cover',
             }}
           />
 
@@ -189,75 +203,86 @@ export const CallModal: React.FC<CallModalProps> = ({
           {isScreenSharing && (
             <>
               {/* Бейдж над local-видео (показывает, что сейчас экран) */}
-              <div style={{
-                position: 'absolute',
-                bottom: '310px',
-                right: '20px',
-                background: '#ef4444',
-                color: 'white',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
-                animation: 'pulse 2s infinite',
-                zIndex: 20
-              }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  background: 'white',
-                  borderRadius: '50%'
-                }}></span>
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '310px',
+                  right: '20px',
+                  background: '#ef4444',
+                  color: 'white',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
+                  animation: 'pulse 2s infinite',
+                  zIndex: 20,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '8px',
+                    height: '8px',
+                    background: 'white',
+                    borderRadius: '50%',
+                  }}
+                ></span>
                 ВЫ ДЕМОНСТРИРУЕТЕ ЭКРАН
               </div>
 
               {/* Главный бейдж по центру (на весь экран) */}
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(239, 68, 68, 0.95)',
-                color: 'white',
-                padding: '10px 20px',
-                borderRadius: '24px',
-                fontSize: '14px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.6)',
-                animation: 'pulse 2s infinite',
-                zIndex: 20
-              }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: '10px',
-                  height: '10px',
-                  background: 'white',
-                  borderRadius: '50%',
-                  boxShadow: '0 0 8px white'
-                }}></span>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(239, 68, 68, 0.95)',
+                  color: 'white',
+                  padding: '10px 20px',
+                  borderRadius: '24px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.6)',
+                  animation: 'pulse 2s infinite',
+                  zIndex: 20,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '10px',
+                    height: '10px',
+                    background: 'white',
+                    borderRadius: '50%',
+                    boxShadow: '0 0 8px white',
+                  }}
+                ></span>
                 🖥️ Демонстрация экрана активна
               </div>
             </>
           )}
         </div>
 
-        <div style={{
-          padding: '20px',
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '20px'
-        }}>
+        <div
+          style={{
+            padding: '20px',
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '20px',
+          }}
+        >
           <button
             onClick={onToggleMute}
+            aria-label={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
             style={{
               width: '60px',
               height: '60px',
@@ -266,13 +291,14 @@ export const CallModal: React.FC<CallModalProps> = ({
               color: 'white',
               border: 'none',
               fontSize: '24px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             {isMuted ? '🔇' : '🎤'}
           </button>
           <button
             onClick={onToggleVideo}
+            aria-label={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
             style={{
               width: '60px',
               height: '60px',
@@ -281,7 +307,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               color: 'white',
               border: 'none',
               fontSize: '24px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             {isVideoEnabled ? '📹' : '🚫'}
@@ -299,14 +325,15 @@ export const CallModal: React.FC<CallModalProps> = ({
               fontSize: '24px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: isScreenSharing ? '0 0 12px rgba(251, 191, 36, 0.6)' : 'none'
+              boxShadow: isScreenSharing ? '0 0 12px rgba(251, 191, 36, 0.6)' : 'none',
             }}
-            aria-label={isScreenSharing ? 'Stop screen sharing' : 'Start screen sharing'}
+            aria-label={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Поделиться экраном'}
           >
             {isScreenSharing ? '🛑' : '🖥️'}
           </button>
           <button
             onClick={onEnd}
+            aria-label="Завершить звонок"
             style={{
               width: '60px',
               height: '60px',
@@ -315,8 +342,9 @@ export const CallModal: React.FC<CallModalProps> = ({
               color: 'white',
               border: 'none',
               fontSize: '24px',
-              cursor: 'pointer'
-            }}>
+              cursor: 'pointer',
+            }}
+          >
             📞
           </button>
         </div>
@@ -327,36 +355,37 @@ export const CallModal: React.FC<CallModalProps> = ({
   // Исходящий звонок (ожидание ответа)
   if (callState === 'calling') {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}>
-        <div style={{
-          background: 'white',
-          padding: '40px',
-          borderRadius: '16px',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#1f2937' }}>
-            📞 Исходящий звонок
-          </h2>
-          <p style={{ fontSize: '18px', color: '#6b7280' }}>
-            Вызов {partnerName}...
-          </p>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}
+      >
+        <div
+          style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ margin: '0 0 20px 0', color: '#1f2937' }}>📞 Исходящий звонок</h2>
+          <p style={{ fontSize: '18px', color: '#6b7280' }}>Вызов {partnerName}...</p>
           <button
             onClick={() => {
               stopRingtone();
               playEndCallSound();
               onEnd();
             }}
+            aria-label="Отменить звонок"
             style={{
               marginTop: '20px',
               padding: '12px 32px',
@@ -365,7 +394,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               border: 'none',
               borderRadius: '8px',
               fontSize: '16px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             Отмена
@@ -386,7 +415,7 @@ export const CallModal: React.FC<CallModalProps> = ({
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
-        fontSize: '14px'
+        fontSize: '14px',
       }}
     >
       📞 Позвонить

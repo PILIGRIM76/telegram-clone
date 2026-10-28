@@ -1,7 +1,7 @@
 import { logger } from '../services/logger';
 // v3.0 Logout: очистка identity из localStorage + закрытие WebSocket.
-// Offline-first архитектура: logout = забыть личность на этом устройстве.
-// Identity можно восстановить через seed-phrase на любом другом устройстве.
+// При автономной работе выход удаляет identity с этого устройства.
+// Identity можно восстановить по seed-фразе на любом другом устройстве.
 
 import { useCallback } from 'react';
 
@@ -42,13 +42,13 @@ export function useLogout(options: UseLogoutOptions = {}) {
       try {
         ws.close();
       } catch (e) {
-        // ignore
+        // Ошибка закрытия сокета не должна прерывать выход из учётной записи.
       }
     }
 
     logger.info('[PILIGRIM] Logout complete, identity forgotten');
 
-    // 4. Callback для сброса React state (если передан)
+    // 4. Сбрасываем состояние React через обратный вызов, если он передан.
     onLogout?.();
 
     // 5. Reload для полного сброса (надёжнее чем state reset)

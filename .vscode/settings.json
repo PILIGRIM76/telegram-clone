@@ -1,0 +1,52 @@
+﻿{
+  // === 1. ФОРМАТИРОВАНИЕ И СТИЛЬ (Лечит Delete ␍) ===
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "prettier.endOfLine": "lf",
+  "files.eol": "\n",
+
+  // === 2. ESLint (Автофикс ошибок типов и any) ===
+  "eslint.enable": true,
+  "eslint.run": "onType",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+
+  // === 3. SONARLINT (Безопасность E2EE) ===
+  "sonarlint.rules": {
+    "typescript:S4787": { "level": "error" },
+    "typescript:S2068": { "level": "error" },
+    "typescript:S1135": { "level": "info" }
+  },
+  "sonarlint.analyzeNestedProjects": true,
+
+  // === 4. TAILWIND CSS INTELLISENSE (Дизайн Telegram) ===
+  "tailwindCSS.classAttributes": [
+    "class",
+    "className",
+    "ngClass",
+    "styled-components::css"
+  ],
+  "tailwindCSS.experimental.configFile": "./tailwind.config.js",
+
+  // === 5. TODO TREE (Отслеживание UI-дефектов) ===
+  "todo-tree.general.tags": ["TODO", "FIXME", "HACK", "DESIGN-MISMATCH"],
+  "todo-tree.highlights.enabled": true,
+  "todo-tree.tree.showScanModeButton": false,
+
+  // === 6. GIT GRAPH & GITHUB ACTIONS ===
+  "git-graph.commitDetailsView.autoRefresh": true,
+  "github-actions.workflows.paths": [".github/workflows/*.yml"],
+
+  // === 7. SPELL CHECKER (поддержка RU/EN комментариев) ===
+  "cSpell.language": "en,ru"
+}

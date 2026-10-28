@@ -2,7 +2,7 @@ import { logger } from './services/logger';
 
 // Полифилл для crypto.randomUUID() ДОЛЖЕН быть первой строкой (до React/любых компонентов)
 import './polyfills/crypto';
-// Buffer polyfill для браузера (framer-motion/@emotion depend on Node.js Buffer)
+// Подключаем Buffer для браузерной сборки: framer-motion и @emotion используют Buffer из Node.js.
 import './polyfills/buffer';
 
 // Tailwind CSS (PostCSS) — базовая тёмная тема + утилиты
@@ -13,15 +13,15 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
-import { LanguageProvider } from './contexts/LanguageContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LanguageProvider } from './contexts/LanguageContext';
 
-// Phase 9.5 fix: глобальная защита от ошибок, чтобы видеть что падает на устройстве
-window.addEventListener('error', (event) => {
+// Защита от ошибок для диагностики сбоев на устройстве.
+window.addEventListener('error', event => {
   logger.error('[PILIGRIM] GLOBAL ERROR:', event.error?.message || event.message);
   logger.error('[PILIGRIM] GLOBAL ERROR stack:', event.error?.stack);
 });
-window.addEventListener('unhandledrejection', (event) => {
+window.addEventListener('unhandledrejection', event => {
   logger.error('[PILIGRIM] UNHANDLED PROMISE:', event.reason);
 });
 
@@ -39,7 +39,7 @@ logger.info('[PILIGRIM] BOOT: App and LanguageProvider imported');
 try {
   const rootElement = document.getElementById('root');
   if (!rootElement) {
-    throw new Error("Could not find root element to mount to");
+    throw new Error('Could not find root element to mount to');
   }
   logger.info('[PILIGRIM] BOOT: root element found');
 

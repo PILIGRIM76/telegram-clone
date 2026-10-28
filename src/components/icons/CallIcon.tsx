@@ -6,11 +6,7 @@ interface IconProps {
   className?: string;
 }
 
-export const CallIcon: React.FC<IconProps> = ({ 
-  size = 22, 
-  color = 'currentColor', 
-  className 
-}) => (
+export const CallIcon: React.FC<IconProps> = ({ size = 22, color = 'currentColor', className }) => (
   <svg
     width={size}
     height={size}

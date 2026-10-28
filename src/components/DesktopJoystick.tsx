@@ -1,7 +1,4 @@
-// v3.0 Phase 2H: DesktopJoystick — фиксированная боковая навигация для desktop.
-// Width 48px, position fixed left 8px, blur 16px glassmorphism.
-// Compose button (accent) + 4 tab buttons with hover tooltips.
-// Matches desktop SVG schema (1440x900).
+// Боковая навигация для компьютера.
 
 import React, { useState } from 'react';
 import type { TabView } from './TabletTabBar';
@@ -20,9 +17,23 @@ interface JoystickItem {
 
 const ITEMS: JoystickItem[] = [
   { view: 'chats', icon: '\u{1F4AC}', label: '\u0427\u0430\u0442\u044B' },
-  { view: 'contacts', icon: '\u{1F464}', label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B' },
+  {
+    view: 'contacts',
+    icon: '\u{1F464}',
+    label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B',
+  },
+  { view: 'channels', icon: '\u{1F4E2}', label: '\u041A\u0430\u043D\u0430\u043B\u044B' },
+  {
+    view: 'settings',
+    icon: '\u2699\uFE0F',
+    label: '\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438',
+  },
   { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438' },
-  { view: 'favorites', icon: '\u2B50', label: '\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435' },
+  {
+    view: 'favorites',
+    icon: '\u2B50',
+    label: '\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435',
+  },
 ];
 
 const tooltipStyle: React.CSSProperties = {
@@ -69,10 +80,9 @@ export const DesktopJoystick: React.FC<DesktopJoystickProps> = ({
         padding: '8px 0',
         gap: 20,
         zIndex: 50,
-      } as React.CSSProperties}
+      }}
     >
-      {/* Compose button (accent) */}
-      <div style={{ position: 'relative' } as React.CSSProperties}>
+      <div style={{ position: 'relative' }}>
         <button
           data-testid="joystick-compose"
           onClick={onCompose}
@@ -92,17 +102,21 @@ export const DesktopJoystick: React.FC<DesktopJoystickProps> = ({
             justifyContent: 'center',
             cursor: 'pointer',
             boxShadow: '0 4px 12px rgba(232,106,88,0.3)',
-          } as React.CSSProperties}
+          }}
         >
           ✚
         </button>
-        {hovered === 'compose' && <div data-testid="joystick-tooltip" style={tooltipStyle}>Написать</div>}
+        {hovered === 'compose' && (
+          <div data-testid="joystick-tooltip" style={tooltipStyle}>
+            Написать
+          </div>
+        )}
       </div>
 
-      {ITEMS.map((item) => {
+      {ITEMS.map(item => {
         const isActive = activeView === item.view;
         return (
-          <div key={item.view} style={{ position: 'relative' } as React.CSSProperties}>
+          <div key={item.view} style={{ position: 'relative' }}>
             <button
               data-testid={'joystick-' + item.view}
               onClick={() => onViewChange(item.view)}
@@ -123,11 +137,15 @@ export const DesktopJoystick: React.FC<DesktopJoystickProps> = ({
                 justifyContent: 'center',
                 cursor: 'pointer',
                 transition: 'all 150ms ease-out',
-              } as React.CSSProperties}
+              }}
             >
               {item.icon}
             </button>
-            {hovered === item.view && <div data-testid="joystick-tooltip" style={tooltipStyle}>{item.label}</div>}
+            {hovered === item.view && (
+              <div data-testid="joystick-tooltip" style={tooltipStyle}>
+                {item.label}
+              </div>
+            )}
           </div>
         );
       })}

@@ -35,6 +35,7 @@ module.exports = {
     '^.+\\.js$': ['ts-jest', {
       useESM: false,
       tsconfig: {
+        allowJs: true,
         module: 'es2020',
         target: 'ES2020',
       },

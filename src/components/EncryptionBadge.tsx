@@ -1,4 +1,4 @@
-// Phase 1: visual indicator for Signal (PFS) vs legacy (NaCl) encryption.
+// Значок показывает тип шифрования: Signal с прямой секретностью или устаревший NaCl.
 import React from 'react';
 import { Tooltip } from './Tooltip';
 

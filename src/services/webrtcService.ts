@@ -1,14 +1,12 @@
 import { logger } from './logger';
-// v1.5.2 Stage 6: Native WebRTC через browser RTCPeerConnection API.
+// Этап 6: используем встроенный в браузер API RTCPeerConnection для WebRTC.
 // Без simple-peer (он использует Node.js APIs и не работает в Capacitor WebView).
 // Сигналинг через apiService WebSocket (Этап 5).
-// Screen sharing через getDisplayMedia() — НЕ работает на Android WebView (только desktop).
-
-import { apiService } from './apiService';
+// Демонстрация экрана через getDisplayMedia() не работает в Android WebView.
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
 export interface CallEvents {
@@ -33,7 +31,7 @@ function isScreenShareSupported(): boolean {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices) return false;
   if (typeof navigator.mediaDevices.getDisplayMedia !== 'function') return false;
   const ua = navigator.userAgent;
-  // getDisplayMedia НЕ работает на Android WebView (только desktop Chrome/Edge/Firefox)
+  // getDisplayMedia() не работает в Android WebView, но доступен в настольных Chrome, Edge и Firefox.
   if (/Android|iPhone|iPad|iPod/i.test(ua)) return false;
   return true;
 }
@@ -67,7 +65,7 @@ class WebRTCService {
     }
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    pc.onicecandidate = (event) => {
+    pc.onicecandidate = event => {
       if (event.candidate && this.receiverId) {
         const signal: SignalPayload = { type: 'ice', candidate: event.candidate.toJSON() };
         if (this.events.onSignal) {
@@ -76,7 +74,7 @@ class WebRTCService {
       }
     };
 
-    pc.ontrack = (event) => {
+    pc.ontrack = event => {
       logger.info('[PILIGRIM] WebRTC: ontrack', event.track.kind);
       if (!this.remoteStream) {
         this.remoteStream = new MediaStream();
@@ -101,7 +99,7 @@ class WebRTCService {
   }
 
   private addLocalTracks(pc: RTCPeerConnection, stream: MediaStream): void {
-    stream.getTracks().forEach((track) => {
+    stream.getTracks().forEach(track => {
       pc.addTrack(track, stream);
     });
   }
@@ -135,7 +133,11 @@ class WebRTCService {
     }
   }
 
-  async answerCall(caller: string, incomingSignal: SignalPayload, events: CallEvents): Promise<void> {
+  async answerCall(
+    caller: string,
+    incomingSignal: SignalPayload,
+    events: CallEvents
+  ): Promise<void> {
     if (!isRTCAvailable()) {
       events.onError?.(new Error('WebRTC не поддерживается'));
       return;
@@ -197,11 +199,15 @@ class WebRTCService {
 
   private cleanup(): void {
     if (this.peer) {
-      try { this.peer.close(); } catch { /* noop */ }
+      try {
+        this.peer.close();
+      } catch {
+        /* noop */
+      }
       this.peer = null;
     }
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream.getTracks().forEach(track => track.stop());
       this.localStream = null;
     }
     this.stopScreenShare();
@@ -222,7 +228,7 @@ class WebRTCService {
       logger.info('[PILIGRIM] WebRTC: requesting screen share…');
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: 'monitor' } as MediaTrackConstraints,
-        audio: false
+        audio: false,
       });
 
       const screenTrack = this.screenStream.getVideoTracks()[0];
@@ -231,7 +237,7 @@ class WebRTCService {
       }
 
       // Заменяем video-трек в peer connection (sender.replaceTrack)
-      const sender = this.peer.getSenders().find((s) => s.track?.kind === 'video');
+      const sender = this.peer.getSenders().find(s => s.track?.kind === 'video');
       if (sender && this.originalVideoTrack === null) {
         this.originalVideoTrack = sender.track;
       }
@@ -268,13 +274,13 @@ class WebRTCService {
     logger.info('[PILIGRIM] WebRTC: stopping screen share');
 
     if (this.screenStream) {
-      this.screenStream.getTracks().forEach((track) => track.stop());
+      this.screenStream.getTracks().forEach(track => track.stop());
       this.screenStream = null;
     }
 
     // Восстанавливаем оригинальный камерный трек
     if (this.peer && this.originalVideoTrack) {
-      const sender = this.peer.getSenders().find((s) => s.track?.kind === 'video');
+      const sender = this.peer.getSenders().find(s => s.track?.kind === 'video');
       if (sender) {
         try {
           await sender.replaceTrack(this.originalVideoTrack);
@@ -309,7 +315,9 @@ class WebRTCService {
     const audioTracks = this.localStream.getAudioTracks();
     if (audioTracks.length === 0) return false;
     const newState = enabled !== undefined ? enabled : !audioTracks[0].enabled;
-    audioTracks.forEach((track) => { track.enabled = newState; });
+    audioTracks.forEach(track => {
+      track.enabled = newState;
+    });
     return newState;
   }
 
@@ -318,7 +326,9 @@ class WebRTCService {
     const videoTracks = this.localStream.getVideoTracks();
     if (videoTracks.length === 0) return false;
     const newState = enabled !== undefined ? enabled : !videoTracks[0].enabled;
-    videoTracks.forEach((track) => { track.enabled = newState; });
+    videoTracks.forEach(track => {
+      track.enabled = newState;
+    });
     return newState;
   }
 

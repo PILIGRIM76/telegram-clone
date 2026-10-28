@@ -1,24 +1,25 @@
-// v3.0 Phase 2B-1: Responsive Layout Shell
-// 3 layouts (mobile/tablet/desktop) с inline styles (WebView-friendly).
-// Tablet (641–1024) — двухколоночный 30%/70% (RT9 friendly).
-// Desktop (>1024) — фиксированная левая 280px + flex правая.
-// Mobile (≤640) — single column (toggle между списком и активным чатом).
+// Адаптивная оболочка интерфейса.
+// Три адаптивных макета со встроенными стилями для WebView.
+// Планшет (641–1024) — две колонки 30%/70%, подходит для RT9.
+// Настольный экран (>1024) — слева фиксированные 280px, справа гибкая панель.
+// Телефон (≤640) — один столбец с переключением между списком и активным чатом.
 
 import React from 'react';
 import { useBreakpoint, type Breakpoint } from '../hooks/useBreakpoint';
 
 interface ResponsiveShellProps {
-  leftPanel: React.ReactNode;   // список чатов / контактов
-  rightPanel: React.ReactNode;  // активный чат или welcome placeholder
-  tabBar?: React.ReactNode;     // нижний таббар (tablet)
-  fab?: React.ReactNode;        // floating action button (tablet)
-  topBar?: React.ReactNode;     // верхний бар (опционально, для будущего)
-  // v3.0 Phase 2G: mobile floating circle nav (заменяет tabBar на mobile)
+  leftPanel: React.ReactNode; // список чатов / контактов
+  rightPanel: React.ReactNode; // активный чат или welcome placeholder
+  tabBar?: React.ReactNode; // Нижняя панель вкладок на планшете.
+  fab?: React.ReactNode; // Плавающая кнопка действия на планшетах.
+  topBar?: React.ReactNode; // верхний бар (опционально, для будущего)
+  // Этап 2G: круговая навигация на телефоне вместо нижней панели вкладок.
   mobileNav?: React.ReactNode;
-  // v3.0 Phase 2H: desktop joystick (фиксированный слева)
+  // Этап 2H: джойстик, закреплённый слева на настольном экране.
   desktopNav?: React.ReactNode;
-  // v3.0 Phase 2H: 3rd panel on desktop (profile)
+
   profilePanel?: React.ReactNode;
+  mobileShowList?: boolean;
 }
 
 export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
@@ -30,6 +31,7 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
   mobileNav,
   desktopNav,
   profilePanel,
+  mobileShowList = false,
 }) => {
   const bp: Breakpoint = useBreakpoint();
 
@@ -43,8 +45,18 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         width: '100%',
         position: 'relative' as const,
       },
-      left: { display: 'none' }, // скрывается когда открыт чат (toggle логика выше)
-      right: { flex: 1, display: 'flex', flexDirection: 'column' as const, minHeight: 0 },
+      left: {
+        display: mobileShowList ? 'flex' : 'none',
+        flexDirection: 'column' as const,
+        width: '100%',
+        minHeight: 0,
+      },
+      right: {
+        flex: 1,
+        display: mobileShowList ? 'none' : 'flex',
+        flexDirection: 'column' as const,
+        minHeight: 0,
+      },
     },
     tablet: {
       container: {
@@ -79,7 +91,7 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
         position: 'relative' as const,
       },
       left: {
-        // v3.0 Phase 2H: paddingLeft для joystick (48px + 8px left + 8px gap)
+        // Этап 2H: отступ слева для джойстика (48px + 8px от края + 8px промежуток).
         width: 280,
         paddingLeft: 64,
         background: 'var(--color-bg-primary)',
@@ -99,26 +111,17 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
   }[bp];
 
   return (
-    <div
-      data-testid={`responsive-shell-${bp}`}
-      style={layout.container as React.CSSProperties}
-    >
+    <div data-testid={`responsive-shell-${bp}`} style={layout.container}>
       {/* Top bar (опционально) */}
       {topBar}
 
       {/* Левая панель (список чатов / контактов) */}
-      <div
-        data-testid="left-panel"
-        style={layout.left as React.CSSProperties}
-      >
+      <div data-testid="left-panel" style={layout.left}>
         {leftPanel}
       </div>
 
       {/* Правая панель (чат / welcome) */}
-      <div
-        data-testid="right-panel"
-        style={layout.right as React.CSSProperties}
-      >
+      <div data-testid="right-panel" style={layout.right}>
         {rightPanel}
       </div>
 
@@ -132,13 +135,13 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
             left: 0,
             right: 0,
             zIndex: 30,
-          } as React.CSSProperties}
+          }}
         >
           {tabBar}
         </div>
       )}
 
-      {/* FAB (tablet), на mobile заменён floating circle */}
+      {/* Плавающая кнопка на планшете; на телефоне заменена круговой навигацией. */}
       {fab && bp === 'tablet' && (
         <div
           data-testid="fab"
@@ -147,29 +150,47 @@ export const ResponsiveShell: React.FC<ResponsiveShellProps> = ({
             bottom: 24,
             right: 24,
             zIndex: 35,
-          } as React.CSSProperties}
+          }}
         >
           {fab}
         </div>
       )}
 
-      {/* v3.0 Phase 2G: mobile floating circle nav */}
-      {mobileNav && bp === 'mobile' && (
-        <div data-testid="mobile-nav">{mobileNav}</div>
-      )}
+      {/* Этап 2G: круговая навигация на телефоне. */}
+      {mobileNav && bp === 'mobile' && <div data-testid="mobile-nav">{mobileNav}</div>}
 
-      {/* v3.0 Phase 2H: desktop joystick */}
-      {desktopNav && bp === 'desktop' && (
-        <div data-testid="desktop-nav">{desktopNav}</div>
-      )}
+      {/* Этап 2H: джойстик на настольном экране. */}
+      {desktopNav && bp === 'desktop' && <div data-testid="desktop-nav">{desktopNav}</div>}
 
-      {/* v3.0 Phase 2H: 3rd panel (profile) only on desktop */}
+      {/* Этап 2H: третья панель профиля отображается только на настольном экране. */}
       {profilePanel && bp === 'desktop' && (
-        <div
-          data-testid="profile-panel"
-          style={{ display: 'flex', flexShrink: 0 } as React.CSSProperties}
-        >
+        <div data-testid="profile-panel" style={{ display: 'flex', flexShrink: 0 }}>
           {profilePanel}
+        </div>
+      )}
+
+      {profilePanel && bp !== 'desktop' && (
+        <div
+          data-testid="profile-panel-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'var(--color-scrim)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(320px, 100%)',
+              height: '100%',
+              background: 'var(--color-bg-primary)',
+              boxShadow: 'var(--shadow-3)',
+            }}
+          >
+            {profilePanel}
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
+import { useCallback, useEffect, useState } from 'react';
 import { logger } from '../services/logger';
-import { useState, useEffect, useCallback } from 'react';
 import { prismaService } from '../services/prismaService';
 
 export interface CallRecord {
@@ -18,38 +18,41 @@ export function useCallHistory(userId: string) {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
 
-  const loadCalls = useCallback(async (reset: boolean = false) => {
-    if (loading) return;
-    
-    setLoading(true);
-    try {
-      const currentOffset = reset ? 0 : offset;
-      const rawCalls = await prismaService.getCallHistory(userId, 50, currentOffset);
-      const newCalls: CallRecord[] = rawCalls.map(call => ({
-        id: call.id,
-        callerId: call.callerId,
-        receiverId: call.receiverId,
-        callType: call.callType,
-        status: call.status,
-        duration: call.duration,
-        createdAt: call.createdAt instanceof Date ? call.createdAt.toISOString() : call.createdAt
-      }));
-      
-      if (reset) {
-        setCalls(newCalls);
-        setOffset(50);
-      } else {
-        setCalls(prev => [...prev, ...newCalls]);
-        setOffset(prev => prev + 50);
+  const loadCalls = useCallback(
+    async (reset: boolean = false) => {
+      if (loading) return;
+
+      setLoading(true);
+      try {
+        const currentOffset = reset ? 0 : offset;
+        const rawCalls = await prismaService.getCallHistory(userId, 50, currentOffset);
+        const newCalls: CallRecord[] = rawCalls.map(call => ({
+          id: call.id,
+          callerId: call.callerId,
+          receiverId: call.receiverId,
+          callType: call.callType,
+          status: call.status,
+          duration: call.duration,
+          createdAt: call.createdAt instanceof Date ? call.createdAt.toISOString() : call.createdAt,
+        }));
+
+        if (reset) {
+          setCalls(newCalls);
+          setOffset(50);
+        } else {
+          setCalls(prev => [...prev, ...newCalls]);
+          setOffset(prev => prev + 50);
+        }
+
+        setHasMore(newCalls.length === 50);
+      } catch (error) {
+        logger.error('Failed to load call history:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setHasMore(newCalls.length === 50);
-    } catch (error) {
-      logger.error('Failed to load call history:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, offset, loading]);
+    },
+    [userId, offset, loading]
+  );
 
   const loadMore = useCallback(() => {
     if (hasMore && !loading) {
@@ -73,7 +76,7 @@ export function useCallHistory(userId: string) {
     loading,
     hasMore,
     loadMore,
-    refresh
+    refresh,
   };
 }
 
@@ -92,7 +95,7 @@ export function useMissedCalls(userId: string) {
         callType: call.callType,
         status: call.status,
         duration: call.duration,
-        createdAt: call.createdAt instanceof Date ? call.createdAt.toISOString() : call.createdAt
+        createdAt: call.createdAt instanceof Date ? call.createdAt.toISOString() : call.createdAt,
       }));
       setMissedCalls(typedCalls);
     } catch (error) {
@@ -111,6 +114,6 @@ export function useMissedCalls(userId: string) {
   return {
     missedCalls,
     loading,
-    refresh: loadMissedCalls
+    refresh: loadMissedCalls,
   };
 }

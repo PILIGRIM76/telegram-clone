@@ -2,6 +2,7 @@
 // autoprefixer оставлен для совместимости с Capacitor WebView (CSS Grid, flexbox).
 module.exports = {
   plugins: {
+    tailwindcss: {},
     autoprefixer: {},
   },
 };

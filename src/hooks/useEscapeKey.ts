@@ -1,5 +1,5 @@
-// v1.6 Batch 4: useEscapeKey — закрывает модалку по Escape.
-// Стандартный паттерн keyboard accessibility (WAI-ARIA).
+// Хук useEscapeKey закрывает модальное окно по клавише Escape.
+// Использует стандартный шаблон доступности с клавиатуры (WAI-ARIA).
 
 import { useEffect } from 'react';
 

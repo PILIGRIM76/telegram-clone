@@ -1,9 +1,10 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported, deleteToken } from 'firebase/messaging';
+import { getApps, initializeApp } from 'firebase/app';
+import { deleteToken, getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { apiService } from './apiService';
+import { logger } from './logger';
 
-// v3.13: Use process.env instead of import.meta.env for ts-jest compatibility
-// Vite replaces process.env.VITE_* at build time via define config
+// Для совместимости с ts-jest используем process.env вместо import.meta.env.
+// Vite подставляет значения process.env.VITE_* при сборке через define.
 const firebaseConfig = {
   apiKey: process.env.VITE_FIREBASE_API_KEY,
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,119 +16,102 @@ const firebaseConfig = {
 let messaging: ReturnType<typeof getMessaging> | null = null;
 let appInitialized = false;
 
-/**
- * Initialize Firebase app and messaging
- */
+/** Инициализирует приложение Firebase и сервис push-уведомлений. */
 const initFirebase = () => {
   if (appInitialized) return;
-  
-  // Initialize Firebase app if not already initialized
+
+  // Инициализируем Firebase, если он ещё не запущен.
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   appInitialized = true;
   return app;
 };
 
-/**
- * Initialize FCM push notifications
- * Requests permission, gets token, and registers with server
- */
+/** Запускает push-уведомления FCM, запрашивает разрешение и регистрирует токен на сервере. */
 export const initPushNotifications = async (): Promise<string | null> => {
   try {
-    // Initialize Firebase
     initFirebase();
-    
-    // Check if FCM is supported in this browser
+
+    // Проверяем, поддерживается ли FCM в этом браузере.
     const supported = await isSupported();
     if (!supported) {
-      console.log('[Push] FCM not supported in this browser');
+      logger.info('[Push] FCM not supported in this browser');
       return null;
     }
 
     messaging = getMessaging();
-    
-    // Request notification permission
+
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.log('[Push] Notification permission not granted');
+      logger.info('[Push] Notification permission not granted');
       return null;
     }
 
-    // Get FCM token with VAPID key
+    // Получаем токен FCM с помощью ключа VAPID.
     const vapidKey = process.env.VITE_FIREBASE_VAPID_KEY;
     const token = await getToken(messaging, {
       vapidKey: vapidKey || undefined,
     });
 
     if (token) {
-      console.log('[Push] FCM Token obtained:', token.substring(0, 20) + '...');
-      
-      // Register token with server
+      logger.info('[Push] FCM token obtained');
+
+      // Регистрируем токен на сервере.
       await apiService.registerPushToken(token, 'web');
       return token;
     } else {
-      console.warn('[Push] No FCM token received');
+      logger.warn('[Push] No FCM token received');
       return null;
     }
   } catch (error) {
-    console.error('[Push] Initialization error:', error);
+    logger.error('[Push] Initialization error:', error);
     return null;
   }
 };
 
-/**
- * Handle foreground messages (when app is open)
- */
+/** Обрабатывает push-сообщения, полученные при открытом приложении. */
 export const onForegroundMessage = (callback: (payload: any) => void): (() => void) => {
   if (!messaging) {
     initFirebase();
     messaging = getMessaging();
   }
-  
+
   return onMessage(messaging, callback);
 };
 
-/**
- * Request notification permission
- */
+/** Запрашивает разрешение на показ уведомлений. */
 export const requestNotificationPermission = async (): Promise<NotificationPermission> => {
   return await Notification.requestPermission();
 };
 
-/**
- * Get current FCM token
- */
+/** Возвращает текущий токен FCM. */
 export const getFCMToken = async (): Promise<string | null> => {
   if (!messaging) {
     initFirebase();
     messaging = getMessaging();
   }
-  
+
   const vapidKey = process.env.VITE_FIREBASE_VAPID_KEY;
   return await getToken(messaging, { vapidKey: vapidKey || undefined });
 };
 
-/**
- * Delete FCM token (unregister)
- */
+/** Удаляет токен FCM и отменяет его регистрацию. */
 export const deleteFCMToken = async (): Promise<boolean> => {
   if (!messaging) {
     initFirebase();
     messaging = getMessaging();
   }
-  
+
   try {
     await deleteToken(messaging);
-    console.log('[Push] FCM token deleted');
+    logger.info('[Push] FCM token deleted');
     return true;
   } catch (error) {
-    console.error('[Push] Error deleting token:', error);
+    logger.error('[Push] Error deleting token:', error);
     return false;
   }
 };
 
-/**
- * Check if FCM is supported
- */
+/** Проверяет, поддерживается ли FCM в текущем браузере. */
 export const isFCMSupported = async (): Promise<boolean> => {
   return await isSupported();
 };

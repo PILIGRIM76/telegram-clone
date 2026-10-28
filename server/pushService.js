@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 const db = require('./databaseService');
 
 // Initialize Firebase Admin (keys from .env)
-if (!admin.apps.length) {
+if (!admin.getApps().length) {
   const projectId = process.env.FCM_PROJECT_ID;
   const clientEmail = process.env.FCM_CLIENT_EMAIL;
   const privateKey = process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n');
@@ -32,7 +32,7 @@ if (!admin.apps.length) {
 async function sendPushNotification(userUid, senderName, chatId, messageId) {
   try {
     // Check if Firebase Admin is initialized
-    if (!admin.apps.length) {
+    if (!admin.getApps().length) {
       console.log('[Push] Firebase Admin not initialized, skipping push');
       return;
     }
@@ -68,14 +68,16 @@ async function sendPushNotification(userUid, senderName, chatId, messageId) {
         if (!resp.success) {
           const errorCode = resp.error?.code;
           // Remove tokens that are permanently invalid
-          if (errorCode === 'messaging/registration-token-not-registered' ||
-              errorCode === 'messaging/invalid-registration-token' ||
-              errorCode === 'messaging/registration-token-invalid') {
+          if (
+            errorCode === 'messaging/registration-token-not-registered' ||
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/registration-token-invalid'
+          ) {
             failedTokens.push(tokens[idx]);
           }
         }
       });
-      
+
       if (failedTokens.length > 0) {
         console.log('[Push] Removing invalid tokens:', failedTokens);
         for (const token of failedTokens) {
@@ -84,7 +86,9 @@ async function sendPushNotification(userUid, senderName, chatId, messageId) {
       }
     }
 
-    console.log(`[Push] Successfully sent to ${response.successCount} devices (${response.failureCount} failed)`);
+    console.log(
+      `[Push] Successfully sent to ${response.successCount} devices (${response.failureCount} failed)`
+    );
   } catch (error) {
     console.error('[Push] Error sending notification:', error);
     // Don't break the main flow if push fails

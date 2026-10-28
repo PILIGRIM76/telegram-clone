@@ -1,7 +1,7 @@
 import { logger } from '../services/logger';
-// v3.0 Phase 5: useImagePicker - canvas compression для localStorage.
-// Aurora spec: max 1280px, JPEG quality 0.8.
-// localStorage ~5MB лимит -> обязательное сжатие!
+// Этап 5: useImagePicker сжимает изображения на canvas перед сохранением в localStorage.
+// Изображения сжимаются до ширины 1280 пикселей с качеством JPEG 0,8.
+// Лимит localStorage около 5 МБ, поэтому сжатие обязательно.
 
 import { useCallback, useRef, useState } from 'react';
 
@@ -63,7 +63,7 @@ export function useImagePicker() {
       for (const file of Array.from(files).slice(0, 4)) {
         if (!file.type.startsWith('image/')) continue;
         const dataUrl = await compressImage(file);
-        setPendingImages((prev) => [
+        setPendingImages(prev => [
           ...prev,
           {
             id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8),
@@ -81,7 +81,7 @@ export function useImagePicker() {
   }, []);
 
   const removeImage = useCallback((id: string) => {
-    setPendingImages((prev) => prev.filter((img) => img.id !== id));
+    setPendingImages(prev => prev.filter(img => img.id !== id));
   }, []);
 
   const clearImages = useCallback(() => setPendingImages([]), []);

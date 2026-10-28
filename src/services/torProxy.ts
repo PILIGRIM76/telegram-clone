@@ -1,7 +1,7 @@
 import { logger } from './logger';
-// Phase 2: Tor SOCKS5 proxy support (опциональный).
+// Этап 2: необязательная поддержка прокси Tor через SOCKS5.
 // В WebView (Capacitor) нативный SOCKS5 не поддерживается.
-// Fallback: прямое соединение с предупреждением в логах.
+// Если прокси недоступен, используется прямое соединение с предупреждением в журнале.
 
 const TOR_CHECK_URL = 'https://check.torproject.org/api/ip';
 const TOR_SOCKS_HOST = '127.0.0.1';
@@ -14,22 +14,22 @@ export interface TorConfig {
 }
 
 /**
- * Tor proxy manager. Включается через Settings → "Использовать Tor".
+ * Управляет прокси Tor. Включается через настройки «Использовать Tor».
  *
  * Ограничения:
- * - В браузере/Capacitor WebView нет нативной SOCKS5 поддержки.
- * - Для реального использования нужен нативный HTTP proxy (Tor daemon на 9050)
- *   или Capacitor плагин для SOCKS5.
+ * - В браузере и Capacitor WebView нет встроенной поддержки SOCKS5.
+ * - Для реального использования нужен системный HTTP-прокси (служба Tor на порту 9050)
+ *   или плагин Capacitor для SOCKS5.
  *
  * Что мы делаем сейчас:
- * - Храним состояние enabled/disabled
- * - Проверяем доступность Tor через fetch (check.torproject.org)
- * - Логируем предупреждение если Tor включён в WebView без реального proxy
+ * - Храним состояние включения прокси.
+ * - Проверяем доступность Tor через fetch (check.torproject.org).
+ * - Записываем предупреждение, если Tor включён в WebView без прокси.
  */
 export class TorProxy {
   private config: TorConfig;
   private checkCache: { isTor: boolean; checkedAt: number } | null = null;
-  private readonly CHECK_TTL = 5 * 60 * 1000;  // 5 минут кэш
+  private readonly CHECK_TTL = 5 * 60 * 1000; // 5 минут кэш
 
   constructor(config?: Partial<TorConfig>) {
     this.config = {

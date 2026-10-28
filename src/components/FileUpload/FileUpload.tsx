@@ -1,6 +1,6 @@
-import { logger } from '../../services/logger';
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../services/logger';
 
 interface FileUploadProps {
   to: string;
@@ -27,7 +27,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ to, recipientPublicKey }) => {
 
     try {
       const reader = new FileReader();
-      reader.onprogress = (event) => {
+      reader.onprogress = event => {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 100);
           setProgress(percent);
@@ -36,19 +36,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ to, recipientPublicKey }) => {
 
       reader.onload = async () => {
         const base64File = reader.result?.toString().split(',')[1];
-        
+
         const fileData = {
           name: file.name,
           size: file.size,
           type: file.type,
-          data: base64File
+          data: base64File,
         };
 
-        apiService.sendMessage(
-          to,
-          JSON.stringify(fileData),
-          recipientPublicKey || ''
-        );
+        apiService.sendMessage(to, JSON.stringify(fileData), recipientPublicKey || '');
 
         setProgress(100);
         setFile(null);
@@ -67,15 +63,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ to, recipientPublicKey }) => {
 
   return (
     <div className="file-upload">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        disabled={uploading}
-      />
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} disabled={uploading} />
       {file && (
         <div>
-          <span>{file.name} ({file.type})</span>
+          <span>
+            {file.name} ({file.type})
+          </span>
           <button onClick={uploadFile} disabled={uploading}>
             {uploading ? `Uploading... ${progress}%` : 'Upload'}
           </button>

@@ -1,5 +1,5 @@
 import { logger } from '../services/logger';
-// TwoFactorSetup Component for 2FA UI
+
 import React, { useState } from 'react';
 import { setup2FA } from '../services/auth';
 
@@ -14,7 +14,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
   enabled,
   onEnable,
   onDisable,
-  username
+  username,
 }) => {
   const [qrCode, setQrCode] = useState<string>('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
@@ -24,7 +24,9 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
     try {
       const setup = await setup2FA(username);
       setQrCode(setup.qrCode);
-      const codes = Array.from({length: 10}, () => Math.random().toString(36).substring(2, 8).toUpperCase());
+      const codes = Array.from({ length: 10 }, () =>
+        Math.random().toString(36).substring(2, 8).toUpperCase()
+      );
       setBackupCodes(codes);
       setShowCodes(true);
       onEnable(setup.secret, codes);
@@ -44,9 +46,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
     return (
       <div className="p-4 bg-slate-800 rounded">
         <h3 className="text-lg font-bold mb-4 text-yellow-400">2FA Включена</h3>
-        <p className="text-sm text-slate-300 mb-3">
-          Сохраните резервные коды:
-        </p>
+        <p className="text-sm text-slate-300 mb-3">Сохраните резервные коды:</p>
         <div className="grid grid-cols-2 gap-2 mb-4">
           {backupCodes.map((code, i) => (
             <code key={i} className="bg-slate-700 px-2 py-1 rounded text-xs font-mono">

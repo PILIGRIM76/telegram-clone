@@ -1,34 +1,57 @@
-import { useState, useEffect } from 'react';
-import { initPushNotifications, requestNotificationPermission, isFCMSupported } from '../services/pushService';
+import { useEffect, useState } from 'react';
+import { useTranslation } from '../contexts/LanguageContext';
+import { apiService } from '../services/apiService';
+import { logger } from '../services/logger';
+import {
+  deleteFCMToken,
+  getFCMToken,
+  initPushNotifications,
+  isFCMSupported,
+  requestNotificationPermission,
+} from '../services/pushService';
 
 export const NotificationSettings: React.FC = () => {
-  const [permission, setPermission] = useState<NotificationPermission>('default');
+  const { t } = useTranslation();
+  const [permission, setPermission] = useState<NotificationPermission>(() =>
+    typeof Notification === 'undefined' ? 'default' : Notification.permission
+  );
   const [supported, setSupported] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setPermission(Notification.permission);
-    checkSupport();
+    void isFCMSupported()
+      .then(async isSupported => {
+        setSupported(isSupported);
+        if (
+          isSupported &&
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted'
+        ) {
+          const currentToken = await getFCMToken();
+          setToken(currentToken);
+          setNotificationsEnabled(!!currentToken);
+        }
+      })
+      .catch(error => logger.error('[NotificationSettings] Error checking notifications:', error));
   }, []);
-
-  const checkSupport = async () => {
-    const isSupported = await isFCMSupported();
-    setSupported(isSupported);
-  };
 
   const handleEnable = async () => {
     setLoading(true);
     try {
       const newPermission = await requestNotificationPermission();
       setPermission(newPermission);
-      
+
       if (newPermission === 'granted' && supported) {
         const fcmToken = await initPushNotifications();
         setToken(fcmToken);
+        setNotificationsEnabled(!!fcmToken);
       }
     } catch (error) {
-      console.error('[NotificationSettings] Error enabling notifications:', error);
+      setErrorMessage(t('push_enable_error'));
+      logger.error('[NotificationSettings] Error enabling notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -37,11 +60,20 @@ export const NotificationSettings: React.FC = () => {
   const handleDisable = async () => {
     setLoading(true);
     try {
-      // Note: In a real implementation, you'd want to unregister the token from server
-      // await apiService.unregisterPushToken(token);
-      console.log('[NotificationSettings] Notifications disabled');
+      setErrorMessage(null);
+      const currentToken = token || (await getFCMToken());
+      if (currentToken && !(await apiService.unregisterPushToken(currentToken))) {
+        throw new Error('Не удалось удалить токен уведомлений с сервера');
+      }
+      if (currentToken && !(await deleteFCMToken())) {
+        throw new Error('Не удалось удалить локальный токен уведомлений');
+      }
+      setToken(null);
+      setNotificationsEnabled(false);
+      logger.info('[NotificationSettings] Notifications disabled');
     } catch (error) {
-      console.error('[NotificationSettings] Error disabling notifications:', error);
+      setErrorMessage(t('push_disable_error'));
+      logger.error('[NotificationSettings] Error disabling notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -49,63 +81,60 @@ export const NotificationSettings: React.FC = () => {
 
   if (!supported) {
     return (
-      <div className="p-4 border rounded-lg bg-gray-50">
-        <h3 className="font-bold mb-2">Push-уведомления</h3>
-        <p className="text-sm text-gray-600">
-          Ваш браузер не поддерживает push-уведомления (FCM).
+      <div className="rounded-lg border border-tg-border bg-tg-background p-4 text-tg-text dark:border-tg-dark-border dark:bg-tg-dark-background dark:text-tg-dark-text">
+        <h3 className="mb-2 font-bold">{t('push_title')}</h3>
+        <p className="text-sm text-tg-textSecondary dark:text-tg-dark-textSecondary">
+          {t('push_unsupported')}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 border rounded-lg">
-      <h3 className="font-bold mb-2">Push-уведомления</h3>
-      <p className="text-sm text-gray-600 mb-4">
-        Получайте уведомления о новых зашифрованных сообщениях, когда приложение закрыто.
+    <div className="rounded-lg border border-tg-border bg-tg-background p-4 text-tg-text dark:border-tg-dark-border dark:bg-tg-dark-background dark:text-tg-dark-text">
+      <h3 className="mb-2 font-bold">{t('push_title')}</h3>
+      <p className="mb-4 text-sm text-tg-textSecondary dark:text-tg-dark-textSecondary">
+        {t('push_description')}
         <br />
-        <span className="text-xs text-gray-500">
-          В уведомлении НЕ будет текста сообщения (E2EE).
-        </span>
+        <span className="text-xs">{t('push_no_message_text')}</span>
       </p>
-      
-      {permission === 'granted' ? (
+      {errorMessage && (
+        <p role="alert" className="mb-3 text-sm text-tg-danger dark:text-tg-dark-danger">
+          {errorMessage}
+        </p>
+      )}
+
+      {notificationsEnabled ? (
         <div className="space-y-2">
-          <div className="text-green-600 flex items-center gap-2">
+          <div className="flex items-center gap-2 text-tg-success dark:text-tg-dark-success">
             <span className="text-lg">✅</span>
-            <span>Уведомления включены</span>
+            <span>{t('push_enabled')}</span>
           </div>
-          {token && (
-            <details className="text-xs text-gray-500">
-              <summary>FCM Token (для отладки)</summary>
-              <code className="block mt-1 break-all bg-gray-100 p-2 rounded">{token}</code>
-            </details>
-          )}
-          <button 
-            onClick={handleDisable}
+          <button
+            onClick={() => void handleDisable()}
             disabled={loading}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+            className="rounded-lg bg-tg-hover px-4 py-2 text-tg-text transition-colors hover:opacity-80 disabled:opacity-50 dark:bg-tg-dark-hover dark:text-tg-dark-text"
           >
-            {loading ? 'Отключение...' : 'Отключить уведомления'}
+            {loading ? t('push_disabling') : t('push_disable')}
           </button>
         </div>
       ) : permission === 'denied' ? (
-        <div className="text-red-600 space-y-2">
+        <div className="space-y-2 text-tg-danger dark:text-tg-dark-danger">
           <div className="flex items-center gap-2">
             <span className="text-lg">❌</span>
-            <span>Уведомления заблокированы в браузере</span>
+            <span>{t('push_blocked')}</span>
           </div>
-          <p className="text-sm text-gray-600">
-            Разрешите уведомления в настройках браузера (значок замка в адресной строке), затем обновите страницу.
+          <p className="text-sm text-tg-textSecondary dark:text-tg-dark-textSecondary">
+            {t('push_permission_help')}
           </p>
         </div>
       ) : (
-        <button 
-          onClick={handleEnable}
+        <button
+          onClick={() => void handleEnable()}
           disabled={loading}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          className="rounded-lg bg-tg-primary px-4 py-2 text-white transition-colors hover:bg-tg-primaryHover disabled:opacity-50 dark:bg-tg-dark-primary dark:hover:bg-tg-dark-primaryHover"
         >
-          {loading ? 'Включение...' : 'Включить уведомления'}
+          {loading ? t('push_enabling') : t('push_enable')}
         </button>
       )}
     </div>

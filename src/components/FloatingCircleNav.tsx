@@ -1,11 +1,7 @@
-// v3.0 Phase 2G: FloatingCircleNav — mobile navigation per Aurora spec.
-// Outer circle 72px (blur 20px glassmorphism) + inner gradient button 48px.
-// 4 satellites (44px) fan out on arc radius 80px when opened.
-// Compose badge 36px on the right for quick "Написать".
-// Matches mobile SVG schema (360x800).
+// Круговая навигация для мобильных устройств.
 
+import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import type { TabView } from './TabletTabBar';
 
 export type CircleView = TabView;
@@ -20,18 +16,40 @@ interface Satellite {
   view: CircleView;
   icon: string;
   label: string;
-  /** angle in degrees from vertical (negative = left, positive = right) */
+
   angle: number;
 }
 
 const SATELLITES: Satellite[] = [
-  { view: 'chats', icon: '\u{1F4AC}', label: '\u0427\u0430\u0442\u044B', angle: -60 },
-  { view: 'contacts', icon: '\u{1F464}', label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B', angle: -20 },
-  { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438', angle: 20 },
-  { view: 'favorites', icon: '\u2B50', label: '\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435', angle: 60 },
+  { view: 'chats', icon: '\u{1F4AC}', label: '\u0427\u0430\u0442\u044B', angle: -72 },
+  {
+    view: 'contacts',
+    icon: '\u{1F464}',
+    label: '\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B',
+    angle: -45,
+  },
+  {
+    view: 'channels',
+    icon: '\u{1F4E2}',
+    label: '\u041A\u0430\u043D\u0430\u043B\u044B',
+    angle: -15,
+  },
+  {
+    view: 'settings',
+    icon: '\u2699\uFE0F',
+    label: '\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438',
+    angle: 15,
+  },
+  { view: 'calls', icon: '\u{1F4DE}', label: '\u0417\u0432\u043E\u043D\u043A\u0438', angle: 45 },
+  {
+    view: 'favorites',
+    icon: '\u2B50',
+    label: '\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435',
+    angle: 75,
+  },
 ];
 
-const ARC_RADIUS = 80;
+const ARC_RADIUS = 90;
 
 export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
   activeView,
@@ -57,57 +75,58 @@ export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 100,
-        // allow satellites to overflow the 72px box visually
+
         width: 72,
         height: 72,
-      } as React.CSSProperties}
+      }}
     >
-      {/* Satellites fan-out above the circle */}
+      {}
       <AnimatePresence>
-        {isOpen && SATELLITES.map((sat, i) => {
-          const rad = (sat.angle * Math.PI) / 180;
-          const x = Math.sin(rad) * ARC_RADIUS;
-          const y = -Math.cos(rad) * ARC_RADIUS;
-          const isActive = activeView === sat.view;
-          return (
-            <motion.button
-              key={sat.view}
-              data-testid={'circle-sat-' + sat.view}
-              initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
-              animate={{ x, y, opacity: 1, scale: 1 }}
-              exit={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 24, delay: i * 0.03 }}
-              onClick={() => {
-                onViewChange(sat.view);
-                setIsOpen(false);
-              }}
-              aria-label={sat.label}
-              style={{
-                position: 'absolute',
-                left: '50%',
-                bottom: 14,
-                marginLeft: -22,
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                background: isActive ? 'var(--color-accent)' : 'white',
-                border: isActive ? 'none' : '1px solid rgba(0,0,0,0.08)',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                fontSize: 18,
-                color: isActive ? 'white' : 'var(--color-text-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              } as React.CSSProperties}
-            >
-              {sat.icon}
-            </motion.button>
-          );
-        })}
+        {isOpen &&
+          SATELLITES.map((sat, i) => {
+            const rad = (sat.angle * Math.PI) / 180;
+            const x = Math.sin(rad) * ARC_RADIUS;
+            const y = -Math.cos(rad) * ARC_RADIUS;
+            const isActive = activeView === sat.view;
+            return (
+              <motion.button
+                key={sat.view}
+                data-testid={'circle-sat-' + sat.view}
+                initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+                animate={{ x, y, opacity: 1, scale: 1 }}
+                exit={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24, delay: i * 0.03 }}
+                onClick={() => {
+                  onViewChange(sat.view);
+                  setIsOpen(false);
+                }}
+                aria-label={sat.label}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  bottom: 14,
+                  marginLeft: -22,
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  background: isActive ? 'var(--color-accent)' : 'white',
+                  border: isActive ? 'none' : '1px solid rgba(0,0,0,0.08)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                  fontSize: 18,
+                  color: isActive ? 'white' : 'var(--color-text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                {sat.icon}
+              </motion.button>
+            );
+          })}
       </AnimatePresence>
 
-      {/* Outer glass circle 72px + inner gradient button 48px */}
+      {}
       <div
         style={{
           position: 'absolute',
@@ -123,19 +142,24 @@ export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-        } as React.CSSProperties}
+        }}
       >
         <motion.button
           data-testid="circle-main"
           animate={{ rotate: isOpen ? 45 : 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 24 }}
           onClick={handleMainClick}
-          aria-label={isOpen ? '\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u043C\u0435\u043D\u044E' : '\u041C\u0435\u043D\u044E'}
+          aria-label={
+            isOpen
+              ? '\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u043C\u0435\u043D\u044E'
+              : '\u041C\u0435\u043D\u044E'
+          }
           style={{
             width: 48,
             height: 48,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color-primary-start, #E86A58) 0%, var(--color-primary-end, #B388EB) 100%)',
+            background:
+              'linear-gradient(135deg, var(--color-primary-start, #E86A58) 0%, var(--color-primary-end, #B388EB) 100%)',
             border: 'none',
             color: 'white',
             fontSize: 22,
@@ -145,13 +169,13 @@ export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
             justifyContent: 'center',
             cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(232,106,88,0.4)',
-          } as React.CSSProperties}
+          }}
         >
           ✚
         </motion.button>
       </div>
 
-      {/* Compose badge 36px on the right */}
+      {}
       <button
         data-testid="circle-compose"
         onClick={onCompose}
@@ -171,7 +195,7 @@ export const FloatingCircleNav: React.FC<FloatingCircleNavProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-        } as React.CSSProperties}
+        }}
       >
         ✉\uFE0F
       </button>

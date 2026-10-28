@@ -1,8 +1,8 @@
 import { logger } from './logger';
-// Phase 3: Offline message queue — IndexedDB persistence.
-// Сервер НЕ хранит сообщения (Dumb Server principle).
+// Очередь сообщений сохраняется в IndexedDB и отправляется после восстановления связи.
+// По принципу «глупого сервера» сервер не хранит сообщения.
 // Клиент сам хранит недоставленные сообщения в IndexedDB
-// и ретраит при reconnect получателя.
+// и повторяет отправку после восстановления соединения с получателем.
 
 import { openDB, type IDBPDatabase } from 'idb';
 
@@ -11,13 +11,13 @@ export interface QueuedMessage {
   id: string;
   /** UID получателя. */
   recipientUid: string;
-  /** Полный WS payload (JSON-сериализуемый). */
+  /** Полезная нагрузка WebSocket в формате JSON. */
   payload: any;
   /** Timestamp создания (для сортировки FIFO). */
   timestamp: number;
   /** Сколько раз уже пытались отправить. */
   retryCount: number;
-  /** Последняя ошибка при retry (для отладки). */
+  /** Последняя ошибка повторной отправки (для отладки). */
   lastError?: string;
   /** Тип: direct или group. */
   type?: 'direct' | 'group';
@@ -124,7 +124,7 @@ export class OfflineQueue {
    * @param sendFn функция отправки (должна throw если recipient offline)
    */
   async processQueue(
-    sendFn: (payload: any) => Promise<void> | void,
+    sendFn: (payload: any) => Promise<void> | void
   ): Promise<{ sent: number; failed: number; retried: number }> {
     const messages = await this.dequeue();
     if (messages.length === 0) {
@@ -148,11 +148,16 @@ export class OfflineQueue {
         if (newRetryCount >= MAX_RETRY_COUNT) {
           await this.remove(msg.id);
           failed++;
-          logger.error(`[OfflineQueue] Failed after ${MAX_RETRY_COUNT} retries: ${msg.id}`, errorMsg);
+          logger.error(
+            `[OfflineQueue] Failed after ${MAX_RETRY_COUNT} retries: ${msg.id}`,
+            errorMsg
+          );
         } else {
           await this.updateRetry(msg.id, newRetryCount, errorMsg);
           retried++;
-          logger.warn(`[OfflineQueue] Retry ${newRetryCount}/${MAX_RETRY_COUNT} for ${msg.id}: ${errorMsg}`);
+          logger.warn(
+            `[OfflineQueue] Retry ${newRetryCount}/${MAX_RETRY_COUNT} for ${msg.id}: ${errorMsg}`
+          );
         }
       }
     }
@@ -162,7 +167,7 @@ export class OfflineQueue {
   }
 
   /**
-   * Возвращает singleton instance.
+   * Возвращает общий экземпляр очереди.
    */
   static instance(): OfflineQueue {
     if (!offlineQueueInstance) {

@@ -1,9 +1,9 @@
-// v3.0 Phase 2F: Tooltip компонент с glassmorphism эффектом.
-// Поддержка hover (desktop) и long-press (touch).
+// Этап 2F: всплывающая подсказка с эффектом матового стекла.
+// Поддерживает наведение мышью и долгое нажатие на сенсорном экране.
 // 4 позиции: top, bottom, left, right. Использует Framer Motion.
 
+import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface TooltipProps {
   content: string;
@@ -11,11 +11,7 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({
-  content,
-  children,
-  position = 'top',
-}) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top' }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 

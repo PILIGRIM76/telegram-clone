@@ -1,5 +1,5 @@
-// Phase 9.5 fix: better-sqlite3 (Node.js) не работает в Capacitor WebView.
-// Заменяем на in-memory stub (без реального хранения).
+// better-sqlite3 из Node.js не работает в Capacitor WebView.
+// Используем временную заглушку в памяти без постоянного хранения.
 import type { Message } from '../types';
 
 class SqliteStorage {
@@ -23,13 +23,19 @@ class SqliteStorage {
 
   async deleteMessage(id: string): Promise<void> {
     for (const [chatId, msgs] of this.memStore.entries()) {
-      this.memStore.set(chatId, msgs.filter(m => (m as any).id !== id));
+      this.memStore.set(
+        chatId,
+        msgs.filter(m => (m as any).id !== id)
+      );
     }
   }
 
   async clearMessages(olderThan: number): Promise<void> {
     for (const [chatId, msgs] of this.memStore.entries()) {
-      this.memStore.set(chatId, msgs.filter(m => Number((m as any).timestamp) >= olderThan));
+      this.memStore.set(
+        chatId,
+        msgs.filter(m => Number((m as any).timestamp) >= olderThan)
+      );
     }
   }
 }

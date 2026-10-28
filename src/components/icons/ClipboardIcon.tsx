@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export const ClipboardIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (

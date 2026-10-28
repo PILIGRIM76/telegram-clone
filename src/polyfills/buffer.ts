@@ -1,4 +1,4 @@
-// Buffer polyfill для браузера (framer-motion/@emotion depend on Node.js Buffer)
+// Подключаем Buffer для браузерной сборки: framer-motion и @emotion используют Buffer из Node.js.
 // Импортируется ДО React и любых компонентов.
 if (typeof window !== 'undefined' && typeof (window as any).Buffer === 'undefined') {
   const BufferPolyfill = function (this: any, data: any, encoding?: string) {
@@ -8,7 +8,8 @@ if (typeof window !== 'undefined' && typeof (window as any).Buffer === 'undefine
       return arr;
     }
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+      return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return new Uint8Array(0);
   };
   BufferPolyfill.from = function (data: any, encoding?: string) {
@@ -18,7 +19,8 @@ if (typeof window !== 'undefined' && typeof (window as any).Buffer === 'undefine
       return arr;
     }
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+      return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return new Uint8Array(0);
   };
   BufferPolyfill.alloc = function (size: number, fill?: number) {
@@ -26,6 +28,8 @@ if (typeof window !== 'undefined' && typeof (window as any).Buffer === 'undefine
     if (fill !== undefined) arr.fill(fill);
     return arr;
   };
-  BufferPolyfill.isBuffer = function () { return false; };
+  BufferPolyfill.isBuffer = function () {
+    return false;
+  };
   (window as any).Buffer = BufferPolyfill;
 }

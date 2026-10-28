@@ -1,5 +1,5 @@
 // Централизованный logger для PILIGRIM.
-// debug/info подавляются в production (import.meta.env.DEV === false),
+// Сообщения debug/info отключены в боевой сборке (import.meta.env.DEV === false),
 // warn/error всегда видны — это осознанный выбор: критические сбои
 // должны оставлять след даже в релизе, а отладочный шум — нет.
 // Это поддерживает privacy-позицию мессенджера (никаких скрытых логов
@@ -7,8 +7,8 @@
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-// FIX 2026-09-10: import.meta.env ломает ts-jest (TS1343).
-// Используем process.env — работает в Node (тесты) и заменяется Vite через define.
+// import.meta.env не поддерживается в ts-jest (TS1343).
+// process.env работает в Node.js в тестах и подставляется Vite через define.
 const isDev = process.env.DEV !== 'false';
 
 class Logger {

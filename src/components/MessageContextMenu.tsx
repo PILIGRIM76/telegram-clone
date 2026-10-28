@@ -1,6 +1,7 @@
 import React from 'react';
-import { ContextMenu, MenuItem } from './ContextMenu';
 import type { Message } from '../types';
+import type { MenuItem } from './ContextMenu';
+import { ContextMenu } from './ContextMenu';
 
 interface MessageContextMenuProps {
   message: Message;
@@ -23,7 +24,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   onDeleteForMe,
   onDeleteForAll,
   onCopy,
-  onReply
+  onReply,
 }) => {
   const isOwn = message.senderId === currentUserUid;
   const canEdit = isOwn && message.type === 'user' && !message.isDeleted;
@@ -39,19 +40,23 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   }
 
   if (canDelete) {
-    items.push({ id: 'delete_me', icon: '🗑️', label: 'Удалить для себя', dangerous: true, onClick: onDeleteForMe });
+    items.push({
+      id: 'delete_me',
+      icon: '🗑️',
+      label: 'Удалить для себя',
+      dangerous: true,
+      onClick: onDeleteForMe,
+    });
     if (isOwn) {
-      items.push({ id: 'delete_all', icon: '🗑️', label: 'Удалить для всех', dangerous: true, onClick: onDeleteForAll });
+      items.push({
+        id: 'delete_all',
+        icon: '🗑️',
+        label: 'Удалить для всех',
+        dangerous: true,
+        onClick: onDeleteForAll,
+      });
     }
   }
 
-  return (
-    <ContextMenu
-      isOpen={true}
-      x={0}
-      y={0}
-      items={items}
-      onClose={onClose}
-    />
-  );
+  return <ContextMenu isOpen={true} x={0} y={0} items={items} onClose={onClose} />;
 };

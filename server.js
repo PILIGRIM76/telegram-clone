@@ -1,6 +1,5 @@
-
 const express = require('express');
-// Phase 2: Metadata protection — используем crypto для генерации session ID
+// Фаза 2: Защита метаданных — используем crypto для генерации session ID
 // вместо логирования IP-адресов клиентов.
 const crypto = require('crypto');
 const http = require('http');
@@ -9,17 +8,17 @@ const path = require('path');
 const url = require('url');
 const { db, STORAGE_TYPE } = require('./db/index.js');
 
-// Phase 2: SQLite persistence + JWT Auth
+// Фаза 2: SQLite персистентность + JWT аутентификация
 const sqlDb = require('./server/databaseService.js');
 const authService = require('./server/authService.js');
 
-// v3.13: Push Notifications (FCM)
+// v3.13: Push-уведомления (FCM)
 const pushService = require('./server/pushService.js');
 
-// In-memory maps for WS routing only (data persisted in SQLite)
+// In-memory карты для WS-маршрутизации (данные в SQLite)
 const wsUsers = new Map(); // uid -> ws reference
 
-// Initialize on startup
+// Инициализация при запуске
 function initStorage() {
   console.log('[STORAGE] SQLite-based storage initialized');
 }
@@ -55,7 +54,12 @@ function setUserProfileCache(uid, profile) {
 }
 
 function updateUserProfileCache(uid, partial) {
-  const current = userProfileCache.get(uid) || { publicKey: null, preKeyBundle: null, store: null, boards: [] };
+  const current = userProfileCache.get(uid) || {
+    publicKey: null,
+    preKeyBundle: null,
+    store: null,
+    boards: [],
+  };
   const updated = { ...current, ...partial };
   userProfileCache.set(uid, updated);
   return updated;
@@ -66,7 +70,14 @@ const КАТАЛОГ_ПОДАРКОВ = [
   { id: 'gift_rose', name: 'Роза', emoji: '🌹', type: 'free' },
   { id: 'gift_star', name: 'Звезда', emoji: '⭐', type: 'free' },
   { id: 'gift_crown', name: 'Корона', emoji: '👑', type: 'premium', price: 100, currency: 'USDT' },
-  { id: 'gift_diamond', name: 'Бриллиант', emoji: '💎', type: 'premium', price: 250, currency: 'USDT' },
+  {
+    id: 'gift_diamond',
+    name: 'Бриллиант',
+    emoji: '💎',
+    type: 'premium',
+    price: 250,
+    currency: 'USDT',
+  },
   { id: 'gift_rocket', name: 'Ракета', emoji: '🚀', type: 'premium', price: 500, currency: 'USDT' },
 ];
 
@@ -76,172 +87,172 @@ console.log('Сервер ШифроСвязь запускается...');
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 function сгенерироватьТокен() {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 // Симуляция проверки транзакции в блокчейне
 function проверитьТранзакцию(txid, ожидаемыйАдрес, сумма) {
-    console.log(`[БЛОКЧЕЙН] Проверка TXID: ${txid} -> ${ожидаемыйАдрес} (${сумма})`);
-    // В реальности здесь был бы запрос к API Etherscan или Blockchain.info
-    return txid && txid.startsWith('0x'); // Простая валидация
+  console.log(`[БЛОКЧЕЙН] Проверка TXID: ${txid} -> ${ожидаемыйАдрес} (${сумма})`);
+  // В реальности здесь был бы запрос к API Etherscan или Blockchain.info
+  return txid && txid.startsWith('0x'); // Простая валидация
 }
 
 // --- MIDDLEWARE АДМИНИСТРАТОРА ---
 const adminAuth = (req, res, next) => {
-    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
 
-    if (login && password && login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
-        return next();
-    }
+  if (login && password && login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+    return next();
+  }
 
-    res.set('WWW-Authenticate', 'Basic realm="CipherLink Admin"');
-    res.status(401).send('Требуется авторизация администратора');
+  res.set('WWW-Authenticate', 'Basic realm="CipherLink Admin"');
+  res.status(401).send('Требуется авторизация администратора');
 };
 
 // --- АДМИН ЭНДПОИНТЫ ---
 
 // Раздача админки
 app.get('/admin', adminAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin.html'));
+  res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
 // Статистика
 app.get('/api/admin/stats', adminAuth, (req, res) => {
-    let onlineUsers = 0;
-    let publicStores = 0;
-    let totalBoards = 0;
-    let totalUsers = 0;
+  let onlineUsers = 0;
+  let publicStores = 0;
+  let totalBoards = 0;
+  let totalUsers = 0;
 
-    // Count from userProfileCache + DB
-    // Get all users from SQLite
-    const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
-    totalUsers = allUsers.length;
+  // Count from userProfileCache + DB
+  // Get all users from SQLite
+  const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
+  totalUsers = allUsers.length;
 
-    for (const { uid } of allUsers) {
-        const ws = wsUsers.get(uid);
-        if (ws && ws.readyState === WebSocket.OPEN) onlineUsers++;
-        
-        const profile = getUserProfileFromDB(uid);
-        if (profile) {
-            if (profile.store && profile.store.тип === 'публичный') publicStores++;
-            if (profile.boards) totalBoards += profile.boards.length;
-        }
+  for (const { uid } of allUsers) {
+    const ws = wsUsers.get(uid);
+    if (ws && ws.readyState === WebSocket.OPEN) onlineUsers++;
+
+    const profile = getUserProfileFromDB(uid);
+    if (profile) {
+      if (profile.store && profile.store.тип === 'публичный') publicStores++;
+      if (profile.boards) totalBoards += profile.boards.length;
     }
+  }
 
-    // Phase 2: stats endpoint НЕ возвращает IP-адреса пользователей.
-    // Только агрегированные counters (online count, total count).
-    res.json({
-        totalUsers,
-        onlineUsers,
-        totalGroups: группы.size,
-        publicStores,
-        totalBoards,
-        // Phase 3: Dumb Server — сервер НЕ хранит офлайн-сообщения.
-        // Клиенты используют IndexedDB queue (OfflineQueue service).
-    });
+  // Phase 2: stats endpoint НЕ возвращает IP-адреса пользователей.
+  // Только агрегированные counters (online count, total count).
+  res.json({
+    totalUsers,
+    onlineUsers,
+    totalGroups: группы.size,
+    publicStores,
+    totalBoards,
+    // Phase 3: Dumb Server — сервер НЕ хранит офлайн-сообщения.
+    // Клиенты используют IndexedDB queue (OfflineQueue service).
+  });
 });
 
 // Список пользователей (упрощенный)
 app.get('/api/admin/users', adminAuth, (req, res) => {
-    const userList = [];
-    const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
-    
-    for (const { uid } of allUsers) {
-        const ws = wsUsers.get(uid);
-        const profile = getUserProfileFromDB(uid);
-        
-        userList.push({
-            uid,
-            isOnline: ws && ws.readyState === WebSocket.OPEN,
-            hasStore: !!(profile?.store),
-            boardsCount: profile?.boards?.length || 0,
-            // Phase 2: только session ID, никаких IP-адресов.
-            // sessionId меняется при каждом WS reconnect — невозможно
-            // связать разные сессии одного юзера между собой.
-            sessionId: ws?.sessionId || null,
-            connectedAt: ws?.connectedAt || null,
-        });
-    }
-    // Пагинация должна быть тут, но для прототипа отдаем 100 последних
-    res.json(userList.slice(-100));
+  const userList = [];
+  const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
+
+  for (const { uid } of allUsers) {
+    const ws = wsUsers.get(uid);
+    const profile = getUserProfileFromDB(uid);
+
+    userList.push({
+      uid,
+      isOnline: ws && ws.readyState === WebSocket.OPEN,
+      hasStore: !!profile?.store,
+      boardsCount: profile?.boards?.length || 0,
+      // Phase 2: только session ID, никаких IP-адресов.
+      // sessionId меняется при каждом WS reconnect — невозможно
+      // связать разные сессии одного юзера между собой.
+      sessionId: ws?.sessionId || null,
+      connectedAt: ws?.connectedAt || null,
+    });
+  }
+  // Пагинация должна быть тут, но для прототипа отдаем 100 последних
+  res.json(userList.slice(-100));
 });
 
 // Бан пользователя (удаление)
 app.post('/api/admin/ban', adminAuth, (req, res) => {
-    const { uid } = req.body;
-    const ws = wsUsers.get(uid);
-    if (ws) ws.close();
-    
-    // Delete from SQLite (cascades to user_profiles, identities, sessions, messages)
-    const result = sqlDb.db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
-    
-    // Remove from cache
-    userProfileCache.delete(uid);
-    wsUsers.delete(uid);
-    
-    // Remove from groups
-    for (const g of группы.values()) {
-        g.участники = g.участники.filter(u => u !== uid);
-    }
-    
-    if (result.changes > 0) {
-        res.json({ success: true });
-    } else {
-        res.status(404).json({ error: 'Пользователь не найден' });
-    }
+  const { uid } = req.body;
+  const ws = wsUsers.get(uid);
+  if (ws) ws.close();
+
+  // Delete from SQLite (cascades to user_profiles, identities, sessions, messages)
+  const result = sqlDb.db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
+
+  // Remove from cache
+  userProfileCache.delete(uid);
+  wsUsers.delete(uid);
+
+  // Remove from groups
+  for (const g of группы.values()) {
+    g.участники = g.участники.filter(u => u !== uid);
+  }
+
+  if (result.changes > 0) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Пользователь не найден' });
+  }
 });
 
 // Список магазинов
 app.get('/api/admin/stores', adminAuth, (req, res) => {
-    const stores = [];
-    const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
-    
-    for (const { uid } of allUsers) {
-        const profile = getUserProfileFromDB(uid);
-        if (profile?.store) {
-            stores.push({
-                uid,
-                ...profile.store
-            });
-        }
+  const stores = [];
+  const allUsers = sqlDb.db.prepare('SELECT uid FROM users').all();
+
+  for (const { uid } of allUsers) {
+    const profile = getUserProfileFromDB(uid);
+    if (profile?.store) {
+      stores.push({
+        uid,
+        ...profile.store,
+      });
     }
-    res.json(stores);
+  }
+  res.json(stores);
 });
 
 // Удаление магазина (модерация)
 app.delete('/api/admin/stores/:uid', adminAuth, (req, res) => {
-    const { uid } = req.params;
-    const profile = getUserProfileFromDB(uid);
-    if (profile && profile.store) {
-        // Clear store in SQLite
-        sqlDb.saveStoreData(uid, null);
-        // Update cache
-        updateUserProfileCache(uid, { store: null });
-        res.json({ success: true });
-    } else {
-        res.status(404).json({ error: 'Магазин не найден' });
-    }
+  const { uid } = req.params;
+  const profile = getUserProfileFromDB(uid);
+  if (profile && profile.store) {
+    // Clear store in SQLite
+    sqlDb.saveStoreData(uid, null);
+    // Update cache
+    updateUserProfileCache(uid, { store: null });
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Магазин не найден' });
+  }
 });
 
 // Глобальная рассылка
 app.post('/api/admin/broadcast', adminAuth, (req, res) => {
-    const { message } = req.body;
-    let count = 0;
-    const systemMsg = JSON.stringify({
-        type: 'system',
-        from: 'system',
-        content: message,
-        timestamp: new Date().toISOString()
-    });
+  const { message } = req.body;
+  let count = 0;
+  const systemMsg = JSON.stringify({
+    type: 'system',
+    from: 'system',
+    content: message,
+    timestamp: new Date().toISOString(),
+  });
 
-    for (const [uid, ws] of wsUsers.entries()) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(systemMsg);
-            count++;
-        }
+  for (const [uid, ws] of wsUsers.entries()) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(systemMsg);
+      count++;
     }
-    res.json({ sentTo: count });
+  }
+  res.json({ sentTo: count });
 });
 
 // --- ПУБЛИЧНЫЕ API ЭНДПОИНТЫ ---
@@ -376,16 +387,18 @@ app.get('/key/:uid', (req, res) => {
   let магазинДанные = profile.store;
   if (магазинДанные && магазинДанные.тип === 'приватная') магазинДанные = null;
 
-  const активныеДоски = (profile.boards || []).filter(д => !д.expiresAt || д.expiresAt > Date.now());
+  const активныеДоски = (profile.boards || []).filter(
+    д => !д.expiresAt || д.expiresAt > Date.now()
+  );
 
   res.json({
-      uid,
-      publicKey: profile.publicKey,
-      // Phase 2: публикация Signal pre-key bundle для PFS сессий.
-      // Если у юзера нет bundle → null, клиент делает fallback на NaCl.
-      preKeyBundle: profile.preKeyBundle || null,
-      store: магазинДанные,
-      boards: активныеДоски
+    uid,
+    publicKey: profile.publicKey,
+    // Phase 2: публикация Signal pre-key bundle для PFS сессий.
+    // Если у юзера нет bundle → null, клиент делает fallback на NaCl.
+    preKeyBundle: profile.preKeyBundle || null,
+    store: магазинДанные,
+    boards: активныеДоски,
   });
 });
 
@@ -399,7 +412,14 @@ app.post('/keys/publish', (req, res) => {
     return res.status(400).json({ ошибка: 'preKeyBundle обязателен' });
   }
   // Валидация минимально необходимых полей для Signal pre-key bundle
-  const required = ['registrationId', 'preKeyId', 'preKey', 'signedPreKeyId', 'signedPreKey', 'identityKey'];
+  const required = [
+    'registrationId',
+    'preKeyId',
+    'preKey',
+    'signedPreKeyId',
+    'signedPreKey',
+    'identityKey',
+  ];
   for (const field of required) {
     if (preKeyBundle[field] === undefined || preKeyBundle[field] === null) {
       return res.status(400).json({ ошибка: `Поле ${field} обязательно в preKeyBundle` });
@@ -409,41 +429,43 @@ app.post('/keys/publish', (req, res) => {
   sqlDb.savePreKeyBundle(uid, preKeyBundle);
   // Update cache
   updateUserProfileCache(uid, { preKeyBundle });
-  console.log(`[KEYS] Pre-key bundle published for ${uid} (deviceId=${preKeyBundle.deviceId || 1})`);
+  console.log(
+    `[KEYS] Pre-key bundle published for ${uid} (deviceId=${preKeyBundle.deviceId || 1})`
+  );
   res.json({ ok: true });
 });
 
 // 2. МАГАЗИНЫ
 app.post('/store', (req, res) => {
-    const { uid, store } = req.body;
-    const profile = getUserProfileFromDB(uid);
-    if (!profile) return res.status(404).json({ ошибка: 'Пользователь не найден' });
+  const { uid, store } = req.body;
+  const profile = getUserProfileFromDB(uid);
+  if (!profile) return res.status(404).json({ ошибка: 'Пользователь не найден' });
 
-    // Если магазин приватный, генерируем токен приглашения
-    let token = store.inviteToken;
-    if (store.type === 'private' && !token) {
-        token = сгенерироватьТокен();
-    }
+  // Если магазин приватный, генерируем токен приглашения
+  let token = store.inviteToken;
+  if (store.type === 'private' && !token) {
+    token = сгенерироватьТокен();
+  }
 
-    const storeData = { ...store, inviteToken: token };
-    // Persist to SQLite
-    sqlDb.saveStoreData(uid, storeData);
-    // Update cache
-    updateUserProfileCache(uid, { store: storeData });
-    res.json({ ok: true, inviteToken: token });
+  const storeData = { ...store, inviteToken: token };
+  // Persist to SQLite
+  sqlDb.saveStoreData(uid, storeData);
+  // Update cache
+  updateUserProfileCache(uid, { store: storeData });
+  res.json({ ok: true, inviteToken: token });
 });
 
 app.get('/store/invite/:token', (req, res) => {
-    const { token } = req.params;
-    // Query all user profiles from SQLite (could be optimized with index)
-    // For now, iterate through cache + fallback to DB
-    for (const [uid, profile] of userProfileCache.entries()) {
-        if (profile.store && profile.store.inviteToken === token) {
-            return res.json({ uid, store: profile.store, publicKey: profile.publicKey });
-        }
+  const { token } = req.params;
+  // Query all user profiles from SQLite (could be optimized with index)
+  // For now, iterate through cache + fallback to DB
+  for (const [uid, profile] of userProfileCache.entries()) {
+    if (profile.store && profile.store.inviteToken === token) {
+      return res.json({ uid, store: profile.store, publicKey: profile.publicKey });
     }
-    // Fallback: could query DB directly, but for simplicity check all profiles
-    res.status(404).json({ ошибка: 'Приглашение недействительно' });
+  }
+  // Fallback: could query DB directly, but for simplicity check all profiles
+  res.status(404).json({ ошибка: 'Приглашение недействительно' });
 });
 
 // 3. ГРУППЫ
@@ -455,344 +477,347 @@ app.get('/store/invite/:token', (req, res) => {
 // принимаем старый формат (массив UID) для совместимости,
 // но НЕ отдаём его другим клиентам через API.
 app.post('/groups/create', (req, res) => {
-    const { title, ownerId, type, encryptedMembers, members } = req.body;
-    const id = `group_${Date.now()}`;
-    const token = type === 'private' ? сгенерироватьТокен() : undefined;
+  const { title, ownerId, type, encryptedMembers, members } = req.body;
+  const id = `group_${Date.now()}`;
+  const token = type === 'private' ? сгенерироватьТокен() : undefined;
 
-    // Phase 2: prefer encryptedMembers (opaque blob). Fallback to legacy members.
-    const opaqueMembers = encryptedMembers || ['__legacy_placeholder__'];
-    const memberCount = Array.isArray(opaqueMembers) ? opaqueMembers.length : 1;
+  // Phase 2: prefer encryptedMembers (opaque blob). Fallback to legacy members.
+  const opaqueMembers = encryptedMembers || ['__legacy_placeholder__'];
+  const memberCount = Array.isArray(opaqueMembers) ? opaqueMembers.length : 1;
 
-    группы.set(id, {
-        id,
-        title,
-        ownerId,
-        type,
-        token,
-        // Phase 2: opaque blob для сервера. Сервер не знает состав группы.
-        encryptedMembers: opaqueMembers,
-        memberCount,
-        // Помечаем legacy группы для возможной миграции в будущем.
-        isLegacy: !encryptedMembers && !!members,
-    });
-    console.log(`[ГРУППА] Создана ${id} (encrypted=${!!encryptedMembers}, members=${memberCount})`);
-    res.json({ id, token });
+  группы.set(id, {
+    id,
+    title,
+    ownerId,
+    type,
+    token,
+    // Phase 2: opaque blob для сервера. Сервер не знает состав группы.
+    encryptedMembers: opaqueMembers,
+    memberCount,
+    // Помечаем legacy группы для возможной миграции в будущем.
+    isLegacy: !encryptedMembers && !!members,
+  });
+  console.log(`[ГРУППА] Создана ${id} (encrypted=${!!encryptedMembers}, members=${memberCount})`);
+  res.json({ id, token });
 });
 
 app.post('/groups/join', (req, res) => {
-    const { uid, token, groupId, encryptedMembers } = req.body;
+  const { uid, token, groupId, encryptedMembers } = req.body;
 
-    let группа = null;
-    if (groupId) группа = группы.get(groupId);
-    else if (token) {
-        for (const g of группы.values()) {
-            if (g.token === token) { группа = g; break; }
-        }
+  let группа = null;
+  if (groupId) группа = группы.get(groupId);
+  else if (token) {
+    for (const g of группы.values()) {
+      if (g.token === token) {
+        группа = g;
+        break;
+      }
     }
+  }
 
-    if (!группа) return res.status(404).json({ ошибка: 'Группа не найдена' });
+  if (!группа) return res.status(404).json({ ошибка: 'Группа не найдена' });
 
-    // Phase 2: клиент отправляет обновлённый зашифрованный список участников.
-    if (encryptedMembers && Array.isArray(encryptedMembers)) {
-        группа.encryptedMembers = encryptedMembers;
-        группа.memberCount = encryptedMembers.length;
-        группа.isLegacy = false;
-    } else {
-        // Backward compat: legacy клиент без encryptedMembers.
-        console.warn(`[ГРУППА] Legacy join без encryptedMembers — count инкрементируется`);
-        if (!группа.encryptedMembers || группа.encryptedMembers.length === 0) {
-            группа.encryptedMembers = ['__legacy_placeholder__'];
-        }
-        группа.memberCount = (группа.memberCount || 1) + 1;
+  // Phase 2: клиент отправляет обновлённый зашифрованный список участников.
+  if (encryptedMembers && Array.isArray(encryptedMembers)) {
+    группа.encryptedMembers = encryptedMembers;
+    группа.memberCount = encryptedMembers.length;
+    группа.isLegacy = false;
+  } else {
+    // Backward compat: legacy клиент без encryptedMembers.
+    console.warn(`[ГРУППА] Legacy join без encryptedMembers — count инкрементируется`);
+    if (!группа.encryptedMembers || группа.encryptedMembers.length === 0) {
+      группа.encryptedMembers = ['__legacy_placeholder__'];
     }
+    группа.memberCount = (группа.memberCount || 1) + 1;
+  }
 
-    // Возвращаем группу БЕЗ encryptedMembers (opaque blob, клиент его уже имеет).
-    const { encryptedMembers: _omit, ...safeGroup } = группа;
-    // v3.14: Add member to group_members table
-    sqlDb.addGroupMember(группа.id, uid, 'member');
-    res.json({ group: safeGroup });
+  // Возвращаем группу БЕЗ encryptedMembers (opaque blob, клиент его уже имеет).
+  const { encryptedMembers: _omit, ...safeGroup } = группа;
+  // v3.14: Add member to group_members table
+  sqlDb.addGroupMember(группа.id, uid, 'member');
+  res.json({ group: safeGroup });
 });
 
 // ===== v3.14: Group Admin Tools REST API =====
 
 // Kick member from group
 app.post('/groups/kick', (req, res) => {
-    const { groupId, actorUid, targetUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Недостаточно прав' });
-    }
-    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-    if (targetRole === 'owner') {
-        return res.status(403).json({ error: 'Нельзя кикнуть владельца' });
-    }
-    sqlDb.removeGroupMember(groupId, targetUid);
-    sqlDb.logGroupAction(groupId, actorUid, 'kick', targetUid, {});
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+  const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+  if (targetRole === 'owner') {
+    return res.status(403).json({ error: 'Нельзя кикнуть владельца' });
+  }
+  sqlDb.removeGroupMember(groupId, targetUid);
+  sqlDb.logGroupAction(groupId, actorUid, 'kick', targetUid, {});
+  res.json({ ok: true });
 });
 
 // Ban user from group
 app.post('/groups/ban', (req, res) => {
-    const { groupId, actorUid, targetUid, reason } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Недостаточно прав' });
-    }
-    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-    if (targetRole === 'owner') {
-        return res.status(403).json({ error: 'Нельзя забанить владельца' });
-    }
-    sqlDb.banUser(groupId, targetUid, actorUid, reason || '');
-    sqlDb.logGroupAction(groupId, actorUid, 'ban', targetUid, { reason: reason || '' });
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid, reason } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+  const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+  if (targetRole === 'owner') {
+    return res.status(403).json({ error: 'Нельзя забанить владельца' });
+  }
+  sqlDb.banUser(groupId, targetUid, actorUid, reason || '');
+  sqlDb.logGroupAction(groupId, actorUid, 'ban', targetUid, { reason: reason || '' });
+  res.json({ ok: true });
 });
 
 // Unban user from group
 app.post('/groups/unban', (req, res) => {
-    const { groupId, actorUid, targetUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Недостаточно прав' });
-    }
-    sqlDb.unbanUser(groupId, targetUid);
-    sqlDb.logGroupAction(groupId, actorUid, 'unban', targetUid, {});
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+  sqlDb.unbanUser(groupId, targetUid);
+  sqlDb.logGroupAction(groupId, actorUid, 'unban', targetUid, {});
+  res.json({ ok: true });
 });
 
 // Promote member to admin
 app.post('/groups/promote', (req, res) => {
-    const { groupId, actorUid, targetUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (actorRole !== 'owner') {
-        return res.status(403).json({ error: 'Только владелец может повышать' });
-    }
-    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-    if (targetRole !== 'member') {
-        return res.status(400).json({ error: 'Можно повысить только участника' });
-    }
-    sqlDb.promoteToAdmin(groupId, targetUid);
-    sqlDb.logGroupAction(groupId, actorUid, 'promote', targetUid, {});
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (actorRole !== 'owner') {
+    return res.status(403).json({ error: 'Только владелец может повышать' });
+  }
+  const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+  if (targetRole !== 'member') {
+    return res.status(400).json({ error: 'Можно повысить только участника' });
+  }
+  sqlDb.promoteToAdmin(groupId, targetUid);
+  sqlDb.logGroupAction(groupId, actorUid, 'promote', targetUid, {});
+  res.json({ ok: true });
 });
 
 // Demote admin to member
 app.post('/groups/demote', (req, res) => {
-    const { groupId, actorUid, targetUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (actorRole !== 'owner') {
-        return res.status(403).json({ error: 'Только владелец может понижать' });
-    }
-    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-    if (targetRole !== 'admin') {
-        return res.status(400).json({ error: 'Можно понизить только админа' });
-    }
-    sqlDb.demoteToMember(groupId, targetUid);
-    sqlDb.logGroupAction(groupId, actorUid, 'demote', targetUid, {});
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (actorRole !== 'owner') {
+    return res.status(403).json({ error: 'Только владелец может понижать' });
+  }
+  const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+  if (targetRole !== 'admin') {
+    return res.status(400).json({ error: 'Можно понизить только админа' });
+  }
+  sqlDb.demoteToMember(groupId, targetUid);
+  sqlDb.logGroupAction(groupId, actorUid, 'demote', targetUid, {});
+  res.json({ ok: true });
 });
 
 // Transfer ownership
 app.post('/groups/transfer-ownership', (req, res) => {
-    const { groupId, actorUid, targetUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (actorRole !== 'owner') {
-        return res.status(403).json({ error: 'Только владелец может передать владение' });
-    }
-    const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-    if (targetRole !== 'admin' && targetRole !== 'member') {
-        return res.status(400).json({ error: 'Можно передать только админу или участнику' });
-    }
-    sqlDb.transferOwnership(groupId, targetUid);
-    sqlDb.logGroupAction(groupId, actorUid, 'transfer_ownership', targetUid, {});
-    res.json({ ok: true });
+  const { groupId, actorUid, targetUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (actorRole !== 'owner') {
+    return res.status(403).json({ error: 'Только владелец может передать владение' });
+  }
+  const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
+  if (targetRole !== 'admin' && targetRole !== 'member') {
+    return res.status(400).json({ error: 'Можно передать только админу или участнику' });
+  }
+  sqlDb.transferOwnership(groupId, targetUid);
+  sqlDb.logGroupAction(groupId, actorUid, 'transfer_ownership', targetUid, {});
+  res.json({ ok: true });
 });
 
 // Delete group
 app.delete('/groups/:groupId', (req, res) => {
-    const { groupId } = req.params;
-    const { actorUid } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (actorRole !== 'owner') {
-        return res.status(403).json({ error: 'Только владелец может удалить группу' });
-    }
-    sqlDb.logGroupAction(groupId, actorUid, 'delete_group', null, {});
-    группы.delete(groupId);
-    const members = sqlDb.getGroupMembers(groupId);
-    for (const member of members) {
-        sqlDb.removeGroupMember(groupId, member.user_uid);
-    }
-    res.json({ ok: true });
+  const { groupId } = req.params;
+  const { actorUid } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (actorRole !== 'owner') {
+    return res.status(403).json({ error: 'Только владелец может удалить группу' });
+  }
+  sqlDb.logGroupAction(groupId, actorUid, 'delete_group', null, {});
+  группы.delete(groupId);
+  const members = sqlDb.getGroupMembers(groupId);
+  for (const member of members) {
+    sqlDb.removeGroupMember(groupId, member.user_uid);
+  }
+  res.json({ ok: true });
 });
 
 // Get group audit log
 app.get('/groups/:groupId/audit-log', (req, res) => {
-    const { groupId } = req.params;
-    const { actorUid, limit, offset } = req.query;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Недостаточно прав' });
-    }
-    const logs = sqlDb.getGroupAuditLog(groupId, parseInt(limit) || 100, parseInt(offset) || 0);
-    res.json({ logs });
+  const { groupId } = req.params;
+  const { actorUid, limit, offset } = req.query;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+  const logs = sqlDb.getGroupAuditLog(groupId, parseInt(limit) || 100, parseInt(offset) || 0);
+  res.json({ logs });
 });
 
 // Get group members
 app.get('/groups/:groupId/members', (req, res) => {
-    const { groupId } = req.params;
-    const { actorUid } = req.query;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin', 'member'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Вы не участник этой группы' });
-    }
-    const members = sqlDb.getGroupMembers(groupId);
-    const bannedUsers = sqlDb.getBannedUsers(groupId);
-    res.json({ members, bannedUsers });
+  const { groupId } = req.params;
+  const { actorUid } = req.query;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin', 'member'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Вы не участник этой группы' });
+  }
+  const members = sqlDb.getGroupMembers(groupId);
+  const bannedUsers = sqlDb.getBannedUsers(groupId);
+  res.json({ members, bannedUsers });
 });
 
 // Get group settings
 app.get('/groups/:groupId/settings', (req, res) => {
-    const { groupId } = req.params;
-    const { actorUid } = req.query;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin', 'member'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Вы не участник этой группы' });
-    }
-    const settings = sqlDb.getGroupSettings(groupId);
-    res.json({ settings });
+  const { groupId } = req.params;
+  const { actorUid } = req.query;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin', 'member'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Вы не участник этой группы' });
+  }
+  const settings = sqlDb.getGroupSettings(groupId);
+  res.json({ settings });
 });
 
 // Update group settings
 app.put('/groups/:groupId/settings', (req, res) => {
-    const { groupId } = req.params;
-    const { actorUid, settings } = req.body;
-    const group = группы.get(groupId);
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
-    if (!['owner', 'admin'].includes(actorRole)) {
-        return res.status(403).json({ error: 'Недостаточно прав' });
-    }
-    sqlDb.updateGroupSettings(groupId, actorUid, settings);
-    sqlDb.logGroupAction(groupId, actorUid, 'update_settings', null, settings);
-    const updatedSettings = sqlDb.getGroupSettings(groupId);
-    res.json({ settings: updatedSettings });
+  const { groupId } = req.params;
+  const { actorUid, settings } = req.body;
+  const group = группы.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+  const actorRole = sqlDb.getGroupMemberRole(groupId, actorUid);
+  if (!['owner', 'admin'].includes(actorRole)) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+  sqlDb.updateGroupSettings(groupId, actorUid, settings);
+  sqlDb.logGroupAction(groupId, actorUid, 'update_settings', null, settings);
+  const updatedSettings = sqlDb.getGroupSettings(groupId);
+  res.json({ settings: updatedSettings });
 });
 
 // 4. ДОСКИ ОБЪЯВЛЕНИЙ
 app.post('/boards/create', (req, res) => {
-    const { uid, title, description, txid, rentalDuration, tariff } = req.body;
-    const profile = getUserProfileFromDB(uid);
-    if (!profile) return res.status(404).send();
+  const { uid, title, description, txid, rentalDuration, tariff } = req.body;
+  const profile = getUserProfileFromDB(uid);
+  if (!profile) return res.status(404).send();
 
-    // Симуляция проверки оплаты за создание доски
-    if (!проверитьТранзакцию(txid, 'SMART_CONTRACT_ADDR', tariff)) {
-        return res.status(402).json({ ошибка: 'Оплата не подтверждена' });
-    }
+  // Симуляция проверки оплаты за создание доски
+  if (!проверитьТранзакцию(txid, 'SMART_CONTRACT_ADDR', tariff)) {
+    return res.status(402).json({ ошибка: 'Оплата не подтверждена' });
+  }
 
-    const новаяДоска = {
-        id: `board_${Date.now()}`,
-        ownerUid: uid,
-        title,
-        description,
-        announcements: [],
-        expiresAt: Date.now() + (rentalDuration || 24 * 3600 * 1000) // По умолчанию день
-    };
+  const новаяДоска = {
+    id: `board_${Date.now()}`,
+    ownerUid: uid,
+    title,
+    description,
+    announcements: [],
+    expiresAt: Date.now() + (rentalDuration || 24 * 3600 * 1000), // По умолчанию день
+  };
 
-    const boards = [...(profile.boards || []), новаяДоска];
-    // Persist to SQLite
-    sqlDb.saveBoardsData(uid, boards);
-    // Update cache
-    updateUserProfileCache(uid, { boards });
-    res.json({ board: новаяДоска });
+  const boards = [...(profile.boards || []), новаяДоска];
+  // Persist to SQLite
+  sqlDb.saveBoardsData(uid, boards);
+  // Update cache
+  updateUserProfileCache(uid, { boards });
+  res.json({ board: новаяДоска });
 });
 
 app.put('/boards/:boardId', (req, res) => {
-    const { boardId } = req.params;
-    // Find board across all users (could be optimized with index)
-    for (const [uid, profile] of userProfileCache.entries()) {
-        const board = profile.boards?.find(b => b.id === boardId);
-        if (board) {
-            Object.assign(board, req.body);
-            // Persist updated boards
-            sqlDb.saveBoardsData(uid, profile.boards);
-            return res.json({ ok: true });
-        }
+  const { boardId } = req.params;
+  // Find board across all users (could be optimized with index)
+  for (const [uid, profile] of userProfileCache.entries()) {
+    const board = profile.boards?.find(b => b.id === boardId);
+    if (board) {
+      Object.assign(board, req.body);
+      // Persist updated boards
+      sqlDb.saveBoardsData(uid, profile.boards);
+      return res.json({ ok: true });
     }
-    res.status(404).json({ ошибка: 'Доска не найдена' });
+  }
+  res.status(404).json({ ошибка: 'Доска не найдена' });
 });
 
 app.post('/boards/:boardId/announcements', (req, res) => {
-    const { uid, announcement } = req.body;
-    const { boardId } = req.params;
+  const { uid, announcement } = req.body;
+  const { boardId } = req.params;
 
-    const profile = getUserProfileFromDB(uid);
-    if (!profile) return res.status(404).send();
+  const profile = getUserProfileFromDB(uid);
+  if (!profile) return res.status(404).send();
 
-    const доска = profile.boards?.find(д => д.id === boardId);
-    if (!доска) return res.status(404).json({ ошибка: 'Доска не найдена' });
+  const доска = profile.boards?.find(д => д.id === boardId);
+  if (!доска) return res.status(404).json({ ошибка: 'Доска не найдена' });
 
-    // Если доска платная (монетизация включена владельцем), проверяем TXID
-    if (доска.pricePerAd && доска.pricePerAd > 0) {
-        if (!проверитьТранзакцию(req.body.txid, доска.contractAddress, доска.pricePerAd)) {
-            return res.status(402).json({ ошибка: 'Требуется оплата' });
-        }
+  // Если доска платная (монетизация включена владельцем), проверяем TXID
+  if (доска.pricePerAd && доска.pricePerAd > 0) {
+    if (!проверитьТранзакцию(req.body.txid, доска.contractAddress, доска.pricePerAd)) {
+      return res.status(402).json({ ошибка: 'Требуется оплата' });
     }
+  }
 
-    доска.announcements.push({ ...announcement, id: `ann_${Date.now()}`, publishedAt: Date.now() });
-    // Persist updated boards
-    sqlDb.saveBoardsData(uid, profile.boards);
-    res.json({ ok: true });
+  доска.announcements.push({ ...announcement, id: `ann_${Date.now()}`, publishedAt: Date.now() });
+  // Persist updated boards
+  sqlDb.saveBoardsData(uid, profile.boards);
+  res.json({ ok: true });
 });
 
 app.delete('/boards/:boardId/announcements/:annId', (req, res) => {
-    const { boardId, annId } = req.params;
-    for (const [uid, profile] of userProfileCache.entries()) {
-        const board = profile.boards?.find(b => b.id === boardId);
-        if (board) {
-            board.announcements = board.announcements.filter(a => a.id !== annId);
-            // Persist updated boards
-            sqlDb.saveBoardsData(uid, profile.boards);
-            return res.json({ ok: true });
-        }
+  const { boardId, annId } = req.params;
+  for (const [uid, profile] of userProfileCache.entries()) {
+    const board = profile.boards?.find(b => b.id === boardId);
+    if (board) {
+      board.announcements = board.announcements.filter(a => a.id !== annId);
+      // Persist updated boards
+      sqlDb.saveBoardsData(uid, profile.boards);
+      return res.json({ ok: true });
     }
-    res.status(404).json({ ошибка: 'Доска не найдена' });
+  }
+  res.status(404).json({ ошибка: 'Доска не найдена' });
 });
 
 app.put('/boards/:boardId/announcements/:annId', (req, res) => {
-    const { boardId, annId } = req.params;
-    const { announcement } = req.body;
-    for (const [uid, profile] of userProfileCache.entries()) {
-        const board = profile.boards?.find(b => b.id === boardId);
-        if (board) {
-            const idx = board.announcements.findIndex(a => a.id === annId);
-            if (idx !== -1) {
-                board.announcements[idx] = { ...board.announcements[idx], ...announcement };
-                // Persist updated boards
-                sqlDb.saveBoardsData(uid, profile.boards);
-                return res.json({ ok: true });
-            }
-        }
+  const { boardId, annId } = req.params;
+  const { announcement } = req.body;
+  for (const [uid, profile] of userProfileCache.entries()) {
+    const board = profile.boards?.find(b => b.id === boardId);
+    if (board) {
+      const idx = board.announcements.findIndex(a => a.id === annId);
+      if (idx !== -1) {
+        board.announcements[idx] = { ...board.announcements[idx], ...announcement };
+        // Persist updated boards
+        sqlDb.saveBoardsData(uid, profile.boards);
+        return res.json({ ok: true });
+      }
     }
-    res.status(404).json({ ошибка: 'Объявление не найдено' });
+  }
+  res.status(404).json({ ошибка: 'Объявление не найдено' });
 });
 
 // ============================================================
@@ -871,9 +896,15 @@ app.get('/channels/:id/posts', (req, res) => {
 // Список всех публичных каналов (лента/каталог для клиента)
 app.get('/channels', (req, res) => {
   const list = Array.from(каналы.values()).map(к => ({
-    id: к.id, title: к.title, description: к.description, ownerId: к.ownerId,
-    avatar: к.avatar, verified: к.verified,
-    subscriberCount: к.subscribers.length, postCount: к.postCount, inviteToken: к.inviteToken,
+    id: к.id,
+    title: к.title,
+    description: к.description,
+    ownerId: к.ownerId,
+    avatar: к.avatar,
+    verified: к.verified,
+    subscriberCount: к.subscribers.length,
+    postCount: к.postCount,
+    inviteToken: к.inviteToken,
   }));
   res.json({ channels: list });
 });
@@ -883,15 +914,23 @@ app.post('/channels/:id/post', (req, res) => {
   const канал = каналы.get(req.params.id);
   if (!канал) return res.status(404).json({ ошибка: 'Канал не найден' });
   const { authorId, text, attachments } = req.body;
-  if (!канал.admins.includes(authorId)) return res.status(403).json({ ошибка: 'Только владелец/админ может публиковать' });
+  if (!канал.admins.includes(authorId))
+    return res.status(403).json({ ошибка: 'Только владелец/админ может публиковать' });
   const пост = {
-    id: `post_${Date.now()}`, channelId: канал.id, authorId,
-    text: text || '', attachments: attachments || [], timestamp: new Date().toISOString(), views: 0,
+    id: `post_${Date.now()}`,
+    channelId: канал.id,
+    authorId,
+    text: text || '',
+    attachments: attachments || [],
+    timestamp: new Date().toISOString(),
+    views: 0,
   };
   канал.posts = канал.posts || [];
   канал.posts.push(пост);
   канал.postCount = канал.posts.length;
-  канал.subscribers.forEach(u => { if (u !== authorId) отправить(u, { type: 'channel_post', post, channelId: канал.id }); });
+  канал.subscribers.forEach(u => {
+    if (u !== authorId) отправить(u, { type: 'channel_post', post, channelId: канал.id });
+  });
   res.json({ ok: true, post });
 });
 
@@ -903,7 +942,8 @@ app.post('/channels/admin/add', (req, res) => {
   const { channelId, ownerId, adminUid } = req.body;
   const канал = каналы.get(channelId);
   if (!канал) return res.status(404).json({ ошибка: 'Канал не найден' });
-  if (!проверитьВладельцаКанала(канал, ownerId)) return res.status(403).json({ ошибка: 'Только владелец может назначать админов' });
+  if (!проверитьВладельцаКанала(канал, ownerId))
+    return res.status(403).json({ ошибка: 'Только владелец может назначать админов' });
   if (!канал.admins.includes(adminUid)) канал.admins.push(adminUid);
   res.json({ ok: true, admins: канал.admins });
 });
@@ -911,7 +951,8 @@ app.post('/channels/admin/remove', (req, res) => {
   const { channelId, ownerId, adminUid } = req.body;
   const канал = каналы.get(channelId);
   if (!канал) return res.status(404).json({ ошибка: 'Канал не найден' });
-  if (!проверитьВладельцаКанала(канал, ownerId)) return res.status(403).json({ ошибка: 'Только владелец' });
+  if (!проверитьВладельцаКанала(канал, ownerId))
+    return res.status(403).json({ ошибка: 'Только владелец' });
   канал.admins = канал.admins.filter(u => u !== adminUid);
   res.json({ ok: true, admins: канал.admins });
 });
@@ -919,7 +960,8 @@ app.post('/channels/transfer', (req, res) => {
   const { channelId, ownerId, newOwnerUid } = req.body;
   const канал = каналы.get(channelId);
   if (!канал) return res.status(404).json({ ошибка: 'Канал не найден' });
-  if (!проверитьВладельцаКанала(канал, ownerId)) return res.status(403).json({ ошибка: 'Только владелец может передать канал' });
+  if (!проверитьВладельцаКанала(канал, ownerId))
+    return res.status(403).json({ ошибка: 'Только владелец может передать канал' });
   канал.ownerId = newOwnerUid;
   if (!канал.admins.includes(newOwnerUid)) канал.admins.push(newOwnerUid);
   res.json({ ok: true, ownerId: newOwnerUid });
@@ -927,12 +969,12 @@ app.post('/channels/transfer', (req, res) => {
 
 // --- ГРУППЫ: передача владения (creator management) ---
 app.post('/groups/transfer', (req, res) => {
-    const { groupId, ownerId, newOwnerUid } = req.body;
-    const группа = группы.get(groupId);
-    if (!группа) return res.status(404).json({ ошибка: 'Группа не найдена' });
-    if (группа.ownerId !== ownerId) return res.status(403).json({ ошибка: 'Только владелец' });
-    группа.ownerId = newOwnerUid;
-    res.json({ ok: true, ownerId: newOwnerUid });
+  const { groupId, ownerId, newOwnerUid } = req.body;
+  const группа = группы.get(groupId);
+  if (!группа) return res.status(404).json({ ошибка: 'Группа не найдена' });
+  if (группа.ownerId !== ownerId) return res.status(403).json({ ошибка: 'Только владелец' });
+  группа.ownerId = newOwnerUid;
+  res.json({ ok: true, ownerId: newOwnerUid });
 });
 
 // --- МАГАЗИНЫ: передача владения ---
@@ -957,13 +999,36 @@ app.post('/gifts/send', (req, res) => {
   const подарок = КАТАЛОГ_ПОДАРКОВ.find(g => g.id === giftId);
   if (!подарок) return res.status(404).json({ ошибка: 'Подарок не найден в каталоге' });
   if (!fromUid || !toUid) return res.status(400).json({ ошибка: 'fromUid и toUid обязательны' });
-  const giftSend = { id: `gift_${Date.now()}`, giftId, fromUid, toUid, channelId, message, sentAt: Date.now() };
-  отправить(toUid, { type: 'gift', gift: подарок, from: fromUid, message, channelId, sentAt: giftSend.sentAt });
+  const giftSend = {
+    id: `gift_${Date.now()}`,
+    giftId,
+    fromUid,
+    toUid,
+    channelId,
+    message,
+    sentAt: Date.now(),
+  };
+  отправить(toUid, {
+    type: 'gift',
+    gift: подарок,
+    from: fromUid,
+    message,
+    channelId,
+    sentAt: giftSend.sentAt,
+  });
   if (channelId) {
     const канал = каналы.get(channelId);
-    if (канал) канал.subscribers.forEach(u => {
-      if (u !== fromUid) отправить(u, { type: 'gift_channel', gift: подарок, from: fromUid, channelId, sentAt: giftSend.sentAt });
-    });
+    if (канал)
+      канал.subscribers.forEach(u => {
+        if (u !== fromUid)
+          отправить(u, {
+            type: 'gift_channel',
+            gift: подарок,
+            from: fromUid,
+            channelId,
+            sentAt: giftSend.sentAt,
+          });
+      });
   }
   res.json({ ok: true, gift: giftSend });
 });
@@ -972,7 +1037,15 @@ app.post('/gifts/send', (req, res) => {
 app.post('/rewards/grant', (req, res) => {
   const { uid, type, label, description, icon } = req.body;
   if (!uid || !label) return res.status(400).json({ ошибка: 'uid и label обязательны' });
-  const награда = { id: `reward_${Date.now()}`, uid, type: type || 'achievement', label, description, icon, earnedAt: Date.now() };
+  const награда = {
+    id: `reward_${Date.now()}`,
+    uid,
+    type: type || 'achievement',
+    label,
+    description,
+    icon,
+    earnedAt: Date.now(),
+  };
   if (!награды.has(uid)) награды.set(uid, []);
   награды.get(uid).push(награда);
   отправить(uid, { type: 'reward', reward: награда });
@@ -980,6 +1053,224 @@ app.post('/rewards/grant', (req, res) => {
 });
 app.get('/rewards/:uid', (req, res) => {
   res.json({ rewards: награды.get(req.params.uid) || [] });
+});
+
+// --- REACTIONS API ---
+app.post('/api/messages/:messageId/reaction', (req, res) => {
+  const { messageId } = req.params;
+  const { emoji, action } = req.body; // action: 'add' | 'remove'
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!emoji || !action) return res.status(400).json({ error: 'emoji and action required' });
+  if (!['add', 'remove'].includes(action))
+    return res.status(400).json({ error: 'action must be add or remove' });
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const uid = payload.uid;
+
+  // Verify message exists and user has access
+  const message = sqlDb.getMessage(messageId);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+
+  // Check if user is sender or receiver (or group member)
+  const isParticipant = message.sender_uid === uid || message.receiver_uid === uid;
+  if (!isParticipant) {
+    // Check group membership if it's a group message
+    // For now, allow if we can't determine - the DB will handle it
+  }
+
+  let success = false;
+  if (action === 'add') {
+    sqlDb.addReaction(messageId, uid, emoji);
+    success = true;
+  } else if (action === 'remove') {
+    success = sqlDb.removeReaction(messageId, uid, emoji);
+  }
+
+  if (!success) {
+    return res.status(400).json({ error: 'Failed to update reaction' });
+  }
+
+  // Get updated reaction counts
+  const reactions = sqlDb.getReactionCountsForMessage(messageId);
+  const myReactions = reactions.map(r => ({
+    ...r,
+    mine: r.users.includes(uid),
+  }));
+
+  // Broadcast to all chat participants via WebSocket
+  const broadcastData = {
+    type: 'reaction_update',
+    messageId,
+    userId: uid,
+    emoji,
+    action,
+    reactions: myReactions,
+  };
+
+  // Send to receiver (1-to-1) or group members
+  if (message.receiver_uid && message.receiver_uid !== uid) {
+    отправить(message.receiver_uid, broadcastData);
+  }
+  if (message.sender_uid && message.sender_uid !== uid) {
+    отправить(message.sender_uid, broadcastData);
+  }
+
+  res.json({ ok: true, reactions: myReactions });
+});
+
+// v3.18: Message Forwarding API
+app.post('/api/messages/:messageId/forward', (req, res) => {
+  const { messageId } = req.params;
+  const { targetChatIds } = req.body; // array of UIDs
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!targetChatIds || !Array.isArray(targetChatIds) || targetChatIds.length === 0) {
+    return res.status(400).json({ error: 'targetChatIds array required' });
+  }
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const uid = payload.uid;
+
+  // Verify message exists and user has access
+  const message = sqlDb.getMessage(messageId);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+
+  // Check if user is sender or receiver
+  const isParticipant = message.sender_uid === uid || message.receiver_uid === uid;
+  if (!isParticipant) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  // Forward the message
+  const result = sqlDb.forwardMessage(messageId, uid, targetChatIds);
+
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  // Get the new message IDs and broadcast them
+  // We need to get the newly created messages to broadcast
+  // For simplicity, we'll just return success count
+  // The actual broadcasting will happen when the recipients come online or via push
+
+  res.json({ ok: true, successCount: result.successCount });
+});
+
+// v3.19: Username-based User Lookup API
+
+// PUT /api/profile/username - Register or update username
+app.put('/api/profile/username', (req, res) => {
+  const { username } = req.body;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const uid = payload.uid;
+
+  // Update username
+  const result = sqlDb.updateUsername(uid, username);
+
+  if (!result.success) {
+    if (result.error === 'Username already taken') {
+      return res.status(409).json({ error: result.error });
+    }
+    return res.status(400).json({ error: result.error });
+  }
+
+  // Return updated profile
+  const profile = sqlDb.getUserPreview(uid);
+  res.json({ ok: true, profile });
+});
+
+// GET /api/users/search?q=<query> - Search users by username
+app.get('/api/users/search', (req, res) => {
+  const query = req.query.q;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!query || typeof query !== 'string') {
+    return res.status(400).json({ error: 'Query parameter q required' });
+  }
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const results = sqlDb.searchUsers(query);
+  res.json({ ok: true, users: results });
+});
+
+// GET /api/users/:uid/preview - Get user preview for contact card
+app.get('/api/users/:uid/preview', (req, res) => {
+  const { uid } = req.params;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const profile = sqlDb.getUserPreview(uid);
+  if (!profile) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json({ ok: true, profile });
+});
+
+// v3.20: Phone contact sync - Find users by phone hashes
+// POST /api/users/find-by-phone
+app.post('/api/users/find-by-phone', (req, res) => {
+  const { phoneHashes } = req.body;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!phoneHashes || !Array.isArray(phoneHashes) || phoneHashes.length === 0) {
+    return res.status(400).json({ error: 'phoneHashes array required' });
+  }
+
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  // Find users by phone hashes
+  const results = sqlDb.findUsersByPhoneHashes(phoneHashes);
+  res.json({ ok: true, users: results });
 });
 
 // --- WEBSOCKET LOGIK ---
@@ -1004,13 +1295,13 @@ app.get('/rewards/:uid', (req, res) => {
   const uid = payload.uid;
   ws.uid = uid;
   wsUsers.set(uid, ws);
-  
+
   // v3.11: Update presence - user is now online
   sqlDb.updateUserPresence(uid, true);
-  
+
   // Broadcast user online status to their contacts
   broadcastPresenceUpdate(uid, true);
-  
+
   // Load user profile from SQLite into cache
   const profile = sqlDb.getUserProfile(uid);
   if (profile) {
@@ -1020,7 +1311,7 @@ app.get('/rewards/:uid', (req, res) => {
     // Initialize empty profile in cache
     userProfileCache.set(uid, { publicKey: null, preKeyBundle: null, store: null, boards: [] });
   }
-  
+
   console.log('[WS] client connected: uid=' + uid);
 
   const offlineMsgs = sqlDb.takeOfflineMessages(uid);
@@ -1028,188 +1319,272 @@ app.get('/rewards/:uid', (req, res) => {
     ws.send(JSON.stringify(msg));
   });
 
-  ws.on('message', (данные) => {
+  ws.on('message', данные => {
+    let msg;
     try {
-      const msg = JSON.parse(данные);
-      if (msg.type === 'noise') return;
-      
-      // --- v3.11: Typing Indicators ---
-      if (msg.type === 'typing_start' || msg.type === 'typing_stop') {
-        const { chatId } = msg;
-        // Broadcast to chat participants (except sender)
-        broadcastTypingUpdate(chatId, uid, msg.type === 'typing_start');
-        return;
+      msg = JSON.parse(данные);
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+    if (msg.type === 'noise') return;
+    // --- v3.11: Typing Indicators ---
+    if (msg.type === 'typing_start' || msg.type === 'typing_stop') {
+      const { chatId } = msg;
+      // Broadcast to chat participants (except sender)
+      broadcastTypingUpdate(chatId, uid, msg.type === 'typing_start');
+      return;
+    }
+
+    // --- v3.11: Read Receipts ---
+    if (msg.type === 'message_read') {
+      const { messageId } = msg;
+      const readerUid = uid;
+
+      sqlDb.markMessageAsRead(messageId, readerUid);
+
+      // Notify sender that message was read
+      const message = sqlDb.getMessage(messageId);
+      if (message) {
+        отправить(message.sender_uid, {
+          type: 'receipt_update',
+          messageId,
+          readerUid,
+          timestamp: Date.now(),
+        });
       }
-      
-      // --- v3.11: Read Receipts ---
-      if (msg.type === 'message_read') {
-        const { messageId } = msg;
-        const readerUid = uid;
-        
-        sqlDb.markMessageAsRead(messageId, readerUid);
-        
-        // Notify sender that message was read
-        const message = sqlDb.getMessage(messageId);
-        if (message) {
-          отправить(message.sender_uid, {
-            type: 'receipt_update',
-            messageId,
-            readerUid,
-            timestamp: Date.now()
+      return;
+    }
+
+    if (msg.type === 'read' && msg.messageId) {
+      // Legacy read receipt handler - keep for backward compatibility
+      for (const [otherUid, otherUser] of wsUsers) {
+        if (otherUid === uid) continue;
+        if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+          otherUser.send(
+            JSON.stringify({
+              type: 'receipt',
+              receipt: 'read',
+              messageId: msg.messageId,
+              from: uid,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        }
+      }
+      return;
+    }
+    if (msg.type === 'typing' && msg.to) {
+      // Legacy typing handler - keep for backward compatibility
+      отправить(msg.to, {
+        type: 'typing',
+        from: uid,
+        chatId: msg.to,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    if (msg.type === 'message' || msg.type === 'text') {
+      const { to, content, id, groupId, channelId, encryptedAttachments, ttl } = msg;
+      const исходящее = {
+        from: uid,
+        content: content || '',
+        timestamp: new Date().toISOString(),
+        groupId,
+        type: msg.type,
+        channelId,
+      };
+      // Save message and get the message ID
+      const messageId = sqlDb.saveMessage({
+        senderUid: uid,
+        receiverUid: to,
+        content: content || '',
+        encryptedAttachments: encryptedAttachments || [],
+        ttl,
+      });
+      // Attach messageId to outgoing message for receipts
+      исходящее.id = messageId;
+
+      if (channelId) {
+        const канал = каналы.get(channelId);
+        if (канал) {
+          const пост = {
+            id: 'post_' + Date.now(),
+            channelId: канал.id,
+            authorId: uid,
+            text: content || '',
+            timestamp: new Date().toISOString(),
+            views: 0,
+          };
+          канал.posts = канал.posts || [];
+          канал.posts.push(пост);
+          канал.postCount = (канал.posts || []).length;
+          канал.subscribers.forEach(subUid => {
+            if (subUid === uid) return;
+            const subWs = wsUsers.get(subUid);
+            if (subWs && subWs.readyState === WebSocket.OPEN) {
+              subWs.send(
+                JSON.stringify({ ...исходящее, type: 'channel_post', post, channelId: канал.id })
+              );
+            }
           });
         }
-        return;
-      }
-      
-      if (msg.type === 'read' && msg.messageId) {
-        // Legacy read receipt handler - keep for backward compatibility
-        for (const [otherUid, otherUser] of wsUsers) {
-          if (otherUid === uid) continue;
-          if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-            otherUser.send(JSON.stringify({ type: 'receipt', receipt: 'read', messageId: msg.messageId, from: uid, timestamp: new Date().toISOString() }));
-          }
-        }
-        return;
-      }
-      if (msg.type === 'typing' && msg.to) {
-        // Legacy typing handler - keep for backward compatibility
-        отправить(msg.to, { type: 'typing', from: uid, chatId: msg.to, timestamp: new Date().toISOString() });
-        return;
-      }
-      if (msg.type === 'message' || msg.type === 'text') {
-        const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
-        const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
-        // Save message and get the message ID
-        const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
-        // Attach messageId to outgoing message for receipts
-        исходящее.id = messageId;
-        
-        if (channelId) {
-          const канал = каналы.get(channelId);
-          if (канал) {
-            const пост = { id: 'post_' + Date.now(), channelId: канал.id, authorId: uid, text: content || '', timestamp: new Date().toISOString(), views: 0 };
-            канал.posts = канал.posts || [];
-            канал.posts.push(пост);
-            канал.postCount = (канал.posts || []).length;
-            канал.subscribers.forEach(subUid => {
-              if (subUid === uid) return;
-              const subWs = wsUsers.get(subUid);
-              if (subWs && subWs.readyState === WebSocket.OPEN) {
-                subWs.send(JSON.stringify({ ...исходящее, type: 'channel_post', post, channelId: канал.id }));
-              }
-            });
-          }
-        } else if (groupId) {
-          const группа = группы.get(groupId);
-          if (группа) {
-            for (const [otherUid, otherUser] of wsUsers) {
-              if (otherUid === uid) continue;
-              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-                otherUser.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
-              }
+      } else if (groupId) {
+        const группа = группы.get(groupId);
+        if (группа) {
+          for (const [otherUid, otherUser] of wsUsers) {
+            if (otherUid === uid) continue;
+            if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+              otherUser.send(JSON.stringify({ ...исходящее, groupId: группа.id }));
             }
           }
-        } else {
-          отправить(to, исходящее);
         }
-        if (id) {
-          const recWs = wsUsers.get(to);
-          const delivered = recWs && recWs.readyState === WebSocket.OPEN;
-          отправить(uid, { type: 'receipt', receipt: delivered ? 'delivered' : 'queued', messageId: id, to: to, timestamp: new Date().toISOString(), queued: !delivered });
-        }
+      } else {
+        отправить(to, исходящее);
       }
-      if (msg.type === 'reaction') {
-        const { messageId, emoji, action, to, groupId } = msg;
+      if (id) {
+        const recWs = wsUsers.get(to);
+        const delivered = recWs && recWs.readyState === WebSocket.OPEN;
+        отправить(uid, {
+          type: 'receipt',
+          receipt: delivered ? 'delivered' : 'queued',
+          messageId: id,
+          to: to,
+          timestamp: new Date().toISOString(),
+          queued: !delivered,
+        });
+      }
+    }
+    if (msg.type === 'reaction') {
+      const { messageId, emoji, action, to, groupId } = msg; // action: 'add' | 'remove'
+
+      let success = false;
+      if (action === 'add') {
         sqlDb.addReaction(messageId, uid, emoji);
-        const reactionMsg = { type: 'reaction', messageId, userUid: uid, emoji, action };
-        if (to) {
-          отправить(to, reactionMsg);
+        success = true;
+      } else if (action === 'remove') {
+        success = sqlDb.removeReaction(messageId, uid, emoji);
+      }
+
+      if (!success) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to update reaction' }));
+        return;
+      }
+
+      // Get updated reaction counts
+      const reactions = sqlDb.getReactionCountsForMessage(messageId);
+      const myReactions = reactions.map(r => ({
+        ...r,
+        mine: r.users.includes(uid),
+      }));
+
+      // Broadcast updated reactions to all chat participants
+      const broadcastData = {
+        type: 'reaction_update',
+        messageId,
+        userId: uid,
+        emoji,
+        action,
+        reactions: myReactions,
+      };
+
+      // Get the message to know who to send to
+      const message = sqlDb.getMessage(messageId);
+      if (message) {
+        if (message.receiver_uid && message.receiver_uid !== uid) {
+          отправить(message.receiver_uid, broadcastData);
         }
-        if (groupId) {
-          const группа = группы.get(groupId);
-          if (группа) {
-            for (const [otherUid, otherUser] of wsUsers) {
-              if (otherUid === uid) continue;
-              if (otherUser && otherUser.readyState === WebSocket.OPEN) {
-                otherUser.send(JSON.stringify({ ...reactionMsg, groupId: группа.id }));
-              }
+        if (message.sender_uid && message.sender_uid !== uid) {
+          отправить(message.sender_uid, broadcastData);
+        }
+      }
+
+      // Also handle group messages
+      if (groupId) {
+        const группа = группы.get(groupId);
+        if (группа) {
+          for (const [otherUid, otherUser] of wsUsers) {
+            if (otherUid === uid) continue;
+            if (otherUser && otherUser.readyState === WebSocket.OPEN) {
+              otherUser.send(JSON.stringify({ ...broadcastData, groupId: группа.id }));
             }
           }
         }
       }
+    }
 
-      // --- v3.12: Message Editing ---
-      if (msg.type === 'message_edit') {
-        const { messageId, newContent } = msg;
+    // --- v3.12: Message Editing ---
+    if (msg.type === 'message_edit') {
+      const { messageId, newContent } = msg;
 
-        // Verify the user owns the message
-        const message = sqlDb.getMessage(messageId);
-        if (!message || message.sender_uid !== uid) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на редактирование' }));
-          return;
-        }
-
-        // Save old version and update
-        sqlDb.editMessage(messageId, newContent);
-
-        // Broadcast to chat participants
-        const editedAt = Date.now();
-        const broadcastMsg = {
-          type: 'message_edited',
-          messageId,
-          newContent,
-          editedAt
-        };
-
-        if (message.receiver_uid) {
-          отправить(message.receiver_uid, broadcastMsg);
-        }
-        // Also send back to sender for confirmation
-        ws.send(broadcastMsg);
+      // Verify the user owns the message
+      const message = sqlDb.getMessage(messageId);
+      if (!message || message.sender_uid !== uid) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на редактирование' }));
+        return;
       }
 
-      // --- v3.12: Message Deletion ---
-      if (msg.type === 'message_delete') {
-        const { messageId, deleteForAll } = msg;
+      // Save old version and update
+      sqlDb.editMessage(messageId, newContent);
 
-        const message = sqlDb.getMessage(messageId);
-        if (!message) return;
+      // Broadcast to chat participants
+      const editedAt = Date.now();
+      const broadcastMsg = {
+        type: 'message_edited',
+        messageId,
+        newContent,
+        editedAt,
+      };
 
-        // Check permissions: owner or group admin
-        const isOwner = message.sender_uid === uid;
-        let isAdmin = false;
+      if (message.receiver_uid) {
+        отправить(message.receiver_uid, broadcastMsg);
+      }
+      // Also send back to sender for confirmation
+      ws.send(broadcastMsg);
+    }
 
-        // For group messages, check if user is admin
-        // Note: This would need groupId to be passed in the message or derived from context
-        // For now, only owner can delete
+    // --- v3.12: Message Deletion ---
+    if (msg.type === 'message_delete') {
+      const { messageId, deleteForAll } = msg;
 
-        if (!isOwner && !isAdmin) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на удаление' }));
-          return;
-        }
+      const message = sqlDb.getMessage(messageId);
+      if (!message) return;
 
-        sqlDb.deleteMessage(messageId, deleteForAll, uid);
+      // Check permissions: owner or group admin
+      const isOwner = message.sender_uid === uid;
+      let isAdmin = false;
 
-        // Broadcast deletion event
-        const broadcastMsg = {
-          type: 'message_deleted',
-          messageId,
-          deleteForAll
-        };
+      // For group messages, check if user is admin
+      // Note: This would need groupId to be passed in the message or derived from context
+      // For now, only owner can delete
 
-        if (message.receiver_uid) {
-          отправить(message.receiver_uid, broadcastMsg);
-        }
-        // Also send back to sender for confirmation
-        ws.send(broadcastMsg);
-// --- v3.14: Group Admin Tools ---
+      if (!isOwner && !isAdmin) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Нет прав на удаление' }));
+        return;
+      }
+
+      sqlDb.deleteMessage(messageId, deleteForAll, uid);
+
+      // Broadcast deletion event
+      const broadcastMsg = {
+        type: 'message_deleted',
+        messageId,
+        deleteForAll,
+      };
+
+      if (message.receiver_uid) {
+        отправить(message.receiver_uid, broadcastMsg);
+      }
+      // Also send back to sender for confirmation
+      ws.send(broadcastMsg);
+      // --- v3.14: Group Admin Tools ---
 
       // Helper: Check group permission
       function checkGroupPermission(groupId, actorUid, allowedRoles) {
         const role = sqlDb.getGroupMemberRole(groupId, actorUid);
         return allowedRoles.includes(role);
       }
-      
+
       // Helper: Broadcast to all group members
       function broadcastToGroup(groupId, message) {
         const members = sqlDb.getGroupMembers(groupId);
@@ -1220,7 +1595,7 @@ app.get('/rewards/:uid', (req, res) => {
           }
         }
       }
-      
+
       // Kick member from group (owner or admin)
       if (msg.type === 'group_kick') {
         const { groupId, targetUid } = msg;
@@ -1235,10 +1610,15 @@ app.get('/rewards/:uid', (req, res) => {
         }
         sqlDb.removeGroupMember(groupId, targetUid);
         sqlDb.logGroupAction(groupId, uid, 'kick', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_kicked', groupId, targetUid, kickedBy: uid });
+        broadcastToGroup(groupId, {
+          type: 'group_member_kicked',
+          groupId,
+          targetUid,
+          kickedBy: uid,
+        });
         return;
       }
-      
+
       // Ban user from group (owner or admin)
       if (msg.type === 'group_ban') {
         const { groupId, targetUid, reason } = msg;
@@ -1253,10 +1633,16 @@ app.get('/rewards/:uid', (req, res) => {
         }
         sqlDb.banUser(groupId, targetUid, uid, reason || '');
         sqlDb.logGroupAction(groupId, uid, 'ban', targetUid, { reason: reason || '' });
-        broadcastToGroup(groupId, { type: 'group_member_banned', groupId, targetUid, bannedBy: uid, reason: reason || '' });
+        broadcastToGroup(groupId, {
+          type: 'group_member_banned',
+          groupId,
+          targetUid,
+          bannedBy: uid,
+          reason: reason || '',
+        });
         return;
       }
-      
+
       // Unban user from group (owner or admin)
       if (msg.type === 'group_unban') {
         const { groupId, targetUid } = msg;
@@ -1266,15 +1652,22 @@ app.get('/rewards/:uid', (req, res) => {
         }
         sqlDb.unbanUser(groupId, targetUid);
         sqlDb.logGroupAction(groupId, uid, 'unban', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_unbanned', groupId, targetUid, unbannedBy: uid });
+        broadcastToGroup(groupId, {
+          type: 'group_member_unbanned',
+          groupId,
+          targetUid,
+          unbannedBy: uid,
+        });
         return;
       }
-      
+
       // Promote member to admin (owner only)
       if (msg.type === 'group_promote') {
         const { groupId, targetUid } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может повышать до админа' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Только владелец может повышать до админа' })
+          );
           return;
         }
         const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
@@ -1284,15 +1677,23 @@ app.get('/rewards/:uid', (req, res) => {
         }
         sqlDb.promoteToAdmin(groupId, targetUid);
         sqlDb.logGroupAction(groupId, uid, 'promote', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_promoted', groupId, targetUid, promotedBy: uid, newRole: 'admin' });
+        broadcastToGroup(groupId, {
+          type: 'group_member_promoted',
+          groupId,
+          targetUid,
+          promotedBy: uid,
+          newRole: 'admin',
+        });
         return;
       }
-      
+
       // Demote admin to member (owner only)
       if (msg.type === 'group_demote') {
         const { groupId, targetUid } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может понижать админов' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Только владелец может понижать админов' })
+          );
           return;
         }
         const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
@@ -1302,33 +1703,53 @@ app.get('/rewards/:uid', (req, res) => {
         }
         sqlDb.demoteToMember(groupId, targetUid);
         sqlDb.logGroupAction(groupId, uid, 'demote', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_member_demoted', groupId, targetUid, demotedBy: uid, newRole: 'member' });
+        broadcastToGroup(groupId, {
+          type: 'group_member_demoted',
+          groupId,
+          targetUid,
+          demotedBy: uid,
+          newRole: 'member',
+        });
         return;
       }
-      
+
       // Transfer ownership (owner only)
       if (msg.type === 'group_transfer_ownership') {
         const { groupId, targetUid } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может передать владение' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Только владелец может передать владение' })
+          );
           return;
         }
         const targetRole = sqlDb.getGroupMemberRole(groupId, targetUid);
-        if (targetRole !== 'admin' and targetRole !== 'member') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Можно передать владение только админу или участнику' }));
+        if (targetRole !== 'admin' && targetRole !== 'member') {
+          ws.send(
+            JSON.stringify({
+              type: 'error',
+              message: 'Можно передать владение только админу или участнику',
+            })
+          );
           return;
         }
         sqlDb.transferOwnership(groupId, targetUid);
         sqlDb.logGroupAction(groupId, uid, 'transfer_ownership', targetUid, {});
-        broadcastToGroup(groupId, { type: 'group_ownership_transferred', groupId, newOwnerUid: targetUid, oldOwnerUid: uid });
+        broadcastToGroup(groupId, {
+          type: 'group_ownership_transferred',
+          groupId,
+          newOwnerUid: targetUid,
+          oldOwnerUid: uid,
+        });
         return;
       }
-      
+
       // Delete group (owner only)
       if (msg.type === 'group_delete') {
         const { groupId } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Только владелец может удалить группу' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Только владелец может удалить группу' })
+          );
           return;
         }
         sqlDb.logGroupAction(groupId, uid, 'delete_group', null, {});
@@ -1342,19 +1763,21 @@ app.get('/rewards/:uid', (req, res) => {
         }
         return;
       }
-      
+
       // Get group audit log (owner or admin)
       if (msg.type === 'group_audit_log_request') {
         const { groupId, limit, offset } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для просмотра лога' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Недостаточно прав для просмотра лога' })
+          );
           return;
         }
         const logs = sqlDb.getGroupAuditLog(groupId, limit || 100, offset || 0);
         ws.send(JSON.stringify({ type: 'group_audit_log_response', groupId, logs }));
         return;
       }
-      
+
       // Get group members with roles (any member)
       if (msg.type === 'group_members_request') {
         const { groupId } = msg;
@@ -1367,7 +1790,7 @@ app.get('/rewards/:uid', (req, res) => {
         ws.send(JSON.stringify({ type: 'group_members_response', groupId, members, bannedUsers }));
         return;
       }
-      
+
       // Get group settings (any member)
       if (msg.type === 'group_settings_request') {
         const { groupId } = msg;
@@ -1379,34 +1802,65 @@ app.get('/rewards/:uid', (req, res) => {
         ws.send(JSON.stringify({ type: 'group_settings_response', groupId, settings }));
         return;
       }
-      
+
       // Update group settings (owner or admin)
       if (msg.type === 'group_settings_update') {
         const { groupId, settings } = msg;
         if (!checkGroupPermission(groupId, uid, ['owner', 'admin'])) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно прав для изменения настроек' }));
+          ws.send(
+            JSON.stringify({ type: 'error', message: 'Недостаточно прав для изменения настроек' })
+          );
           return;
         }
         sqlDb.updateGroupSettings(groupId, uid, settings);
         sqlDb.logGroupAction(groupId, uid, 'update_settings', null, settings);
         const updatedSettings = sqlDb.getGroupSettings(groupId);
-        broadcastToGroup(groupId, { type: 'group_settings_updated', groupId, settings: updatedSettings, updatedBy: uid });
+        broadcastToGroup(groupId, {
+          type: 'group_settings_updated',
+          groupId,
+          settings: updatedSettings,
+          updatedBy: uid,
+        });
         return;
       }
-    } catch (e) { console.error(e); }
+    }
   });
 
   ws.on('close', () => {
     wsUsers.delete(uid);
     console.log('[WS] client disconnected: uid=' + uid);
-    
+
     // v3.11: Update presence - user is now offline
     sqlDb.updateUserPresence(uid, false);
-    
+
     // Broadcast user offline status to their contacts
     broadcastPresenceUpdate(uid, false);
   });
 });
+
+// v3.17: Disappearing messages cleanup job - runs every minute
+setInterval(() => {
+  try {
+    const expiredMessages = sqlDb.cleanupExpiredMessages();
+    if (expiredMessages.length > 0) {
+      console.log(`[Disappearing Messages] Cleaned up ${expiredMessages.length} expired messages`);
+      // Broadcast message_expired events to affected users
+      for (const msg of expiredMessages) {
+        const expiredEvent = {
+          type: 'message_expired',
+          messageId: msg.id,
+          chatId: msg.receiver_uid, // For 1-to-1, chatId is the other user's UID
+        };
+        // Notify sender
+        отправить(msg.sender_uid, expiredEvent);
+        // Notify receiver
+        отправить(msg.receiver_uid, expiredEvent);
+      }
+    }
+  } catch (e) {
+    console.error('[Disappearing Messages] Cleanup error:', e);
+  }
+}, 60000); // Run every minute
 
 function отправить(uidПолучателя, данные) {
   const ws = wsUsers.get(uidПолучателя);
@@ -1417,10 +1871,23 @@ function отправить(uidПолучателя, данные) {
     if (senderUid) {
       const senderWs = wsUsers.get(senderUid);
       if (senderWs && senderWs.readyState === WebSocket.OPEN) {
-        senderWs.send(JSON.stringify({ type: 'error', error: 'recipient_offline', messageId: данные.id, recipientUid: uidПолучателя, originalPayload: данные }));
+        senderWs.send(
+          JSON.stringify({
+            type: 'error',
+            error: 'recipient_offline',
+            messageId: данные.id,
+            recipientUid: uidПолучателя,
+            originalPayload: данные,
+          })
+        );
       }
     }
-    sqlDb.saveOfflineMessage({ senderUid: данные.from, receiverUid: uidПолучателя, content: typeof данные.content === 'string' ? данные.content : JSON.stringify(данные), encryptedAttachments: данные.encryptedAttachments || [] });
+    sqlDb.saveOfflineMessage({
+      senderUid: данные.from,
+      receiverUid: uidПолучателя,
+      content: typeof данные.content === 'string' ? данные.content : JSON.stringify(данные),
+      encryptedAttachments: данные.encryptedAttachments || [],
+    });
     console.log('[OFFLINE] recipient ' + uidПолучателя + ' not connected, queued in SQLite');
 
     // v3.13: Send push notification for offline user
@@ -1429,11 +1896,11 @@ function отправить(uidПолучателя, данные) {
       // Get sender's username for push title
       const sender = sqlDb.getUserByUid(senderUid);
       const senderName = sender ? sender.username : 'Unknown';
-      
+
       // chatId for direct messages is the other user's UID
       const chatId = senderUid; // or uidПолучателя, both work for navigation
       const messageId = данные.id;
-      
+
       // Send push notification (non-blocking, fire-and-forget)
       pushService.sendPushNotification(uidПолучателя, senderName, chatId, messageId);
     }
@@ -1448,12 +1915,14 @@ function broadcastTypingUpdate(chatId, senderUid, isTyping) {
   const recipientUid = chatId;
   const ws = wsUsers.get(recipientUid);
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'typing_update',
-      uid: senderUid,
-      chatId,
-      isTyping
-    }));
+    ws.send(
+      JSON.stringify({
+        type: 'typing_update',
+        uid: senderUid,
+        chatId,
+        isTyping,
+      })
+    );
   }
 }
 
@@ -1466,9 +1935,9 @@ function broadcastPresenceUpdate(uid, isOnline) {
     type: 'presence_update',
     uid,
     isOnline,
-    lastSeen: isOnline ? null : Math.floor(Date.now() / 1000)
+    lastSeen: isOnline ? null : Math.floor(Date.now() / 1000),
   };
-  
+
   for (const [otherUid, otherUser] of wsUsers) {
     if (otherUid === uid) continue;
     if (otherUser && otherUser.readyState === WebSocket.OPEN) {
@@ -1481,4 +1950,19 @@ function broadcastPresenceUpdate(uid, isOnline) {
 app.use(express.static(path.join(__dirname, 'dist'))); // Если используется сборка
 app.use(express.static(__dirname)); // Для прямой раздачи файлов при разработке
 
-сервер.listen(ПОРТ, () => console.log(`Сервер на порту ${ПОРТ}. Админка доступна по /admin (admin:admin123)`));
+// Allow address reuse to avoid EADDRINUSE on rapid restarts
+сервер.on('error', e => {
+  if (e.code === 'EADDRINUSE') {
+    console.error('[Server] Port in use, retrying...');
+    setTimeout(() => {
+      сервер.close();
+      сервер.listen(ПОРТ);
+    }, 1000);
+  } else {
+    console.error('[Server] Error:', e);
+  }
+});
+
+сервер.listen(ПОРТ, () =>
+  console.log(`Сервер на порту ${ПОРТ}. Админка доступна по /admin (admin:admin123)`)
+);

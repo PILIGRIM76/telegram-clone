@@ -1,11 +1,11 @@
 import { logger } from '../../services/logger';
-// SignalMessageLayer: hybrid encrypt/decrypt for the WS layer.
-// Phase 1: Signal (Double Ratchet) when session exists, NaCl fallback.
+// Гибридное шифрование и расшифрование сообщений для уровня WebSocket.
+// При наличии сессии используется Signal Double Ratchet, иначе — резервный NaCl.
 import { ProtocolAddress, SessionCipher } from 'libsignal';
-import type { PreKeyBundle } from './types';
-import { SignalStorage } from './SignalStorage';
+import { decryptMessage as naclDecrypt, encryptMessage as naclEncrypt } from '../encryption';
 import { SessionStore } from './SessionStore';
-import { encryptMessage as naclEncrypt, decryptMessage as naclDecrypt } from '../encryption';
+import { SignalStorage } from './SignalStorage';
+import type { PreKeyBundle } from './types';
 
 export type EncryptionType = 'signal' | 'nacl';
 
@@ -44,9 +44,7 @@ export async function decryptWithSignal(
   await storage.warmCacheFromStorage();
   const address = new ProtocolAddress(remoteUid, deviceId);
   const cipher = new SessionCipher(storage, address);
-  const bytes = new Uint8Array(
-    payload.data.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
-  );
+  const bytes = new Uint8Array(payload.data.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
   const plaintext = await cipher.decryptWhisperMessage(bytes);
   return new TextDecoder().decode(plaintext);
 }

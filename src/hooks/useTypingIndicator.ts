@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { apiService } from "../services/apiService";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiService } from '../services/apiService';
 
 export function useTypingIndicator(chatId: string) {
   const [isTyping, setIsTyping] = useState(false);
@@ -19,14 +19,14 @@ export function useTypingIndicator(chatId: string) {
     apiService.sendTypingStop(chatId);
   }, [chatId]);
 
-  // Debounced typing stop
+  // Откладывает отправку события об остановке набора текста.
   const debouncedTypingStop = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     debounceTimeoutRef.current = setTimeout(() => {
       sendTypingStop();
-    }, 2000); // 2 second debounce
+    }, 2000); // Задержка перед событием остановки — 2 секунды.
   }, [sendTypingStop]);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function useTypingIndicator(chatId: string) {
         if (data.isTyping) {
           typingTimeoutRef.current = setTimeout(() => {
             setIsTyping(false);
-          }, 5000); // Auto-clear after 5 seconds if no typing_stop received
+          }, 5000); // Сбрасываем индикатор через 5 секунд, если не получено событие typing_stop.
         }
       }
     };
@@ -56,13 +56,11 @@ export function useTypingIndicator(chatId: string) {
     };
   }, [chatId]);
 
-  // Call this when user starts typing
   const onInputChange = useCallback(() => {
     sendTypingStart();
     debouncedTypingStop();
   }, [sendTypingStart, debouncedTypingStop]);
 
-  // Call this when message is sent (immediately stop typing indicator)
   const onMessageSent = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);

@@ -1,14 +1,11 @@
 // ============================================
-// Signal Protocol Types for PILIGRIM
+// Типы протокола Signal, используемые в PILIGRIM.
 // ============================================
-// Phase 1: Perfect Forward Secrecy migration
-// Based on @signalapp/libsignal-client v0.102.0
+// Миграция на прямую секретность.
+// Основано на @signalapp/libsignal-client v0.102.0.
 // ============================================
 
-/**
- * Pre-key bundle received from a remote user.
- * Used to establish a new Double Ratchet session.
- */
+/** Набор ключей, полученный от удалённого пользователя для создания сессии Double Ratchet. */
 export interface PreKeyBundle {
   registrationId: number;
   deviceId: number;
@@ -53,7 +50,7 @@ export interface StoredIdentityKeyPair {
 }
 
 export interface StoredSession {
-  /** Composite key: `${uid}:${deviceId}` */
+  /** Составной ключ в формате `${uid}:${deviceId}`. */
   sessionKey: string;
   uid: string;
   deviceId: number;
@@ -105,7 +102,7 @@ export function generateDeviceId(): number {
 
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
+    .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
 

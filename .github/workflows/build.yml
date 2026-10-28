@@ -1,0 +1,121 @@
+﻿name: Build Desktop Apps
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: CipherLink-*-portable.exe
+            build-script: build:win
+          - os: ubuntu-latest
+            platform: linux
+            artifact: CipherLink-*.AppImage
+            build-script: build:linux
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:4000
+          VITE_WS_URL: ws://localhost:4000
+          VITE_APP_NAME: CipherLink
+      
+      - name: Build Electron app
+        run: npm run ${{ matrix.build-script }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Sign Windows executable
+        if: matrix.platform == 'win'
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          # Надежная проверка: если секрет пустой, просто пропускаем шаг без ошибки
+          if ([string]::IsNullOrEmpty($env:WIN_CSC_LINK)) {
+            Write-Host "⏭️ WIN_CSC_LINK is empty. Skipping code signing." -ForegroundColor Yellow
+            exit 0
+          }
+          
+          Write-Host "🔐 Signing executables..." -ForegroundColor Cyan
+          
+          # Декодируем сертификат из Base64
+          $pfxBytes = [Convert]::FromBase64String($env:WIN_CSC_LINK)
+          $pfxPath = "$env:TEMP\cert.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          
+          # Ищем signtool.exe
+          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Where-Object { $_.FullName -like "*x64*" } | Sort-Object FullName -Descending | Select-Object -First 1
+          
+          if (-not $signtool) { 
+            Write-Host "❌ signtool.exe not found" -ForegroundColor Red
+            exit 1 
+          }
+          
+          # Подписываем все .exe файлы в папке release/
+          $exeFiles = Get-ChildItem -Path "release" -Recurse -Filter "*.exe"
+          foreach ($exe in $exeFiles) {
+            Write-Host "Signing: $($exe.FullName)" -ForegroundColor Green
+            & $signtool.FullName sign /f $pfxPath /p $env:WIN_CSC_KEY_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exe.FullName
+            & $signtool.FullName verify /pa $exe.FullName
+          }
+          
+          Remove-Item $pfxPath -Force
+          Write-Host "✅ Signing completed successfully!" -ForegroundColor Green
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cipherlink-${{ matrix.platform }}
+          path: release/${{ matrix.artifact }}
+          retention-days: 7
+  
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,138 +1,132 @@
-
 export interface AuthResult {
-    success: boolean;
-    user?: User;
-    error?: string;
-    message?: string;
-    requires2FA?: boolean;
-    sessionToken?: string;
-    qrCode?: string;
-    secret?: string;
+  success: boolean;
+  user?: User;
+  error?: string;
+  message?: string;
+  requires2FA?: boolean;
+  sessionToken?: string;
+  qrCode?: string;
+  secret?: string;
 }
 
 export interface TwoFactorSetup {
-    success?: boolean;
-    error?: string;
-    secret: string;
-    qrCode: string;
-    manualKey: string;
+  success?: boolean;
+  error?: string;
+  secret: string;
+  qrCode: string;
+  manualKey: string;
 }
 
 export interface User {
-    uid: string;
-    имяПользователя?: string;
+  uid: string;
+  имяПользователя?: string;
 }
 
 export type MessageStatus = 'sent' | 'delivered' | 'read' | 'received';
 export type E2EEStatus = 'verified' | 'pending' | 'unverified';
 export type OrderStatus = 'new' | 'processing' | 'shipped' | 'completed' | 'paid' | 'cancelled';
 
-/**
- * Phase 7: Pure BIP39 + secp256k1 Identity (v7)
- * 
- * Новая схема: BIP39 → secp256k1 → identity (ключи напрямую, без ECDSA wrapper)
- * - publicKeyHex: 33 байта compressed secp256k1 public key (hex string, 66 chars)
- * - privateKeyHex: 32 байта secp256k1 private key (hex string, 64 chars)
- * - UID = uid_ + первые 16 байт приватного ключа (hex)
- * 
- * Benefits:
- * - Быстрее keygen (нет Web Crypto API round-trip)
- * - Меньше кода, меньше attack surface
- * - Детерминированно: одни и те же 12 слов → одни и те же ключи
- */
+/** Identity v7 на основе BIP39 и secp256k1, без обёртки ECDSA. */
 export interface Identity {
   uid: string;
-  /** Phase 7: secp256k1 public key in compressed hex format (33 bytes = 66 hex chars) */
+  /** Публичный ключ secp256k1 в сжатом hex-формате (33 байта, 66 символов). */
   publicKeyHex: string;
-  /** Phase 7: secp256k1 private key in hex format (32 bytes = 64 hex chars) */
+  /** Приватный ключ secp256k1 в hex-формате (32 байта, 64 символа). */
   privateKeyHex: string;
-  /** Username for display */
+
   username?: string;
-  /** Avatar image base64 data URL */
+  /** Изображение аватара в формате base64 data URL. */
   avatar?: string;
-  /** Store data (for marketplace feature) */
+
   store?: Store;
-  /** Announcement boards */
+  /** Доски объявлений пользователя. */
   boards?: NoticeBoard[];
-  /** 8-hex-char fingerprint for visual verification (SHA-256(truncated) of publicKeyHex) */
+  /** Отпечаток из 8 hex-символов для визуальной проверки: усечённый SHA-256 публичного ключа. */
   keyFingerprint?: string;
-  /** 12-word BIP39 seed phrase (stored as space-separated string for Phase 7) */
+  /** Фраза BIP39 из 12 слов, сохранённая одной строкой. */
   seedPhrase?: string;
-  /** Version marker: 'v7' for new pure BIP39/secp256k1 scheme */
+  /** Версия identity: v7 использует BIP39 и secp256k1. */
   version?: 'v7';
-  /** Always true for new identities */
+
   isBIP39?: boolean;
-  /** Transport NaCl box public key (base64) for E2EE message encryption */
+  /** Публичный транспортный ключ NaCl box в base64 для сквозного шифрования сообщений. */
   transportPublicKey?: string;
 }
 
 /**
- * Legacy identity (pre-Phase 7): с использованием ECDSA P-256 и encryptedKeyPair.
+ * Устаревший формат identity до этапа 7: использует ECDSA P-256 и encryptedKeyPair.
  * Автоматически мигрируется при восстановлении из seed-фразы.
  */
 export interface LegacyIdentity {
   uid: string;
-  /** ECDSA P-256 JWK public key (legacy) */
+  /** Публичный ключ ECDSA P-256 в формате JWK для identity старого формата. */
   publicKey: string;
-  /** ECDSA P-256 JWK private key (legacy) */
+  /** Приватный ключ ECDSA P-256 в формате JWK для identity старого формата. */
   privateKey: string;
   username?: string;
   avatar?: string;
   store?: Store;
   boards?: NoticeBoard[];
   keyFingerprint?: string;
-  /** 12-словная BIP39 фраза */
+  /** Фраза BIP39 из 12 слов. */
   seedPhrase?: string;
-  /** Зашифрованный ECDSA JWK (legacy) */
+  /** Зашифрованный ключ ECDSA JWK старого формата. */
   encryptedKeyPair?: string;
-  /** false/undefined = legacy PBKDF2 identity */
+  /** Значение false или undefined обозначает identity, созданную прежним способом PBKDF2. */
   isBIP39?: boolean;
-  /** Transport NaCl box public key (base64) for E2EE message encryption */
+  /** Публичный транспортный ключ NaCl box в base64 для сквозного шифрования сообщений. */
   transportPublicKey?: string;
 }
 
-/**
- * Union type for all identity variants.
- * Use isBIP39/version to distinguish at runtime.
- */
+/** Объединённый тип identity; варианты различаются по полю isBIP39 или version. */
 export type IdentityType = Identity | LegacyIdentity;
 
 export interface Contact {
-  id: string; // Локальный ID
+  id: string; // Локальный идентификатор.
   uid: string;
   name: string;
   verified: boolean;
-  /** Phase 7: secp256k1 public key in hex format (66 chars) OR ECDSA JWK (legacy) */
+  /** Публичный ключ secp256k1 в hex-формате или JWK ECDSA для устаревшей identity. */
   publicKey?: string;
-  /** Phase 7: secp256k1 public key hex (preferred) */
+  /** Публичный ключ secp256k1 в hex-формате; предпочтительный вариант. */
   publicKeyHex?: string;
   keyFingerprint?: string;
   mutedUntil?: number | 'forever';
   archived?: boolean;
-  /** v3.0 Phase 4: E2EE status of contact */
+  /** Статус сквозного шифрования контакта. */
   e2eeStatus?: E2EEStatus;
-  /** v3.11: Online status (true if connected via WebSocket) */
+  /** Признак, что пользователь подключён через WebSocket. */
   isOnline?: boolean;
-  /** v3.11: Last seen timestamp (unix seconds) */
+  /** Время последней активности в формате Unix time (секунды). */
   lastSeen?: number;
 }
 
 export interface Group {
-    id: string; // ID на сервере
-    name: string;
-    members: string[]; // UID участников
-    ownerId: string;
-    type: 'public' | 'private';
-    inviteToken?: string;
+  id: string; // Идентификатор на сервере.
+  name: string;
+  members: string[]; // UID участников
+  ownerId: string;
+  type: 'public' | 'private';
+  inviteToken?: string;
+}
+
+// v3.19: User preview for contact cards and search results
+export interface UserPreview {
+  uid: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  // v3.20: Phone hash for contact sync (optional, for debugging/display)
+  phoneHash?: string;
 }
 
 export interface Gift {
-    id: string;
-    name: string;
-    emoji: string;
-    type: 'free' | 'premium';
-    price?: number;
-    currency?: string;
+  id: string;
+  name: string;
+  emoji: string;
+  type: 'free' | 'premium';
+  price?: number;
+  currency?: string;
 }
 
 export interface Message {
@@ -145,76 +139,102 @@ export interface Message {
   type?: 'user' | 'system' | 'read' | 'voice';
 
   // Медиа файлы
-  media?: string; // Base64 строка (legacy single media)
+  media?: string; // Строка Base64 для одного медиафайла старого формата.
   mediaType?: 'image' | 'video';
 
-  // v3.0 Phase 5: массив вложений (фото-галерея)
+  // Этап 5: массив вложений для фотогалереи.
   attachments?: { id: string; dataUrl: string; name: string }[];
 
   // Для исчезающих сообщений
-  disappearIn?: number; // В секундах
-  timerSetAt?: number; // Timestamp установки
+  disappearIn?: number; // В секундах (TTL при отправке)
+  timerSetAt?: number; // Время установки таймера (Unix ms)
+  expiresAt?: number; // Время истечения таймера (Unix ms) - вычисляется на сервере
 
   // Для сложных данных (заказы, обновления, подарки)
-  payload?: any;
+  payload?: unknown;
 
-    // Phase 7.6 / Stage 4: E2EE (RSA-OAEP)
-  /** Зашифрованный текст (base64). Если есть — UI показывает иконку 🔒. */
+  // Поля сквозного шифрования RSA-OAEP.
+  /** Зашифрованный текст в base64. При наличии интерфейс показывает значок 🔒. */
   encryptedPayload?: string;
-  /** Флаг: true если сообщение было зашифровано при отправке. */
+  /** Признак того, что сообщение было зашифровано при отправке. */
   isEncrypted?: boolean;
-    /** v3.0 Phase 3: ID родительского сообщения, на которое данное является ответом */
+  /** Этап 3: идентификатор сообщения, на которое дано это сообщение. */
   replyTo?: string;
 
-  /** v3.0 Phase 4: E2EE status of individual message */
-  /** v3.0 Phase 4: E2EE status of individual message */
   e2eeStatus?: E2EEStatus;
 
   // ============================================================
-  // E2EE File Attachments (Phase: File Sharing)
+  // Зашифрованные файловые вложения.
   // ============================================================
-  /** Зашифрованные файловые вложения с E2EE метаданными */
+  /** Зашифрованные файловые вложения с метаданными сквозного шифрования. */
   encryptedAttachments?: EncryptedAttachment[];
 
-  // v3.9: Voice Messages
-  /** Метаданные голосового сообщения */
+  // Данные голосового сообщения.
+  /** Метаданные голосового сообщения. */
   voiceMetadata?: VoiceMessageMetadata;
 
-  // v3.12: Message Editing & Deletion
-  /** Timestamp последнего редактирования */
+  // Редактирование и удаление сообщений.
+  /** Время последнего редактирования. */
   editedAt?: number;
-  /** Timestamp удаления */
+  /** Время удаления. */
   deletedAt?: number;
-  /** Флаг: сообщение было отредактировано */
+  /** Признак того, что сообщение было отредактировано. */
   isEdited?: boolean;
-  /** Флаг: сообщение удалено (для текущего пользователя) */
+  /** Признак подсветки сообщения в результатах поиска. */
+  highlighted?: boolean;
+  /** Признак того, что сообщение удалено для текущего пользователя. */
   isDeleted?: boolean;
 
-  // v3.11: Read Receipts
-  /** Массив объектов {uid, timestamp} для отслеживания кто прочитал */
+  // Отметки о прочтении.
+  /** Массив объектов {uid, timestamp} для отслеживания прочтения. */
   readBy?: { uid: string; timestamp: number }[];
+
+  // Реакции (эмодзи).
+  /** Массив реакций: { emoji: string; count: number; users: string[]; mine?: boolean }. */
+  reactions?: Reaction[];
+
+  // Пересылка сообщений.
+  /** Информация об исходном сообщении, если это пересланное сообщение. */
+  forwardedFrom?: {
+    /** UID оригинального отправителя. */
+    originalSenderUid: string;
+    /** ID оригинального сообщения. */
+    originalMessageId: string;
+    /** Счетчик пересылок (сколько раз пересылали). */
+    forwardCount: number;
+    /** Имя оригинального отправителя (для отображения в UI). */
+    originalSenderName?: string;
+  };
+}
+
+/** Реакция на сообщение (эмодзи + количество + список пользователей). */
+export interface Reaction {
+  emoji: string;
+  count: number;
+  users: string[]; // UID пользователей, поставивших эту реакцию
+  mine?: boolean; // Поставил ли текущий пользователь эту реакцию
 }
 
 /**
  * Зашифрованное файловое вложение с E2EE
- * - ciphertext: зашифрованные данные файла (ArrayBuffer base64)
- * - iv: вектор инициализации AES-GCM
- * - key: симметричный ключ, зашифрованный публичным ключом получателя
- * - name: оригинальное имя файла
- * - type: MIME-тип файла
- * - size: оригинальный размер файла
+ * - ciphertext: зашифрованные данные файла (ArrayBuffer в base64);
+ * - iv: вектор инициализации AES-GCM;
+ * - key: симметричный ключ, зашифрованный открытым ключом получателя;
+ * - name: исходное имя файла;
+ * - type: MIME-тип файла;
+ * - size: исходный размер файла.
  */
 export interface EncryptedAttachment {
   id: string;
   name: string;
   type: string;
   size: number;
-  ciphertext: string; // base64 encoded ArrayBuffer
-  iv: string; // base64 encoded Uint8Array
-  key: string; // base64 encoded encrypted symmetric key
+  ciphertext: string; // Зашифрованные данные ArrayBuffer в base64.
+  iv: string; // Вектор инициализации Uint8Array в base64.
+  key: string; // Зашифрованный симметричный ключ в base64.
 }
 
-/** Original attachment type (for backward compatibility) */
+/** Вложение с данными, подготовленными для отображения в интерфейсе. */
 export interface Attachment {
   id: string;
   dataUrl: string;
@@ -224,153 +244,153 @@ export interface Attachment {
 export interface Chat {
   contactId: string; // Может быть ID контакта или ID группы
   messages: Message[];
-  disappearTimer?: number; // Текущая настройка таймера для этого чата
-  /** v1.6 Batch 4: timestamp до которого уведомления чата заглушены (Number.MAX_SAFE_INTEGER = forever) */
+  disappearIn?: number; // Текущая настройка таймера для этого чата (секунды)
+  /** Этап 4: время, до которого уведомления отключены (Number.MAX_SAFE_INTEGER означает навсегда). */
   mutedUntil?: number;
-  /** v1.6 Batch 4: чат в архиве (скрыт из основного списка) */
+  /** Этап 4: чат перемещён в архив и скрыт из основного списка. */
   archived?: boolean;
-  /** v3.0 Phase 4 (Signal Protocol): тип шифрования чата — 'signal' (PFS, Double Ratchet) или 'nacl' (legacy). */
+  /** Этап 4 (Signal Protocol): тип шифрования — 'signal' (PFS, Double Ratchet) или 'nacl' (старый формат). */
   encryptionType?: 'signal' | 'nacl';
 }
 
 // --- E-Commerce и Доски ---
 
 export interface Product {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    currency: string; // Обычно 'USDT' или 'BTC' (симуляция)
-    image?: string; // Base64
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string; // Обычно 'USDT' или 'BTC' (симуляция)
+  image?: string; // Данные в формате Base64.
 }
 
 export interface Order {
-    id: string;
-    product: Product;
-    buyerUid: string;
-    status: OrderStatus;
-    createdAt: number;
-    txid?: string; // ID транзакции оплаты
+  id: string;
+  product: Product;
+  buyerUid: string;
+  status: OrderStatus;
+  createdAt: number;
+  txid?: string; // ID транзакции оплаты
 }
 
 export interface Store {
-    name: string;
-    description: string;
-    type: 'public' | 'private';
-    products: Product[];
-    sellerWallet?: string;
-    paymentAddress?: string; // Смарт-контракт
-    inviteToken?: string;
+  name: string;
+  description: string;
+  type: 'public' | 'private';
+  products: Product[];
+  sellerWallet?: string;
+  paymentAddress?: string; // Смарт-контракт
+  inviteToken?: string;
 }
 
 export interface Announcement {
-    id: string;
-    title: string;
-    content: string;
-    publishedAt: number;
+  id: string;
+  title: string;
+  content: string;
+  publishedAt: number;
 }
 
 export interface NoticeBoard {
-    id: string;
-    ownerUid: string;
-    name: string;
-    description: string;
-    announcements: Announcement[];
-    
-    // Монетизация
-    expiresAt?: number; // Timestamp
-    pricePerAd?: number;
-    ownerWallet?: string;
-    contractAddress?: string;
+  id: string;
+  ownerUid: string;
+  name: string;
+  description: string;
+  announcements: Announcement[];
+
+  // Монетизация
+  expiresAt?: number; // Временные отметки.
+  pricePerAd?: number;
+  ownerWallet?: string;
+  contractAddress?: string;
 }
 
 // ============================================================
-// Telegram-like features (v3.x): Channels, Gifts, Rewards, Creator Management
+// Каналы, подарки, награды и инструменты управления авторами.
 // ============================================================
 
 /** Роль участника в канале/группе/магазине. */
 export type MemberRole = 'owner' | 'admin' | 'moderator' | 'member';
 
 /**
- * Канал (Telegram-style broadcast).
+ * Канал для публикации сообщений в стиле Telegram.
  * Только владелец и назначенные админы могут публиковать посты.
- * Подписчики (subscribers) нужны серверу только для маршрутизации (Dumb Server).
+ * Список подписчиков нужен серверу только для маршрутизации; содержимое ему недоступно.
  */
 export interface Channel {
-    id: string;
-    title: string;
-    description?: string;
-    ownerId: string;            // создатель (creator)
-    admins: string[];           // UID администраторов (включая owner)
-    moderators: string[];       // UID модераторов
-    subscribers: string[];      // UID подписчиков (для маршрутизации)
-    avatar?: string;            // base64 data URL
-    verified?: boolean;
-    createdAt: number;
-    postCount: number;
-    inviteToken?: string;
+  id: string;
+  title: string;
+  description?: string;
+  ownerId: string; // Создатель.
+  admins: string[]; // UID администраторов, включая владельца.
+  moderators: string[]; // UID модераторов
+  subscribers: string[]; // UID подписчиков для маршрутизации.
+  avatar?: string; // Изображение в формате base64 data URL.
+  verified?: boolean;
+  createdAt: number;
+  postCount: number;
+  inviteToken?: string;
 }
 
 /** Пост в канале. */
 export interface ChannelPost {
-    id: string;
-    channelId: string;
-    authorId: string;           // UID автора (owner/admin)
-    text: string;
-    attachments?: { id: string; dataUrl: string; name: string }[];
-    timestamp: string;
-    encryptedPayload?: string;  // опционально E2EE
-    views: number;
+  id: string;
+  channelId: string;
+  authorId: string; // UID автора: владелец или администратор.
+  text: string;
+  attachments?: { id: string; dataUrl: string; name: string }[];
+  timestamp: string;
+  encryptedPayload?: string; // Необязательное сквозное шифрование.
+  views: number;
 }
 
 /**
- * Отправка подарка (Telegram-style gifts).
+ * Отправка подарка в стиле Telegram.
  * `giftId` ссылается на каталог Gift.
  */
 export interface GiftSend {
-    id: string;
-    giftId: string;
-    fromUid: string;
-    toUid: string;
-    channelId?: string;         // если отправлено в канал (публично)
-    message?: string;
-    sentAt: number;
+  id: string;
+  giftId: string;
+  fromUid: string;
+  toUid: string;
+  channelId?: string; // Указывается, если подарок опубликован в канале.
+  message?: string;
+  sentAt: number;
 }
 
 /**
- * Награда / достижение пользователя (achievements, levels, полученные подарки).
+ * Награда или достижение пользователя: уровень или полученный подарок.
  */
 export interface Reward {
-    id: string;
-    uid: string;                // получатель
-    type: 'achievement' | 'gift' | 'level' | 'creator';
-    label: string;
-    description?: string;
-    icon?: string;              // emoji или asset
-    earnedAt: number;
+  id: string;
+  uid: string; // получатель
+  type: 'achievement' | 'gift' | 'level' | 'creator';
+  label: string;
+  description?: string;
+  icon?: string; // emoji или asset
+  earnedAt: number;
 }
 
-/** Расширенная группа с ролями создателя/админов (надстройка над legacy Group). */
+/** Группа с ролями создателя и администраторов, расширяющая Group старого формата. */
 export interface ManagedGroup extends Group {
-    admins: string[];
-    moderators: string[];
+  admins: string[];
+  moderators: string[];
 }
 
 /** Публичная карточка канала (без раскрытия списка подписчиков). */
 export interface PublicChannel {
-    id: string;
-    title: string;
-    description?: string;
-    ownerId: string;
-    avatar?: string;
-    verified?: boolean;
-    subscriberCount: number;
-    postCount: number;
-    inviteToken?: string;
+  id: string;
+  title: string;
+  description?: string;
+  ownerId: string;
+  avatar?: string;
+  verified?: boolean;
+  subscriberCount: number;
+  postCount: number;
+  inviteToken?: string;
 }
 
 // ============================================================
-// v3.7 Message Search (client-side, E2EE-safe)
+// Поиск сообщений на клиенте без нарушения сквозного шифрования.
 // ============================================================
 
 /**
@@ -391,36 +411,33 @@ export interface SearchResult {
 export interface SearchOptions {
   query: string;
   contactUid?: string; // если ищем в конкретном чате
-  limit?: number; // максимальное количество результатов (default: 50)
+  limit?: number; // Максимальное количество результатов (по умолчанию 50).
 }
 
-// Voice Messages types (v3.9)
+// Типы голосовых сообщений.
 
-// Status of voice recording
 export type RecordingStatus = 'idle' | 'recording' | 'processing' | 'error';
 
-// Metadata for voice messages
 export interface VoiceMessageMetadata {
-  duration: number; // duration in seconds
-  mimeType: string; // audio format (e.g., 'audio/webm')
-  size: number; // size in bytes
+  duration: number;
+  mimeType: string; // Формат аудио, например audio/webm.
+  size: number;
 }
 
-// Decrypted voice message for playback
 export interface DecryptedVoiceMessage {
-  blob: Blob; // decrypted audio blob
-  url: string; // object URL for playback
+  blob: Blob; // Расшифрованные аудиоданные.
+  url: string;
   duration: number;
 }
 
-// Recording state update event
+// Событие изменения состояния записи.
 export interface RecordingStateUpdate {
   status: RecordingStatus;
   elapsedSeconds: number;
   error?: string;
 }
 
-// v3.12: Message Editing & Deletion
+// Типы для редактирования и удаления сообщений.
 export interface MessageEdit {
   id: string;
   messageId: string;

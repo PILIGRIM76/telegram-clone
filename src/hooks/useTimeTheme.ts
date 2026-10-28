@@ -1,23 +1,23 @@
 import { logger } from '../services/logger';
-// v3.0 Phase 1: Time-based theme hook — автопереключение темы по времени суток.
-// Каждую минуту проверяет час и применяет body.theme-{morning|day|evening|night}.
+// Этап 1: хук автоматически переключает тему в зависимости от времени суток.
+// Каждую минуту проверяет время и применяет класс body.theme-{morning|day|evening|night}.
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type TimeTheme = 'morning' | 'day' | 'evening' | 'night';
 
 function getThemeForHour(hour: number): TimeTheme {
-  if (hour >= 6 && hour < 12) return 'morning';   // мандарин
-  if (hour >= 12 && hour < 18) return 'day';      // терракот
-  if (hour >= 18 && hour < 23) return 'evening';  // фиолет
-  return 'night';                                  // лавандовый
+  if (hour >= 6 && hour < 12) return 'morning'; // мандарин
+  if (hour >= 12 && hour < 18) return 'day'; // терракот
+  if (hour >= 18 && hour < 23) return 'evening'; // фиолет
+  return 'night'; // лавандовый
 }
 
 /**
  * Хук для автопереключения темы по времени суток.
  * - Каждую минуту проверяет текущий час
- * - Применяет body.theme-{name} класс
- * - Возвращает текущую тему для UI индикатора
+ * - Применяет класс body.theme-{name}.
+ * - Возвращает текущую тему для индикатора интерфейса.
  */
 export function useTimeTheme(): TimeTheme {
   const [theme, setTheme] = useState<TimeTheme>(() => getThemeForHour(new Date().getHours()));
@@ -26,7 +26,7 @@ export function useTimeTheme(): TimeTheme {
     const update = () => {
       const hour = new Date().getHours();
       const newTheme = getThemeForHour(hour);
-      setTheme((prev) => (prev !== newTheme ? newTheme : prev));
+      setTheme(prev => (prev !== newTheme ? newTheme : prev));
     };
     // Проверяем сразу при mount (могло пройти время с прошлого рендера)
     update();
@@ -43,6 +43,29 @@ export function useTimeTheme(): TimeTheme {
     body.classList.add(`theme-${theme}`);
     logger.info(`[PILIGRIM v3.0] theme switched to: ${theme}`);
   }, [theme]);
+
+  useEffect(() => {
+    const applyPreference = (mode: string | null) => {
+      const isDark = mode === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      document.body.classList.toggle('theme-dark', isDark);
+    };
+    const handlePreferenceChange = (event: Event) => {
+      applyPreference((event as CustomEvent<string>).detail);
+    };
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'cipherlink-theme') applyPreference(event.newValue);
+    };
+
+    applyPreference(localStorage.getItem('cipherlink-theme'));
+    window.addEventListener('cipherlink:theme-change', handlePreferenceChange);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('cipherlink:theme-change', handlePreferenceChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   return theme;
 }

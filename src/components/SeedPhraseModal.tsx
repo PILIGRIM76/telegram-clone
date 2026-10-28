@@ -1,5 +1,5 @@
+import React, { useEffect, useState } from 'react';
 import { logger } from '../services/logger';
-import React, { useState, useEffect } from 'react';
 
 interface SeedPhraseModalProps {
   seedPhrase: string;
@@ -12,7 +12,7 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
   seedPhrase,
   onConfirm,
   onSkip,
-  username
+  username,
 }) => {
   logger.info('🎭 [PILIGRIM] SeedPhraseModal рендерится, props:', {
     seedPhraseLength: seedPhrase?.length,
@@ -49,7 +49,9 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
         <div className="bg-slate-800 rounded-lg p-6 max-w-md">
-          <p className="text-red-400">Ошибка: seed-фраза должна содержать 12 слов (получено {words.length})</p>
+          <p className="text-red-400">
+            Ошибка: seed-фраза должна содержать 12 слов (получено {words.length})
+          </p>
           <button onClick={onSkip} className="mt-4 bg-slate-600 px-4 py-2 rounded text-white">
             Закрыть
           </button>
@@ -61,7 +63,6 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl border border-yellow-600/40">
-
         {/* Заголовок с предупреждением */}
         <div className="p-6 border-b border-slate-700 bg-yellow-900/20">
           <h2 className="text-2xl font-bold text-yellow-300 mb-2 flex items-center">
@@ -69,7 +70,9 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
             Сохраните вашу seed-фразу
           </h2>
           {username && (
-            <p className="text-sm text-slate-400">Пользователь: <span className="text-cyan-300">{username}</span></p>
+            <p className="text-sm text-slate-400">
+              Пользователь: <span className="text-cyan-300">{username}</span>
+            </p>
           )}
         </div>
 
@@ -79,7 +82,9 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
             ⚠️ Это единственный способ восстановить ваш аккаунт
           </p>
           <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
-            <li>Запишите эти 12 слов <strong>на бумаге</strong> и храните в безопасном месте</li>
+            <li>
+              Запишите эти 12 слов <strong>на бумаге</strong> и храните в безопасном месте
+            </li>
             <li>Не храните их в открытом виде на компьютере или в облаке</li>
             <li>Если вы потеряете seed-фразу — доступ к аккаунту будет невозможен</li>
             <li>Никому не показывайте эту фразу</li>
@@ -127,13 +132,12 @@ const SeedPhraseModal: React.FC<SeedPhraseModalProps> = ({
             <input
               type="checkbox"
               checked={hasSaved}
-              onChange={(e) => setHasSaved(e.target.checked)}
+              onChange={e => setHasSaved(e.target.checked)}
               className="mt-1 w-5 h-5 accent-cyan-500 cursor-pointer"
             />
             <span className="text-sm text-slate-200 select-none">
-              <strong className="text-white">Я сохранил эту фразу в безопасном месте.</strong>
-              {' '}
-              Я понимаю, что без неё восстановить аккаунт будет невозможно.
+              <strong className="text-white">Я сохранил эту фразу в безопасном месте.</strong> Я
+              понимаю, что без неё восстановить аккаунт будет невозможно.
             </span>
           </label>
 
