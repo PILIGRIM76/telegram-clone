@@ -27,10 +27,30 @@ db.exec(`
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    display_name TEXT,
+    avatar_url TEXT,
     -- v3.11: Presence tracking
     last_seen INTEGER DEFAULT (unixepoch()),
     is_online INTEGER DEFAULT 0
   );
+
+  // v3.19: Migration for display_name and avatar_url columns (if upgrading from older version)
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  // v3.19: Create index on username for faster search
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+  } catch (e) {
+    // Index already exists, ignore
+  }
 
   CREATE TABLE IF NOT EXISTS identities (
     uid TEXT PRIMARY KEY,
@@ -191,20 +211,20 @@ db.exec(`
 // Insert a new user (uid, username, password_hash)
 function createUser(uid, username, passwordHash) {
   const stmt = db.prepare(
-    'INSERT INTO users (uid, username, password_hash, created_at) VALUES (?, ?, ?, ?)'
+    'INSERT INTO users (uid, username, password_hash, created_at, display_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const now = new Date().toISOString();
-  stmt.run(uid, username, passwordHash, now);
-}
-
-// Get user by username
-function getUserByUsername(username) {
-  return db.prepare('SELECT uid, username, password_hash, created_at FROM users WHERE username = ?').get(username);
+  stmt.run(uid, username, passwordHash, now, null, null);
 }
 
 // Get user by uid
 function getUserByUid(uid) {
-  return db.prepare('SELECT uid, username, password_hash, created_at FROM users WHERE uid = ?').get(uid);
+  return db.prepare('SELECT uid, username, password_hash, created_at, display_name, avatar_url FROM users WHERE uid = ?').get(uid);
+}
+
+// Get user by username (case-insensitive)
+function getUserByUsername(username) {
+  return db.prepare('SELECT uid, username, password_hash, created_at, display_name, avatar_url FROM users WHERE LOWER(username) = LOWER(?)').get(username);
 }
 
 // Store/update identity info for a user
@@ -898,11 +918,70 @@ function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
   return { successCount, forwardedFrom };
 }
 
+// v3.19: Username-based user search and profile update
+
+// Update username for a user
+function updateUsername(uid, newUsername) {
+  const normalizedUsername = newUsername.toLowerCase().trim();
+  
+  // Validate username format: alphanumeric, underscore, 3-32 chars
+  if (!/^[a-z0-9_]{3,32}$/.test(normalizedUsername)) {
+    return { success: false, error: 'Invalid username format. Use 3-32 characters: a-z, 0-9, _' };
+  }
+
+  // Check if username is already taken by another user
+  const existing = db.prepare('SELECT uid FROM users WHERE LOWER(username) = LOWER(?) AND uid != ?').get(normalizedUsername, uid);
+  if (existing) {
+    return { success: false, error: 'Username already taken' };
+  }
+
+  // Update username
+  const stmt = db.prepare('UPDATE users SET username = ? WHERE uid = ?');
+  const result = stmt.run(normalizedUsername, uid);
+  
+  if (result.changes === 0) {
+    return { success: false, error: 'User not found' };
+  }
+
+  return { success: true, username: normalizedUsername };
+}
+
+// Search users by username (for @username lookup)
+function searchUsers(query) {
+  const normalizedQuery = query.toLowerCase().replace(/^@/, '').trim();
+  
+  if (normalizedQuery.length < 1) {
+    return [];
+  }
+
+  const results = db.prepare(`
+    SELECT uid, username, display_name as displayName, avatar_url as avatarUrl
+    FROM users 
+    WHERE LOWER(username) LIKE ?
+    LIMIT 10
+  `).all(`%${normalizedQuery}%`);
+
+  return results;
+}
+
+// Get user profile preview by uid (for contact cards)
+function getUserPreview(uid) {
+  return db.prepare(`
+    SELECT uid, username, display_name as displayName, avatar_url as avatarUrl
+    FROM users 
+    WHERE uid = ?
+  `).get(uid);
+}
+
 module.exports = {
   db,
   createUser,
   getUserByUsername,
   getUserByUid,
+  // v3.19: Username-based user search and profile
+  updateUsername,
+  searchUsers,
+  getUserPreview,
   saveIdentity,
   getIdentity,
   saveMessage,

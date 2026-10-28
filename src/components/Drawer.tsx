@@ -26,6 +26,7 @@ interface DrawerProps {
   activeView?: string;
   onNavigate?: (view: 'chats' | 'contacts' | 'calls' | 'favorites' | 'channels') => void;
   onOpenAccount?: () => void; // Открывает параметры безопасности.
+  onOpenUsernameModal?: () => void; // Открывает настройки username.
   onCreateGroup?: () => void;
 }
 
@@ -121,6 +122,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   activeView,
   onNavigate,
   onOpenAccount,
+  onOpenUsernameModal,
   onCreateGroup,
 }) => {
   const bp: Breakpoint = useBreakpoint();
@@ -226,6 +228,14 @@ export const Drawer: React.FC<DrawerProps> = ({
       id: 'qr',
       label: lang === 'ru' ? 'Мой QR-код' : 'My QR code',
       onClick: () => setShowQr(q => !q),
+    },
+    {
+      id: 'username',
+      label: lang === 'ru' ? 'Имя пользователя' : 'Username',
+      onClick: () => {
+        onOpenUsernameModal?.();
+        onClose();
+      },
     },
     {
       id: 'lang',

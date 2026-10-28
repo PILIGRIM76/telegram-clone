@@ -1097,6 +1097,85 @@ app.post('/api/messages/:messageId/forward', (req, res) => {
   res.json({ ok: true, successCount: result.successCount });
 });
 
+// v3.19: Username-based User Lookup API
+
+// PUT /api/profile/username - Register or update username
+app.put('/api/profile/username', (req, res) => {
+  const { username } = req.body;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const uid = payload.uid;
+  
+  // Update username
+  const result = sqlDb.updateUsername(uid, username);
+  
+  if (!result.success) {
+    if (result.error === 'Username already taken') {
+      return res.status(409).json({ error: result.error });
+    }
+    return res.status(400).json({ error: result.error });
+  }
+  
+  // Return updated profile
+  const profile = sqlDb.getUserPreview(uid);
+  res.json({ ok: true, profile });
+});
+
+// GET /api/users/search?q=<query> - Search users by username
+app.get('/api/users/search', (req, res) => {
+  const query = req.query.q;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!query || typeof query !== 'string') {
+    return res.status(400).json({ error: 'Query parameter q required' });
+  }
+  
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const results = sqlDb.searchUsers(query);
+  res.json({ ok: true, users: results });
+});
+
+// GET /api/users/:uid/preview - Get user preview for contact card
+app.get('/api/users/:uid/preview', (req, res) => {
+  const { uid } = req.params;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  
+  let payload;
+  try {
+    payload = authService.verifyAccessToken(token);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const profile = sqlDb.getUserPreview(uid);
+  if (!profile) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  res.json({ ok: true, profile });
+});
+
 // --- WEBSOCKET LOGIK ---
 
 серверВебсокетов.on('connection', (ws, req) => {

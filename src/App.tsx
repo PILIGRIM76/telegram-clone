@@ -121,6 +121,8 @@ const App: React.FC = () => {
   // v3.18: Forward messages modal
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardTargetMessage, setForwardTargetMessage] = useState<Message | null>(null);
+  // v3.19: Username settings modal
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
   const { language, setLanguage } = useTranslation();
   // v1.6 Этап 4: toast-уведомления (объявлены раньше handlers, чтобы их можно было вызывать)
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
@@ -812,6 +814,18 @@ const App: React.FC = () => {
     }
   };
 
+  // v3.19: Username settings modal handlers
+  const handleOpenUsernameModal = () => {
+    setShowUsernameModal(true);
+  };
+
+  const handleUsernameUpdated = (newUsername: string) => {
+    logger.info('[PILIGRIM] Username updated:', newUsername);
+    if (identity) {
+      setIdentity({ ...identity, username: newUsername });
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('piligrim-identity');
     setIdentity(null);
@@ -1310,6 +1324,7 @@ const App: React.FC = () => {
           setActiveTab('settings');
           setShowAccountPage(true);
         }}
+        onOpenUsernameModal={handleOpenUsernameModal}
         onCreateGroup={() => {
           setActiveTab('chats');
           window.setTimeout(() => {

@@ -110,6 +110,14 @@ export interface Group {
   inviteToken?: string;
 }
 
+// v3.19: User preview for contact cards and search results
+export interface UserPreview {
+  uid: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
 export interface Gift {
   id: string;
   name: string;

@@ -1080,6 +1080,100 @@ class ApiService {
       return { successCount: 0 };
     }
   }
+
+  // v3.19: Update username
+  async updateUsername(
+    username: string
+  ): Promise<{ success: boolean; profile?: import('../types').UserPreview; error?: string }> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] updateUsername: no access token');
+      return { success: false, error: 'No access token' };
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/profile/username`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logger.warn('[API] updateUsername failed:', response.status, errorData);
+        return { success: false, error: errorData.error || 'Failed to update username' };
+      }
+      const data = await response.json();
+      return { success: true, profile: data.profile };
+    } catch (e) {
+      logger.error('[API] updateUsername error:', e);
+      return { success: false, error: 'Network error' };
+    }
+  }
+
+  // v3.19: Search users by username
+  async searchUsers(query: string): Promise<import('../types').UserPreview[]> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] searchUsers: no access token');
+      return [];
+    }
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/users/search?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        logger.warn('[API] searchUsers failed:', response.status);
+        return [];
+      }
+      const data = await response.json();
+      return data.users || [];
+    } catch (e) {
+      logger.error('[API] searchUsers error:', e);
+      return [];
+    }
+  }
+
+  // v3.19: Get user preview by UID
+  async getUserPreview(uid: string): Promise<import('../types').UserPreview | null> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] getUserPreview: no access token');
+      return null;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/users/${uid}/preview`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        logger.warn('[API] getUserPreview failed:', response.status);
+        return null;
+      }
+      const data = await response.json();
+      return data.profile || null;
+    } catch (e) {
+      logger.error('[API] getUserPreview error:', e);
+      return null;
+    }
+  }
 }
 
 export const apiService = new ApiService();
