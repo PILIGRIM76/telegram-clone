@@ -52,6 +52,7 @@ describe('WebSocket API Service', () => {
   describe('sendMessage', () => {
     test('should send message when connected', () => {
       apiService.connect('sender-uid');
+      apiService.setRecipientPublicKey('receiver-public-key-base64');
       apiService.sendMessage('receiver-uid', 'Hello');
       expect(mockWebSocket.send).toHaveBeenCalled();
       // Phase 2: пакеты padded с constant-size prefix. Извлекаем JSON.

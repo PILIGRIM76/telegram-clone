@@ -664,9 +664,9 @@ class ApiService {
         // Phase 2: constant-size padding.
         this.ws.send(encodeConstantSizePacket(legacyPayload));
       } else {
-        const plainPayload = JSON.stringify({ to, content, ...extraOptions });
-        // Phase 2: constant-size padding.
-        this.ws.send(encodeConstantSizePacket(plainPayload));
+        // SECURITY: Жёсткий запрет на отправку plaintext
+        logger.error(`[API] sendMessage: BLOCKED - missing keys for ${to}. Message NOT sent.`);
+        throw new Error('Missing cryptographic keys - cannot send unencrypted message');
       }
     }
   }
@@ -686,10 +686,12 @@ class ApiService {
     if (!this.myKeyPair) {
       this.initKeys();
     }
+    // SECURITY: Жёсткая проверка - сообщение НЕ отправляется без ключа получателя
     if (!recipientPublicKeyBase64) {
-      logger.warn(`[API] sendMessageSecure: no recipientPublicKey for ${to}, sending plaintext`);
-      this.ws.send(JSON.stringify({ to, content, ...extraOptions }));
-      return null;
+      logger.error(
+        `[API] sendMessageSecure: BLOCKED - no recipientPublicKey for ${to}. Message NOT sent.`
+      );
+      throw new Error('Missing recipient public key - cannot send unencrypted message');
     }
     const recipientKey = this.base64ToKey(recipientPublicKeyBase64);
     // this.myKeyPair гарантированно не null после lazy initKeys() выше.

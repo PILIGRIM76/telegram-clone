@@ -611,7 +611,7 @@ const App: React.FC = () => {
   };
   // v1.5.2 Stage 4: handleSendMessage — шифрует сообщение публичным ключом контакта
   // (RSA-OAEP) перед сохранением в localStorage. Если publicKey отсутствует —
-  // отправляем в plaintext с предупреждением (graceful fallback для UX).
+  // отправка БЛОКИРУЕТСЯ (безопасность E2EE). Сообщение ставится в offline queue.
   const handleSendMessage = async (
     chatId: string,
     text: string,
@@ -640,13 +640,23 @@ const App: React.FC = () => {
     // 1. РС‰РµРј РєРѕРЅС‚Р°РєС‚, С‡С‚РѕР±С‹ РїРѕР»СѓС‡РёС‚СЊ РµРіРѕ publicKey
     const contact = contacts.find(c => c.id === chatId || c.uid === chatId);
 
-    // 2. Шифруем, если есть publicKey
+    // 2. Шифруем — ОБЯЗАТЕЛЬНО, иначе сообщение не уйдёт
     let encryptedPayload: string | undefined;
     let isEncrypted = false;
-    // Phase 2: Signal (PFS Double Ratchet) preferred, NaCl fallback.
-    // apiService.sendMessageSecure returns { type: 'signal' | 'nacl' } | null.
-    // Old encryptAESGCM was only at-rest AES-GCM (secp256k1 privKey), no PFS.
     let encryptionType: 'signal' | 'nacl' | undefined;
+
+    // SECURITY: Жёсткая проверка ключей ПЕРЕД попыткой отправки
+    if (!contact?.publicKey) {
+      logger.error(
+        `[PILIGRIM] SECURITY: BLOCKED - no publicKey for contact ${chatId}. Message queued offline.`
+      );
+      // Сообщение НЕ отправляется, остаётся локально
+      throw new Error('Missing contact public key - cannot send unencrypted message');
+    }
+    if (!ws.isConnected) {
+      logger.info(`[PILIGRIM] WS offline, message saved locally only (offline-first)`);
+    }
+
     if (contact?.publicKey && ws.isConnected) {
       try {
         const msgId =
@@ -675,34 +685,19 @@ const App: React.FC = () => {
           encryptedPayload = '[secure:' + encryptionType + ']';
         }
         logger.info(
-          `[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '⚠️ plaintext'} для ${contact.name}`
+          `[PILIGRIM] E2EE: ${encryptionType === 'signal' ? '🔒 Signal (PFS)' : encryptionType === 'nacl' ? '🔓 NaCl (legacy)' : '❌ BLOCKED'} для ${contact.name}`
         );
       } catch (error) {
         logger.error(`[PILIGRIM] E2EE: ошибка шифрования для ${contact.name}:`, error);
-        // Fallback: отправляем в plaintext, но НЕ теряем сообщение
-        if (contact?.publicKey && ws.isConnected) {
-          try {
-            apiService.sendMessage(contact.uid, trimmed, contact.publicKey, {
-              type: messageType,
-              voiceMetadata,
-              encryptedAttachments:
-                encryptedAttachments && encryptedAttachments.length > 0
-                  ? encryptedAttachments
-                  : undefined,
-              disappearIn: ttl,
-              timerSetAt: ttl ? Date.now() : undefined,
-            });
-          } catch (e) {
-            logger.error('[PILIGRIM] plaintext fallback send failed', e);
-          }
-        }
+        // SECURITY: НЕТ fallback на plaintext! Ошибка пробрасывается наверх
+        throw error;
       }
     } else if (!contact?.publicKey) {
-      logger.warn(
-        `[PILIGRIM] E2EE: publicKey отсутствует для chatId=${chatId}, будет NaCl/plaintext fallback`
+      logger.error(
+        `[PILIGRIM] SECURITY: publicKey отсутствует для chatId=${chatId}, отправка ЗАБЛОКИРОВАНА`
       );
     } else if (!ws.isConnected) {
-      logger.info(`[PILIGRIM] WS offline, message saved locally only (encryptionType deferred)`);
+      logger.info(`[PILIGRIM] WS offline, message saved locally only (offline-first)`);
     }
 
     // 3. Создаём Message (text — для локального UI, encryptedPayload — для хранения/передачи)
@@ -763,20 +758,18 @@ const App: React.FC = () => {
       logger.info(`[PILIGRIM] Chat ${chatId} encryptionType set to: ${encryptionType}`);
     }
   };
-  // v3.0 Phase 3: удаление сообщения из чата
+  // v3.0 Phase 3: удаление сообщения из чата — HARD DELETE
   const handleDeleteMessage = (chatId: string, messageId: string) => {
     logger.info('[PILIGRIM] handleDeleteMessage:', { chatId, messageId });
-    // Send delete request via WebSocket (delete for all = false by default)
-    apiService.sendMessageDelete(messageId, false);
-    // Optimistic update - local state will be synced via WS event
+    // Send delete request via WebSocket (delete for all = true for hard delete)
+    apiService.sendMessageDelete(messageId, true);
+    // Optimistic update - физическое удаление из локального стейта
     setChats(prev => {
       const updated = { ...prev };
       if (!updated[chatId]) return prev;
       updated[chatId] = {
         ...updated[chatId],
-        messages: updated[chatId].messages.map(m =>
-          m.id === messageId ? { ...m, isDeleted: true } : m
-        ),
+        messages: updated[chatId].messages.filter(m => m.id !== messageId),
       };
       return updated;
     });

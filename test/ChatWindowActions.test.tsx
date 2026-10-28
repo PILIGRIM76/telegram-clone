@@ -93,6 +93,7 @@ test('records, encrypts, and sends a voice message from the microphone action', 
       messages={[]}
       onSendMessage={onSendMessage}
       currentIdentity={{ uid: 'user-1', privateKeyHex: 'private-key', publicKeyHex: 'public-key' }}
+      partner={{ name: 'Contact 1', uid: 'contact-1', publicKeyHex: 'contact-public-key' }}
     />
   );
 
