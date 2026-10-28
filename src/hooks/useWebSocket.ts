@@ -20,6 +20,8 @@ export interface UseWebSocketOptions {
   onMessage?: (message: Message) => void;
   /** Обратный вызов при изменении состояния подключения. */
   onStatusChange?: (status: WebSocketStatus) => void;
+  /** v3.17: Обратный вызов при истечении TTL сообщения (disappearing messages). */
+  onMessageExpired?: (data: { messageId: string; chatId: string }) => void;
 }
 
 export interface UseWebSocketResult {
@@ -33,7 +35,14 @@ export interface UseWebSocketResult {
 }
 
 export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
-  const { myUid, enabled = true, reconnectInterval = 5000, onMessage, onStatusChange } = options;
+  const {
+    myUid,
+    enabled = true,
+    reconnectInterval = 5000,
+    onMessage,
+    onStatusChange,
+    onMessageExpired,
+  } = options;
 
   const [status, setStatus] = useState<WebSocketStatus>('closed');
   const reconnectTimerRef = useRef<number | null>(null);
@@ -42,8 +51,10 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
   // Стабильные ссылки на колбэки (чтобы не переподключаться при каждом рендере)
   const onMessageRef = useRef(onMessage);
   const onStatusChangeRef = useRef(onStatusChange);
+  const onMessageExpiredRef = useRef(onMessageExpired);
   onMessageRef.current = onMessage;
   onStatusChangeRef.current = onStatusChange;
+  onMessageExpiredRef.current = onMessageExpired;
 
   const updateStatus = useCallback((newStatus: WebSocketStatus) => {
     setStatus(newStatus);
@@ -72,6 +83,19 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
     apiService.onMessage(handler);
   }, []);
 
+  // v3.17: Setup message expired listener for disappearing messages
+  const setupMessageExpiredListener = useCallback(() => {
+    const handler = (data: { messageId: string; chatId: string }) => {
+      logger.info('[PILIGRIM] useWebSocket: message expired', data.messageId);
+      onMessageExpiredRef.current?.(data);
+    };
+    apiService.onMessageExpired(handler);
+    // Return cleanup function
+    return () => {
+      apiService.offMessageExpired(handler);
+    };
+  }, []);
+
   const connect = useCallback(() => {
     if (!enabled) {
       updateStatus('unsupported');
@@ -88,6 +112,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
       // apiService.connect() подключается к WS_URL и регистрирует текущего юзера
       apiService.connect(myUid);
       setupMessageListener();
+      setupMessageExpiredListener();
       // apiService сам эмитит open/close/error события, но мы используем упрощённый флаг:
       // если коннект не упал в течение 2 сек — считаем open
       window.setTimeout(() => {
@@ -105,7 +130,14 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketResult {
       updateStatus('error');
       scheduleReconnect();
     }
-  }, [enabled, myUid, clearReconnect, setupMessageListener, updateStatus]);
+  }, [
+    enabled,
+    myUid,
+    clearReconnect,
+    setupMessageListener,
+    setupMessageExpiredListener,
+    updateStatus,
+  ]);
 
   const scheduleReconnect = useCallback(() => {
     clearReconnect();

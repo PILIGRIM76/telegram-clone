@@ -465,6 +465,19 @@ const App: React.FC = () => {
       logger.info(`[PILIGRIM] WS status: ${status}`);
       setWsStatus(status);
     },
+    // v3.17: Handle disappearing messages expiration
+    onMessageExpired: data => {
+      logger.info('[PILIGRIM] WS: message expired', data);
+      setChats(prev => {
+        const updated = { ...prev };
+        if (!updated[data.chatId]) return prev;
+        updated[data.chatId] = {
+          ...updated[data.chatId],
+          messages: (updated[data.chatId].messages || []).filter(m => m.id !== data.messageId),
+        };
+        return updated;
+      });
+    },
   });
 
   // v3.15: Subscribe to reaction updates from WebSocket
@@ -557,9 +570,24 @@ const App: React.FC = () => {
     };
     apiService.onMessageEdited(handleMessageEdited);
     apiService.onMessageDeleted(handleMessageDeleted);
+    // v3.17: Handle disappearing messages expiration
+    const handleMessageExpired = (data: { messageId: string; chatId: string }) => {
+      logger.info('[PILIGRIM] handleMessageExpired:', data);
+      setChats(prev => {
+        const updated = { ...prev };
+        if (!updated[data.chatId]) return prev;
+        updated[data.chatId] = {
+          ...updated[data.chatId],
+          messages: (updated[data.chatId].messages || []).filter(m => m.id !== data.messageId),
+        };
+        return updated;
+      });
+    };
+    apiService.onMessageExpired(handleMessageExpired);
     return () => {
       apiService.offMessageEdited(handleMessageEdited);
       apiService.offMessageDeleted(handleMessageDeleted);
+      apiService.offMessageExpired(handleMessageExpired);
     };
   }, [identity]);
 
@@ -587,7 +615,8 @@ const App: React.FC = () => {
     replyTo?: string,
     encryptedAttachments?: EncryptedAttachment[],
     voiceMetadata?: VoiceMessageMetadata,
-    messageType?: Message['type']
+    messageType?: Message['type'],
+    ttl?: number
   ) => {
     const trimmed = text.trim();
     if (
@@ -632,6 +661,8 @@ const App: React.FC = () => {
               encryptedAttachments && encryptedAttachments.length > 0
                 ? encryptedAttachments
                 : undefined,
+            disappearIn: ttl,
+            timerSetAt: ttl ? Date.now() : undefined,
           }
         );
         encryptionType = secureResult?.type;
@@ -654,6 +685,8 @@ const App: React.FC = () => {
                 encryptedAttachments && encryptedAttachments.length > 0
                   ? encryptedAttachments
                   : undefined,
+              disappearIn: ttl,
+              timerSetAt: ttl ? Date.now() : undefined,
             });
           } catch (e) {
             logger.error('[PILIGRIM] plaintext fallback send failed', e);
@@ -686,6 +719,10 @@ const App: React.FC = () => {
         encryptedAttachments && encryptedAttachments.length > 0 ? encryptedAttachments : undefined,
       voiceMetadata,
       replyTo,
+      // v3.17: Disappearing messages
+      disappearIn: ttl,
+      timerSetAt: ttl ? Date.now() : undefined,
+      expiresAt: ttl ? Date.now() + ttl * 1000 : undefined,
     };
     logger.info(
       `[PILIGRIM] handleSendMessage: chatId=${chatId}, len=${trimmed.length}, encrypted=${isEncrypted}`

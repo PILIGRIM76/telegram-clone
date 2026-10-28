@@ -61,7 +61,9 @@ db.exec(`
     -- v3.12: Message editing and deletion
     edited_at INTEGER,
     deleted_at INTEGER,
-    deleted_for TEXT  -- JSON array of uids for whom message is deleted
+    deleted_for TEXT,  -- JSON array of uids for whom message is deleted
+    -- v3.17: Disappearing messages (TTL)
+    expires_at INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS offline_messages (
@@ -218,18 +220,21 @@ function getIdentity(uid) {
 }
 
 // Save a message to SQLite
-function saveMessage({ senderUid, receiverUid, content, encryptedAttachments }) {
+function saveMessage({ senderUid, receiverUid, content, encryptedAttachments, ttl }) {
   const stmt = db.prepare(
-    'INSERT INTO messages (sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO messages (sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
   const now = new Date().toISOString();
+  const nowMs = Date.now();
+  const expiresAt = ttl ? nowMs + ttl * 1000 : null;
   const result = stmt.run(
     senderUid,
     receiverUid,
     content,
     encryptedAttachments ? JSON.stringify(encryptedAttachments) : null,
     now,
-    0
+    0,
+    expiresAt
   );
   return result.lastID;
 }
@@ -274,6 +279,27 @@ function cleanupSessions() {
   const stmt = db.prepare('DELETE FROM sessions WHERE expires_at < ?');
   const result = stmt.run(now);
   return result.changes;
+}
+
+// v3.17: Delete expired disappearing messages
+function cleanupExpiredMessages() {
+  const now = Date.now();
+  // Get messages that have expired and need to be deleted
+  const expiredMessages = db.prepare(
+    'SELECT id, sender_uid, receiver_uid FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?'
+  ).all(now);
+  
+  if (expiredMessages.length > 0) {
+    const ids = expiredMessages.map(m => m.id);
+    const placeholders = ids.map(() => '?').join(',');
+    
+    // Delete the expired messages
+    db.prepare(`DELETE FROM messages WHERE id IN (${placeholders})`).run(...ids);
+    
+    // Return deleted messages info for broadcasting
+    return expiredMessages;
+  }
+  return [];
 }
 
 // Get session by refresh token
@@ -808,6 +834,8 @@ module.exports = {
   saveOfflineMessage,
   takeOfflineMessages,
   cleanupSessions,
+  // v3.17: Disappearing messages cleanup
+  cleanupExpiredMessages,
   getSessionByRefreshToken,
   deleteSession,
   createSession,

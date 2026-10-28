@@ -1,7 +1,7 @@
 # Active Context
 
 ## Текущая задача
-Финишная прямая UI редизайна + нормализация кода (LF/CRLF).
+Disappearing Messages (самоудаляющиеся сообщения) — реализация завершена.
 
 ## Актуальный статус ветки
 feature/signal-protocol
@@ -20,4 +20,11 @@ Message Reactions (эмодзи-реакции) полностью реализ�
 - Service: `apiService.sendMessageEdit()`, `sendMessageDelete()`, слушатели `onMessageEdited`, `onMessageDeleted`
 - UI: режим редактирования в MessageInput (баннер с кнопкой "Отмена"), контекстное меню в MessageItem
 - Интеграция: `ChatWindow` управляет состоянием `editingMessageId`, `MessageList` вызывает `handleStartEdit`
+- Build verified: `npm run build` проходит успешно
+
+**Disappearing Messages (самоудаляющиеся сообщения) полностью реализовано:**
+- Backend: БД имеет `expires_at` поле, `saveMessage` рассчитывает TTL, cron job (каждую минуту) удаляет истекшие сообщения и шлёт WS `message_expired` отправителю и получателю
+- Service: `apiService.onMessageExpired()` / `offMessageExpired()`, `useWebSocket` подписывается на событие
+- App.tsx: обрабатывает `message_expired` — удаляет сообщение из локального стора; `handleSendMessage` принимает `ttl` и передаёт в `sendMessageSecure` / `sendMessage` + добавляет `disappearIn`, `timerSetAt`, `expiresAt` в локальное сообщение
+- UI: `MessageTimerSelection` (выбор таймера: Off, 5с, 30с, 1ч, 1д, 1н) интегрирован в `ChatWindow` (MessageInput); `MessageItem` показывает обратный отсчёт ⏳ рядом со временем (обновляется каждые 10 сек); при истечении клиент оптимистично скрывает сообщение, ожидая подтверждения сервера
 - Build verified: `npm run build` проходит успешно

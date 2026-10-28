@@ -51,10 +51,38 @@ const MessageStatusIcons: React.FC<{
   const isDecrypted = !hasEncryptedPayload || !isPlaintextFallback;
   const disappearDuration = message.disappearIn || disappearTimer;
 
+  // v3.17: Countdown timer for disappearing messages
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(() => {
+    if (!message.expiresAt) return null;
+    const remaining = Math.ceil((message.expiresAt - Date.now()) / 1000);
+    return remaining > 0 ? remaining : 0;
+  });
+
+  useEffect(() => {
+    if (!message.expiresAt) return;
+    const updateRemaining = () => {
+      const remaining = Math.ceil((message.expiresAt! - Date.now()) / 1000);
+      setRemainingSeconds(remaining > 0 ? remaining : 0);
+    };
+    updateRemaining();
+    // Update every 10 seconds to avoid too many re-renders
+    const interval = setInterval(updateRemaining, 10000);
+    return () => clearInterval(interval);
+  }, [message.expiresAt]);
+
   const time = new Date(message.timestamp).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  // Format remaining time for display
+  const formatRemaining = (seconds: number): string => {
+    if (seconds <= 0) return '0с';
+    if (seconds < 60) return `${seconds}с`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}м`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}ч`;
+    return `${Math.floor(seconds / 86400)}д`;
+  };
 
   return (
     <div className="inline-flex items-center space-x-1 mt-1 text-xs text-tg-textSecondary dark:text-tg-dark-textSecondary select-none">
@@ -85,6 +113,19 @@ const MessageStatusIcons: React.FC<{
       {disappearDuration && (
         <span title={`Исчезнет через ${disappearDuration} сек`}>
           <ClockIcon className="w-3 h-3 opacity-70 text-yellow-300" />
+        </span>
+      )}
+      {remainingSeconds !== null && remainingSeconds > 0 && (
+        <span
+          className="text-[10px] opacity-80 text-yellow-300"
+          title={`Осталось: ${formatRemaining(remainingSeconds)}`}
+        >
+          ⏳ {formatRemaining(remainingSeconds)}
+        </span>
+      )}
+      {remainingSeconds !== null && remainingSeconds <= 0 && (
+        <span className="text-[10px] opacity-80 text-red-400" title="Сообщение истекло">
+          ⏳ 0с
         </span>
       )}
       <span className="text-[10px] opacity-70 whitespace-nowrap">{time}</span>

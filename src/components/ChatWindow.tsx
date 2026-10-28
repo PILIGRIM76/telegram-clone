@@ -14,10 +14,12 @@ import type {
 import AnimatedAvatar from './AnimatedAvatar';
 import { type EncryptionType } from './EncryptionBadge';
 import MessageItem from './MessageItem';
+import MessageTimerSelection from './MessageTimerSelection';
 import VoiceRecorder from './VoiceRecorder';
 import {
   ArrowLeftIcon,
   CallIcon,
+  ClockIcon,
   EmojiIcon,
   MicrophoneIcon,
   PaperAirplaneIcon,
@@ -342,6 +344,7 @@ interface MessageInputProps {
       editingMessageId?: string;
       encryptedAttachments?: EncryptedAttachment[];
       voiceMetadata?: VoiceMessageMetadata;
+      ttl?: number;
     }
   ) => void;
   identity: IdentityType | null;
@@ -372,6 +375,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [encryptedAttachments, setEncryptedAttachments] = useState<EncryptedAttachment[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // v3.17: Disappearing messages timer selection
+  const [selectedTtl, setSelectedTtl] = useState<number | undefined>(undefined);
+  const [showTimerSelection, setShowTimerSelection] = useState(false);
+  const timerButtonRef = useRef<HTMLButtonElement>(null);
   const typingTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -415,11 +422,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
         replyTo: replyTo?.id,
         encryptedAttachments,
         editingMessageId: editingMessageId ?? undefined,
+        ttl: selectedTtl,
       });
       setDraft('');
       setEncryptedAttachments([]);
       setMediaFile(null);
       setReplyTo(null);
+      // v3.17: Clear timer selection after sending
+      setSelectedTtl(undefined);
+      setShowTimerSelection(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       onInputChange(false);
@@ -603,6 +614,27 @@ const MessageInput: React.FC<MessageInputProps> = ({
             >
               <MicrophoneIcon className="h-5 w-5" />
             </button>
+          )}
+        </div>
+
+        {/* v3.17: Disappearing messages timer selection */}
+        <div className="relative ml-1">
+          <button
+            ref={timerButtonRef}
+            onClick={() => setShowTimerSelection(!showTimerSelection)}
+            className={`p-2 transition-colors ${selectedTtl ? 'text-cyan-400' : 'text-tg-textSecondary dark:text-tg-dark-textSecondary hover:text-cyan-400'}`}
+            title={selectedTtl ? `Timer: ${selectedTtl}s` : 'Set disappearing timer'}
+          >
+            <ClockIcon className="w-5 h-5" />
+          </button>
+          {showTimerSelection && (
+            <MessageTimerSelection
+              currentValue={selectedTtl}
+              onSelect={seconds => {
+                setSelectedTtl(seconds);
+                setShowTimerSelection(false);
+              }}
+            />
           )}
         </div>
 

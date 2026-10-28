@@ -1146,10 +1146,10 @@ app.post('/api/messages/:messageId/reaction', (req, res) => {
       return;
     }
     if (msg.type === 'message' || msg.type === 'text') {
-      const { to, content, id, groupId, channelId, encryptedAttachments } = msg;
+      const { to, content, id, groupId, channelId, encryptedAttachments, ttl } = msg;
       const исходящее = { from: uid, content: content || '', timestamp: new Date().toISOString(), groupId, type: msg.type, channelId };
       // Save message and get the message ID
-      const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [] });
+      const messageId = sqlDb.saveMessage({ senderUid: uid, receiverUid: to, content: content || '', encryptedAttachments: encryptedAttachments || [], ttl });
       // Attach messageId to outgoing message for receipts
       исходящее.id = messageId;
       
@@ -1514,6 +1514,30 @@ app.post('/api/messages/:messageId/reaction', (req, res) => {
     broadcastPresenceUpdate(uid, false);
   });
 });
+
+// v3.17: Disappearing messages cleanup job - runs every minute
+setInterval(() => {
+  try {
+    const expiredMessages = sqlDb.cleanupExpiredMessages();
+    if (expiredMessages.length > 0) {
+      console.log(`[Disappearing Messages] Cleaned up ${expiredMessages.length} expired messages`);
+      // Broadcast message_expired events to affected users
+      for (const msg of expiredMessages) {
+        const expiredEvent = {
+          type: 'message_expired',
+          messageId: msg.id,
+          chatId: msg.receiver_uid // For 1-to-1, chatId is the other user's UID
+        };
+        // Notify sender
+        отправить(msg.sender_uid, expiredEvent);
+        // Notify receiver
+        отправить(msg.receiver_uid, expiredEvent);
+      }
+    }
+  } catch (e) {
+    console.error('[Disappearing Messages] Cleanup error:', e);
+  }
+}, 60000); // Run every minute
 
 function отправить(uidПолучателя, данные) {
   const ws = wsUsers.get(uidПолучателя);

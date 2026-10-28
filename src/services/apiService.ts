@@ -73,6 +73,8 @@ class ApiService {
     messageId: string;
     deleteForAll?: boolean;
   }) => void)[] = [];
+  // v3.17: Disappearing messages listeners
+  private messageExpiredListeners: ((data: { messageId: string; chatId: string }) => void)[] = [];
   // Этап 2: TrafficPadder отправляет шумовые пакеты каждые 30–60 секунд.
   private trafficPadder: TrafficPadder = new TrafficPadder();
 
@@ -490,6 +492,12 @@ class ApiService {
         return;
       }
 
+      // v3.17: Handle message expired (disappearing messages)
+      if (data.type === 'message_expired') {
+        this.messageExpiredListeners.forEach(cb => cb(data));
+        return;
+      }
+
       // Phase 3: Dumb Server — обработка ошибки recipient_offline.
       // Сервер сообщает что получатель не в сети.
       // Сохраняем сообщение в IndexedDB queue и ретраим при reconnect.
@@ -847,6 +855,15 @@ class ApiService {
 
   offMessageDeleted(callback: (data: { messageId: string; deleteForAll?: boolean }) => void): void {
     this.messageDeletedListeners = this.messageDeletedListeners.filter(l => l !== callback);
+  }
+
+  // v3.17: Disappearing messages updates
+  onMessageExpired(callback: (data: { messageId: string; chatId: string }) => void): void {
+    this.messageExpiredListeners.push(callback);
+  }
+
+  offMessageExpired(callback: (data: { messageId: string; chatId: string }) => void): void {
+    this.messageExpiredListeners = this.messageExpiredListeners.filter(l => l !== callback);
   }
 
   // v3.11: Send message read receipt
