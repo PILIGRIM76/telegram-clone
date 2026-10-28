@@ -116,6 +116,8 @@ export interface UserPreview {
   username: string;
   displayName?: string;
   avatarUrl?: string;
+  // v3.20: Phone hash for contact sync (optional, for debugging/display)
+  phoneHash?: string;
 }
 
 export interface Gift {

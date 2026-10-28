@@ -1,4 +1,5 @@
-﻿import * as nacl from 'tweetnacl';
+﻿import * as crypto from 'crypto';
+import * as nacl from 'tweetnacl';
 import { decryptMessage, encryptMessage } from '../crypto/encryption';
 import {
   hybridDecrypt,
@@ -1172,6 +1173,59 @@ class ApiService {
     } catch (e) {
       logger.error('[API] getUserPreview error:', e);
       return null;
+    }
+  }
+
+  // v3.20: Phone contact sync - Find users by phone hashes
+  async findUsersByPhones(phoneNumbers: string[]): Promise<import('../types').UserPreview[]> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] findUsersByPhones: no access token');
+      return [];
+    }
+    if (!phoneNumbers || phoneNumbers.length === 0) {
+      return [];
+    }
+
+    // Normalize phone numbers to E.164 format and hash them
+    // In a real app, APP_SECRET_SALT should come from a secure config
+    const APP_SECRET_SALT = 'cipherlink_phone_salt_v1';
+    const phoneHashes = phoneNumbers.map(number => {
+      // Normalize to E.164 format (remove spaces, dashes, parentheses, etc.)
+      const normalized = number.replace(/[\s\-\(\)]/g, '');
+      // Ensure it starts with + for E.164
+      const e164 = normalized.startsWith('+') ? normalized : '+' + normalized.replace(/^0+/, '');
+      // Hash with app secret salt
+      const hash = crypto
+        .createHash('sha256')
+        .update(e164 + APP_SECRET_SALT)
+        .digest('hex');
+      return hash;
+    });
+
+    // Filter out duplicates
+    const uniqueHashes = [...new Set(phoneHashes)];
+
+    try {
+      const response = await fetch(`${API_URL}/api/users/find-by-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneHashes: uniqueHashes }),
+      });
+      if (!response.ok) {
+        logger.warn('[API] findUsersByPhones failed:', response.status);
+        return [];
+      }
+      const data = await response.json();
+      return data.users || [];
+    } catch (e) {
+      logger.error('[API] findUsersByPhones error:', e);
+      return [];
     }
   }
 }

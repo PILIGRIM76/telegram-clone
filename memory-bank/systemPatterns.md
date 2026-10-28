@@ -1,10 +1,13 @@
 # System Patterns
 
 ## Дизайн-система
+
 Pixel-perfect клон Telegram Desktop.
 
 ## Цвета
+
 **Только семантические токены из tailwind.config.js:**
+
 - `bg-tg-background` / `bg-tg-dark-background` — фон приложения
 - `text-tg-text` / `text-tg-dark-text` — основной текст
 - `bg-tg-primary` / `bg-tg-primaryHover` — акцентные элементы
@@ -15,6 +18,7 @@ Pixel-perfect клон Telegram Desktop.
 **Запрещено:** хардкод HEX/RGB цветов.
 
 ## Компоненты
+
 - **Пузыри сообщений:**
   - Исходящие: `ml-auto bg-tg-outgoing rounded-2xl rounded-tr-sm`
   - Входящие: `mr-auto bg-tg-incoming rounded-2xl rounded-tl-sm`
@@ -24,5 +28,7 @@ Pixel-perfect клон Telegram Desktop.
 - **Скроллбары:** тонкие (6px), полупрозрачные
 
 ## Безопасность
-- Логика шифрования Signal Protocol (`src/crypto/signal/*`, `src/services/cryptoService.ts`) **неприкосновенна** без явного запроса пользователя на фикс конкретного бага
+
+- Логика шифрования Signal Protocol (`src/crypto/signal/*`, `src/services/cryptoService.ts`) **неприкосновенна** без
+  явного запроса пользователя на фикс конкретного бага
 - При работе с ключами всегда проверяй наличие `identity` перед вызовом функций

@@ -29,6 +29,8 @@ db.exec(`
     created_at TEXT NOT NULL,
     display_name TEXT,
     avatar_url TEXT,
+    -- v3.20: Phone contact sync - SHA-256 hash of normalized phone number (E.164 format) + app salt
+    phone_hash TEXT UNIQUE,
     -- v3.11: Presence tracking
     last_seen INTEGER DEFAULT (unixepoch()),
     is_online INTEGER DEFAULT 0
@@ -48,6 +50,19 @@ db.exec(`
   // v3.19: Create index on username for faster search
   try {
     db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+  } catch (e) {
+    // Index already exists, ignore
+  }
+
+  // v3.20: Migration for phone_hash column (for phone contact sync)
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN phone_hash TEXT UNIQUE');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  // v3.20: Create index on phone_hash for faster contact lookup
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash)');
   } catch (e) {
     // Index already exists, ignore
   }
@@ -208,41 +223,58 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_group_settings_group_id ON group_settings(group_id);
 `);
 
-// Insert a new user (uid, username, password_hash)
-function createUser(uid, username, passwordHash) {
+// Insert a new user (uid, username, password_hash, phone_hash optional)
+function createUser(uid, username, passwordHash, phoneHash = null) {
   const stmt = db.prepare(
-    'INSERT INTO users (uid, username, password_hash, created_at, display_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO users (uid, username, password_hash, created_at, display_name, avatar_url, phone_hash) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
   const now = new Date().toISOString();
-  stmt.run(uid, username, passwordHash, now, null, null);
+  stmt.run(uid, username, passwordHash, now, null, null, phoneHash);
 }
 
 // Get user by uid
 function getUserByUid(uid) {
-  return db.prepare('SELECT uid, username, password_hash, created_at, display_name, avatar_url FROM users WHERE uid = ?').get(uid);
+  return db
+    .prepare(
+      'SELECT uid, username, password_hash, created_at, display_name, avatar_url, phone_hash FROM users WHERE uid = ?'
+    )
+    .get(uid);
 }
 
 // Get user by username (case-insensitive)
 function getUserByUsername(username) {
-  return db.prepare('SELECT uid, username, password_hash, created_at, display_name, avatar_url FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+  return db
+    .prepare(
+      'SELECT uid, username, password_hash, created_at, display_name, avatar_url FROM users WHERE LOWER(username) = LOWER(?)'
+    )
+    .get(username);
 }
 
 // Store/update identity info for a user
 function saveIdentity(uid, publicKey, privateKeyBlob) {
   const stmt = db.prepare(
     'INSERT INTO identities (uid, public_key, private_key_blob) VALUES (?, ?, ?) ' +
-    'ON CONFLICT(uid) DO UPDATE SET public_key = excluded.public_key, private_key_blob = excluded.private_key_blob'
+      'ON CONFLICT(uid) DO UPDATE SET public_key = excluded.public_key, private_key_blob = excluded.private_key_blob'
   );
   stmt.run(uid, publicKey, privateKeyBlob || null);
 }
 
 // Get identity by uid
 function getIdentity(uid) {
-  return db.prepare('SELECT uid, public_key, private_key_blob FROM identities WHERE uid = ?').get(uid);
+  return db
+    .prepare('SELECT uid, public_key, private_key_blob FROM identities WHERE uid = ?')
+    .get(uid);
 }
 
 // Save a message to SQLite
-function saveMessage({ senderUid, receiverUid, content, encryptedAttachments, ttl, forwardedFrom }) {
+function saveMessage({
+  senderUid,
+  receiverUid,
+  content,
+  encryptedAttachments,
+  ttl,
+  forwardedFrom,
+}) {
   const stmt = db.prepare(
     'INSERT INTO messages (sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, expires_at, forwarded_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
@@ -280,19 +312,23 @@ function saveOfflineMessage({ senderUid, receiverUid, content, encryptedAttachme
 
 // Take pending offline messages for a uid, then delete them (POP semantics)
 function takeOfflineMessages(uid) {
-  const select = db.prepare('SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp FROM offline_messages WHERE receiver_uid = ?').all(uid);
+  const select = db
+    .prepare(
+      'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp FROM offline_messages WHERE receiver_uid = ?'
+    )
+    .all(uid);
   if (select.length === 0) return [];
-  
+
   const del = db.prepare('DELETE FROM offline_messages WHERE receiver_uid = ?');
   del.run(uid);
-  
+
   // Parse attachments back
   return select.map(m => ({
     senderUid: m.sender_uid,
     receiverUid: m.receiver_uid,
     content: m.content,
     encryptedAttachments: m.encrypted_attachments ? JSON.parse(m.encrypted_attachments) : [],
-    timestamp: m.timestamp
+    timestamp: m.timestamp,
   }));
 }
 
@@ -308,17 +344,19 @@ function cleanupSessions() {
 function cleanupExpiredMessages() {
   const now = Date.now();
   // Get messages that have expired and need to be deleted
-  const expiredMessages = db.prepare(
-    'SELECT id, sender_uid, receiver_uid FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?'
-  ).all(now);
-  
+  const expiredMessages = db
+    .prepare(
+      'SELECT id, sender_uid, receiver_uid FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?'
+    )
+    .all(now);
+
   if (expiredMessages.length > 0) {
     const ids = expiredMessages.map(m => m.id);
     const placeholders = ids.map(() => '?').join(',');
-    
+
     // Delete the expired messages
     db.prepare(`DELETE FROM messages WHERE id IN (${placeholders})`).run(...ids);
-    
+
     // Return deleted messages info for broadcasting
     return expiredMessages;
   }
@@ -327,9 +365,11 @@ function cleanupExpiredMessages() {
 
 // Get session by refresh token
 function getSessionByRefreshToken(refreshToken) {
-  return db.prepare(
-    'SELECT session_id, uid, refresh_token, expires_at FROM sessions WHERE refresh_token = ?'
-  ).get(refreshToken);
+  return db
+    .prepare(
+      'SELECT session_id, uid, refresh_token, expires_at FROM sessions WHERE refresh_token = ?'
+    )
+    .get(refreshToken);
 }
 
 // Delete session (logout)
@@ -351,7 +391,11 @@ function createSession(uid, refreshToken, sessionId, expiresAt) {
 
 // Get full user profile (public_key, pre_key_bundle, store_data, boards_data)
 function getUserProfile(uid) {
-  const row = db.prepare('SELECT uid, public_key, pre_key_bundle, store_data, boards_data, updated_at FROM user_profiles WHERE uid = ?').get(uid);
+  const row = db
+    .prepare(
+      'SELECT uid, public_key, pre_key_bundle, store_data, boards_data, updated_at FROM user_profiles WHERE uid = ?'
+    )
+    .get(uid);
   if (!row) return null;
   return {
     uid: row.uid,
@@ -449,37 +493,45 @@ function removeReaction(messageId, userUid, emoji) {
 
 // Get all reactions for a message
 function getReactionsForMessage(messageId) {
-  return db.prepare(
-    'SELECT id, message_id, user_uid, emoji, created_at FROM reactions WHERE message_id = ? ORDER BY created_at'
-  ).all(messageId);
+  return db
+    .prepare(
+      'SELECT id, message_id, user_uid, emoji, created_at FROM reactions WHERE message_id = ? ORDER BY created_at'
+    )
+    .all(messageId);
 }
 
 // Get reaction counts per emoji for a message
 function getReactionCountsForMessage(messageId) {
-  const rows = db.prepare(
-    'SELECT emoji, COUNT(*) as count, GROUP_CONCAT(user_uid) as users FROM reactions WHERE message_id = ? GROUP BY emoji'
-  ).all(messageId);
+  const rows = db
+    .prepare(
+      'SELECT emoji, COUNT(*) as count, GROUP_CONCAT(user_uid) as users FROM reactions WHERE message_id = ? GROUP BY emoji'
+    )
+    .all(messageId);
   return rows.map(r => ({
     emoji: r.emoji,
     count: r.count,
-    users: r.users ? r.users.split(',') : []
+    users: r.users ? r.users.split(',') : [],
   }));
 }
 
 // Check if user has reacted with specific emoji
 function hasUserReacted(messageId, userUid, emoji) {
-  return db.prepare(
-    'SELECT 1 FROM reactions WHERE message_id = ? AND user_uid = ? AND emoji = ?'
-  ).get(messageId, userUid, emoji) !== undefined;
+  return (
+    db
+      .prepare('SELECT 1 FROM reactions WHERE message_id = ? AND user_uid = ? AND emoji = ?')
+      .get(messageId, userUid, emoji) !== undefined
+  );
 }
 
 // --- v3.12: Message Editing & Deletion ---
 
 // Get a message by ID
 function getMessage(messageId) {
-  return db.prepare(
-    'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, edited_at, deleted_at, deleted_for, expires_at, forwarded_from FROM messages WHERE id = ?'
-  ).get(messageId);
+  return db
+    .prepare(
+      'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, edited_at, deleted_at, deleted_for, expires_at, forwarded_from FROM messages WHERE id = ?'
+    )
+    .get(messageId);
 }
 
 // Edit a message (save old version to history, update content)
@@ -498,9 +550,7 @@ function editMessage(messageId, newContent) {
   }
 
   // Update message content and edited_at
-  const stmt = db.prepare(
-    'UPDATE messages SET content = ?, edited_at = ? WHERE id = ?'
-  );
+  const stmt = db.prepare('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?');
   const result = stmt.run(newContent, editedAt, messageId);
   return result.changes > 0;
 }
@@ -531,9 +581,7 @@ function deleteMessage(messageId, deleteForAll, uid) {
       deletedFor.push(uid);
     }
 
-    const stmt = db.prepare(
-      'UPDATE messages SET deleted_at = ?, deleted_for = ? WHERE id = ?'
-    );
+    const stmt = db.prepare('UPDATE messages SET deleted_at = ?, deleted_for = ? WHERE id = ?');
     const result = stmt.run(deletedAt, JSON.stringify(deletedFor), messageId);
     return result.changes > 0;
   }
@@ -541,9 +589,11 @@ function deleteMessage(messageId, deleteForAll, uid) {
 
 // Get message edit history
 function getMessageHistory(messageId) {
-  return db.prepare(
-    'SELECT id, message_id, old_content, edited_at FROM message_edits WHERE message_id = ? ORDER BY edited_at'
-  ).all(messageId);
+  return db
+    .prepare(
+      'SELECT id, message_id, old_content, edited_at FROM message_edits WHERE message_id = ? ORDER BY edited_at'
+    )
+    .all(messageId);
 }
 
 // Check if message is deleted for a specific user
@@ -566,7 +616,7 @@ function savePushToken(userUid, token, platform = 'web') {
   const crypto = require('crypto');
   const id = crypto.randomBytes(16).toString('hex');
   const now = Math.floor(Date.now() / 1000);
-  
+
   const stmt = db.prepare(`
     INSERT INTO push_tokens (id, user_uid, token, platform, last_active)
     VALUES (?, ?, ?, ?, ?)
@@ -581,9 +631,11 @@ function savePushToken(userUid, token, platform = 'web') {
 
 // Get all push tokens for a user
 function getPushTokens(userUid) {
-  return db.prepare(
-    'SELECT id, user_uid, token, platform, last_active FROM push_tokens WHERE user_uid = ?'
-  ).all(userUid);
+  return db
+    .prepare(
+      'SELECT id, user_uid, token, platform, last_active FROM push_tokens WHERE user_uid = ?'
+    )
+    .all(userUid);
 }
 
 // Remove a specific push token
@@ -602,7 +654,7 @@ function removeAllPushTokens(userUid) {
 
 // Clean up expired tokens (older than specified days)
 function cleanupExpiredTokens(days = 30) {
-  const cutoff = Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60);
+  const cutoff = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
   const stmt = db.prepare('DELETE FROM push_tokens WHERE last_active < ?');
   const result = stmt.run(cutoff);
   return result.changes;
@@ -655,7 +707,7 @@ function markMessageAsRead(messageId, readerUid) {
 function getReadStatus(messageId) {
   const message = getMessage(messageId);
   if (!message || !message.read_by) return [];
-  
+
   try {
     return JSON.parse(message.read_by);
   } catch {
@@ -697,13 +749,17 @@ function removeGroupMember(groupId, userUid) {
 
 // Get group member role
 function getGroupMemberRole(groupId, userUid) {
-  const row = db.prepare('SELECT role FROM group_members WHERE group_id = ? AND user_uid = ?').get(groupId, userUid);
+  const row = db
+    .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_uid = ?')
+    .get(groupId, userUid);
   return row ? row.role : null;
 }
 
 // Get all members of a group with their roles
 function getGroupMembers(groupId) {
-  return db.prepare('SELECT user_uid, role, joined_at FROM group_members WHERE group_id = ?').all(groupId);
+  return db
+    .prepare('SELECT user_uid, role, joined_at FROM group_members WHERE group_id = ?')
+    .all(groupId);
 }
 
 // Check if user is owner of group
@@ -726,14 +782,18 @@ function isGroupMember(groupId, userUid) {
 
 // Promote member to admin (only owner can do this)
 function promoteToAdmin(groupId, targetUid) {
-  const stmt = db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?');
+  const stmt = db.prepare(
+    'UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?'
+  );
   const result = stmt.run('admin', groupId, targetUid, 'member');
   return result.changes > 0;
 }
 
 // Demote admin to member (only owner can do this)
 function demoteToMember(groupId, targetUid) {
-  const stmt = db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?');
+  const stmt = db.prepare(
+    'UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ? AND role = ?'
+  );
   const result = stmt.run('member', groupId, targetUid, 'admin');
   return result.changes > 0;
 }
@@ -742,9 +802,17 @@ function demoteToMember(groupId, targetUid) {
 function transferOwnership(groupId, newOwnerUid) {
   const transaction = db.transaction(() => {
     // Demote current owner to admin
-    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND role = ?').run('admin', groupId, 'owner');
+    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND role = ?').run(
+      'admin',
+      groupId,
+      'owner'
+    );
     // Promote new owner
-    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ?').run('owner', groupId, newOwnerUid);
+    db.prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND user_uid = ?').run(
+      'owner',
+      groupId,
+      newOwnerUid
+    );
   });
   transaction();
   return true;
@@ -779,13 +847,17 @@ function unbanUser(groupId, userUid) {
 
 // Check if user is banned from a group
 function isUserBanned(groupId, userUid) {
-  const row = db.prepare('SELECT * FROM banned_users WHERE group_id = ? AND user_uid = ?').get(groupId, userUid);
+  const row = db
+    .prepare('SELECT * FROM banned_users WHERE group_id = ? AND user_uid = ?')
+    .get(groupId, userUid);
   return row ? row : null;
 }
 
 // Get all banned users for a group
 function getBannedUsers(groupId) {
-  return db.prepare('SELECT user_uid, banned_by, reason, banned_at FROM banned_users WHERE group_id = ?').all(groupId);
+  return db
+    .prepare('SELECT user_uid, banned_by, reason, banned_at FROM banned_users WHERE group_id = ?')
+    .all(groupId);
 }
 
 // Group Audit Log
@@ -804,29 +876,43 @@ function logGroupAction(groupId, actorUid, action, targetUid = null, metadata = 
 
 // Get audit log for a group
 function getGroupAuditLog(groupId, limit = 100, offset = 0) {
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT id, group_id, actor_uid, action, target_uid, metadata, created_at
     FROM group_audit_log
     WHERE group_id = ?
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
-  `).all(groupId, limit, offset);
+  `
+    )
+    .all(groupId, limit, offset);
 }
 
 // Group Settings
 
 // Get group settings
 function getGroupSettings(groupId) {
-  const row = db.prepare('SELECT group_id, members_only, admins_only, updated_at, updated_by FROM group_settings WHERE group_id = ?').get(groupId);
+  const row = db
+    .prepare(
+      'SELECT group_id, members_only, admins_only, updated_at, updated_by FROM group_settings WHERE group_id = ?'
+    )
+    .get(groupId);
   if (!row) {
-    return { group_id: groupId, members_only: 0, admins_only: 0, updated_at: null, updated_by: null };
+    return {
+      group_id: groupId,
+      members_only: 0,
+      admins_only: 0,
+      updated_at: null,
+      updated_by: null,
+    };
   }
   return {
     group_id: row.group_id,
     members_only: row.members_only === 1,
     admins_only: row.admins_only === 1,
     updated_at: row.updated_at,
-    updated_by: row.updated_by
+    updated_by: row.updated_by,
   };
 }
 
@@ -856,7 +942,9 @@ function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
   }
 
   // Check if user has access to the original message (participant in the chat)
-  const isParticipant = originalMessage.sender_uid === currentUserUid || originalMessage.receiver_uid === currentUserUid;
+  const isParticipant =
+    originalMessage.sender_uid === currentUserUid ||
+    originalMessage.receiver_uid === currentUserUid;
   if (!isParticipant) {
     return { successCount: 0, error: 'Access denied' };
   }
@@ -883,7 +971,7 @@ function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
     original_sender_uid: existingForwardedFrom?.original_sender_uid || originalMessage.sender_uid,
     original_message_id: existingForwardedFrom?.original_message_id || originalMessage.id,
     forward_count: newForwardCount,
-    original_sender_name: existingForwardedFrom?.original_sender_name || originalSenderName
+    original_sender_name: existingForwardedFrom?.original_sender_name || originalSenderName,
   };
 
   // Forward to each target chat
@@ -899,13 +987,15 @@ function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
         senderUid: currentUserUid,
         receiverUid: targetChatId,
         content: originalMessage.content,
-        encryptedAttachments: originalMessage.encrypted_attachments ? JSON.parse(originalMessage.encrypted_attachments) : null,
-        forwardedFrom
+        encryptedAttachments: originalMessage.encrypted_attachments
+          ? JSON.parse(originalMessage.encrypted_attachments)
+          : null,
+        forwardedFrom,
       });
 
       if (result) {
         successCount++;
-        
+
         // Broadcast the new message to the target chat via WebSocket
         // The new message will be sent when the WS handler processes it
         // We'll handle this in server.js after calling this function
@@ -923,14 +1013,16 @@ function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
 // Update username for a user
 function updateUsername(uid, newUsername) {
   const normalizedUsername = newUsername.toLowerCase().trim();
-  
+
   // Validate username format: alphanumeric, underscore, 3-32 chars
   if (!/^[a-z0-9_]{3,32}$/.test(normalizedUsername)) {
     return { success: false, error: 'Invalid username format. Use 3-32 characters: a-z, 0-9, _' };
   }
 
   // Check if username is already taken by another user
-  const existing = db.prepare('SELECT uid FROM users WHERE LOWER(username) = LOWER(?) AND uid != ?').get(normalizedUsername, uid);
+  const existing = db
+    .prepare('SELECT uid FROM users WHERE LOWER(username) = LOWER(?) AND uid != ?')
+    .get(normalizedUsername, uid);
   if (existing) {
     return { success: false, error: 'Username already taken' };
   }
@@ -938,7 +1030,7 @@ function updateUsername(uid, newUsername) {
   // Update username
   const stmt = db.prepare('UPDATE users SET username = ? WHERE uid = ?');
   const result = stmt.run(normalizedUsername, uid);
-  
+
   if (result.changes === 0) {
     return { success: false, error: 'User not found' };
   }
@@ -949,28 +1041,61 @@ function updateUsername(uid, newUsername) {
 // Search users by username (for @username lookup)
 function searchUsers(query) {
   const normalizedQuery = query.toLowerCase().replace(/^@/, '').trim();
-  
+
   if (normalizedQuery.length < 1) {
     return [];
   }
 
-  const results = db.prepare(`
+  const results = db
+    .prepare(
+      `
     SELECT uid, username, display_name as displayName, avatar_url as avatarUrl
     FROM users 
     WHERE LOWER(username) LIKE ?
     LIMIT 10
-  `).all(`%${normalizedQuery}%`);
+  `
+    )
+    .all(`%${normalizedQuery}%`);
 
   return results;
 }
 
 // Get user profile preview by uid (for contact cards)
 function getUserPreview(uid) {
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT uid, username, display_name as displayName, avatar_url as avatarUrl
     FROM users 
     WHERE uid = ?
-  `).get(uid);
+  `
+    )
+    .get(uid);
+}
+
+// v3.20: Find users by phone hashes (for phone contact sync)
+// phoneHashes: array of SHA-256 hashes of normalized phone numbers
+function findUsersByPhoneHashes(phoneHashes) {
+  if (!phoneHashes || !Array.isArray(phoneHashes) || phoneHashes.length === 0) {
+    return [];
+  }
+
+  // Limit to reasonable batch size to prevent abuse
+  const limitedHashes = phoneHashes.slice(0, 100);
+  const placeholders = limitedHashes.map(() => '?').join(',');
+
+  const results = db
+    .prepare(
+      `
+    SELECT uid, username, display_name as displayName, avatar_url as avatarUrl
+    FROM users 
+    WHERE phone_hash IN (${placeholders})
+    LIMIT 100
+  `
+    )
+    .all(...limitedHashes);
+
+  return results;
 }
 
 module.exports = {
@@ -982,6 +1107,8 @@ module.exports = {
   updateUsername,
   searchUsers,
   getUserPreview,
+  // v3.20: Phone contact sync
+  findUsersByPhoneHashes,
   saveIdentity,
   getIdentity,
   saveMessage,

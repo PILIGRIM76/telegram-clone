@@ -1,7 +1,9 @@
 # Навык: Telegram UI Builder
 
 ## Инструкция
+
 При создании нового компонента интерфейса следуй этим правилам:
+
 1. Структура: Оборачивай контент в `<Layout>` или используй классы `flex h-screen w-screen overflow-hidden`.
 2. Цвета: Используй ТОЛЬКО семантические классы Tailwind из `tailwind.config.js`:
    - Фон: `bg-tg-background dark:bg-tg-dark-background`
