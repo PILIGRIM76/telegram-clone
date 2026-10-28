@@ -18,6 +18,7 @@ interface MessageItemProps {
   isAdmin?: boolean;
   onEdit?: (messageId: string, newText: string) => void;
   onReply?: (message: Message) => void;
+  onForward?: (message: Message) => void;
   showAvatar?: boolean;
   partner?: (Contact | { name: string }) & {
     isOnline?: boolean;
@@ -156,6 +157,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   isAdmin = false,
   onEdit,
   onReply,
+  onForward,
   showAvatar = false,
   partner,
 }) => {
@@ -302,6 +304,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
     handleCloseContextMenu();
   };
 
+  const handleForward = () => {
+    onForward?.(message);
+    handleCloseContextMenu();
+  };
+
   const handleReply = () => {
     onReply?.(message);
     handleCloseContextMenu();
@@ -323,6 +330,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const contextMenuItems: MenuItem[] = [
     { id: 'reply', icon: '↩️', label: 'Ответить', onClick: handleReply },
     { id: 'copy', icon: '📋', label: 'Копировать', onClick: handleCopy },
+    { id: 'forward', icon: '↪️', label: 'Переслать', onClick: handleForward },
   ];
 
   if (canEdit) {
@@ -430,6 +438,19 @@ const MessageItem: React.FC<MessageItemProps> = ({
               {decryptedText && (
                 <>
                   <div className="whitespace-pre-wrap break-words">{decryptedText}</div>
+                  {message.forwardedFrom && (
+                    <div className="mt-1 text-xs font-medium text-tg-textSecondary dark:text-tg-dark-textSecondary flex items-center gap-1">
+                      <span>Переслано от:</span>
+                      <span className="text-tg-primary">
+                        {message.forwardedFrom.originalSenderName || 'Unknown'}
+                      </span>
+                      {message.forwardedFrom.forwardCount > 1 && (
+                        <span className="text-tg-textSecondary dark:text-tg-dark-textSecondary">
+                          ({message.forwardedFrom.forwardCount}x)
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {message.isEdited && (
                     <span className="text-[10px] text-tg-textSecondary dark:text-tg-dark-textSecondary ml-1">
                       изменено

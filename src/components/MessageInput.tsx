@@ -3,14 +3,16 @@ import { getPrivateKey } from '../services/cryptoService';
 import type { EncryptedAttachment, Gift } from '../types';
 import FileUpload from './FileUpload';
 import GiftSelectorModal from './GiftSelectorModal';
-import { GiftIcon, PaperAirplaneIcon, PaperClipIcon, XMarkIcon } from './icons';
+import MessageTimerSelection from './MessageTimerSelection';
+import { ClockIcon, GiftIcon, PaperAirplaneIcon, PaperClipIcon, XMarkIcon } from './icons';
 
 interface MessageInputProps {
   onSendMessage: (
     text: string,
     attachments?: { id: string; dataUrl: string; name: string }[],
     replyTo?: string,
-    encryptedAttachments?: EncryptedAttachment[]
+    encryptedAttachments?: EncryptedAttachment[],
+    ttl?: number
   ) => void;
   onTyping?: (isTyping: boolean) => void;
   identity: import('../types').IdentityType | null;
@@ -25,6 +27,10 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [encryptedAttachments, setEncryptedAttachments] = useState<EncryptedAttachment[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
+  // v3.17: Disappearing messages timer selection
+  const [selectedTtl, setSelectedTtl] = useState<number | undefined>(undefined);
+  const [showTimerSelection, setShowTimerSelection] = useState(false);
+  const timerButtonRef = useRef<HTMLButtonElement>(null);
 
   const typingTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,15 +99,14 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
               name: enc.name,
             }))
           : undefined;
-      onSendMessage(text.trim(), attachments, undefined, encryptedAttachments);
+      onSendMessage(text.trim(), attachments, undefined, encryptedAttachments, selectedTtl);
       setText('');
       setEncryptedAttachments([]);
       clearFile();
-      if (onTyping) {
-        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-        onTyping(false);
-      }
-      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      // v3.17: Clear timer selection after sending
+      setSelectedTtl(undefined);
+      setShowTimerSelection(false);
+      if (onTyping) onTyping(false);
     }
   };
 
@@ -257,6 +262,27 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onTyping, id
         >
           <GiftIcon className="w-5 h-5" />
         </button>
+
+        {/* v3.17: Disappearing messages timer selection */}
+        <div className="relative">
+          <button
+            ref={timerButtonRef}
+            onClick={() => setShowTimerSelection(!showTimerSelection)}
+            className={`p-2 transition-colors mb-0.5 ${selectedTtl ? 'text-cyan-400' : 'text-slate-400 hover:text-cyan-400'}`}
+            title={selectedTtl ? `Timer: ${selectedTtl}s` : 'Set disappearing timer'}
+          >
+            <ClockIcon className="w-5 h-5" />
+          </button>
+          {showTimerSelection && (
+            <MessageTimerSelection
+              currentValue={selectedTtl}
+              onSelect={seconds => {
+                setSelectedTtl(seconds);
+                setShowTimerSelection(false);
+              }}
+            />
+          )}
+        </div>
 
         <input
           type="file"

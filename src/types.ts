@@ -136,8 +136,9 @@ export interface Message {
   attachments?: { id: string; dataUrl: string; name: string }[];
 
   // Для исчезающих сообщений
-  disappearIn?: number; // В секундах
-  timerSetAt?: number; // Время установки таймера.
+  disappearIn?: number; // В секундах (TTL при отправке)
+  timerSetAt?: number; // Время установки таймера (Unix ms)
+  expiresAt?: number; // Время истечения таймера (Unix ms) - вычисляется на сервере
 
   // Для сложных данных (заказы, обновления, подарки)
   payload?: unknown;
@@ -181,6 +182,19 @@ export interface Message {
   // Реакции (эмодзи).
   /** Массив реакций: { emoji: string; count: number; users: string[]; mine?: boolean }. */
   reactions?: Reaction[];
+
+  // Пересылка сообщений.
+  /** Информация об исходном сообщении, если это пересланное сообщение. */
+  forwardedFrom?: {
+    /** UID оригинального отправителя. */
+    originalSenderUid: string;
+    /** ID оригинального сообщения. */
+    originalMessageId: string;
+    /** Счетчик пересылок (сколько раз пересылали). */
+    forwardCount: number;
+    /** Имя оригинального отправителя (для отображения в UI). */
+    originalSenderName?: string;
+  };
 }
 
 /** Реакция на сообщение (эмодзи + количество + список пользователей). */
@@ -220,7 +234,7 @@ export interface Attachment {
 export interface Chat {
   contactId: string; // Может быть ID контакта или ID группы
   messages: Message[];
-  disappearTimer?: number; // Текущая настройка таймера для этого чата
+  disappearIn?: number; // Текущая настройка таймера для этого чата (секунды)
   /** Этап 4: время, до которого уведомления отключены (Number.MAX_SAFE_INTEGER означает навсегда). */
   mutedUntil?: number;
   /** Этап 4: чат перемещён в архив и скрыт из основного списка. */

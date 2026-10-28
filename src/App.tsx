@@ -28,6 +28,7 @@ import { TabletTabBar, type TabView } from './components/TabletTabBar';
 import { ConfirmLogoutModal } from './components/ConfirmLogoutModal';
 import { Drawer } from './components/Drawer';
 import { FloatingCircleNav } from './components/FloatingCircleNav';
+import ForwardModal from './components/ForwardModal';
 import { LeftAppBar } from './components/LeftAppBar';
 import { ResponsiveShell } from './components/ResponsiveShell';
 import { RightAppBar } from './components/RightAppBar';
@@ -117,6 +118,9 @@ const App: React.FC = () => {
   >('closed');
   // v1.6 Этап 4: показывать модалку верификации контакта
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  // v3.18: Forward messages modal
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardTargetMessage, setForwardTargetMessage] = useState<Message | null>(null);
   const { language, setLanguage } = useTranslation();
   // v1.6 Этап 4: toast-уведомления (объявлены раньше handlers, чтобы их можно было вызывать)
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
@@ -795,6 +799,26 @@ const App: React.FC = () => {
       return updated;
     });
   };
+  // v3.18: Forward message
+  const handleForwardMessage = (message: Message) => {
+    logger.info('[PILIGRIM] handleForwardMessage:', message.id);
+    setForwardTargetMessage(message);
+    setShowForwardModal(true);
+  };
+
+  const handleForwardConfirm = async (targetChatIds: string[]) => {
+    if (!forwardTargetMessage || targetChatIds.length === 0) return;
+
+    logger.info('[PILIGRIM] Forwarding message to:', targetChatIds);
+    const result = await apiService.forwardMessage(forwardTargetMessage.id, targetChatIds);
+
+    if (result.successCount > 0) {
+      logger.info(`[PILIGRIM] Successfully forwarded to ${result.successCount} chats`);
+    } else {
+      logger.warn('[PILIGRIM] Forward failed');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('piligrim-identity');
     setIdentity(null);
@@ -1031,7 +1055,8 @@ const App: React.FC = () => {
                         options?.replyTo,
                         options?.encryptedAttachments,
                         options?.voiceMetadata,
-                        options?.messageType
+                        options?.messageType,
+                        options?.ttl
                       );
                     }}
                     currentIdentity={identity ?? undefined}
@@ -1047,6 +1072,7 @@ const App: React.FC = () => {
                     onEditMessage={(messageId, newText) =>
                       handleEditMessage(selectedChatId, messageId, newText)
                     }
+                    onForwardMessage={handleForwardMessage}
                     onStartCall={() => {
                       const target = contacts.find(c => c.id === selectedChatId);
                       if (target && target.uid) {
@@ -1259,6 +1285,19 @@ const App: React.FC = () => {
             />
           );
         })()}
+
+      {/* v3.18: Forward messages modal */}
+      {showForwardModal && forwardTargetMessage && (
+        <ForwardModal
+          isOpen={showForwardModal}
+          onClose={() => setShowForwardModal(false)}
+          messageToForward={forwardTargetMessage}
+          contacts={contacts}
+          groups={groups}
+          currentUserUid={identity?.uid || ''}
+          onConfirm={handleForwardConfirm}
+        />
+      )}
 
       {/* Batch 4: Toast notifications */}
       <Toasts toasts={toasts} onDismiss={dismissToast} />

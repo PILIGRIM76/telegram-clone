@@ -47,6 +47,7 @@ interface ChatWindowProps {
       encryptedAttachments?: EncryptedAttachment[];
       voiceMetadata?: VoiceMessageMetadata;
       attachments?: { id: string; dataUrl: string; name: string }[];
+      ttl?: number;
     }
   ) => void;
   // Дополнительные данные собеседника, включая статус присутствия и сведения о группе.
@@ -63,6 +64,7 @@ interface ChatWindowProps {
   onVerifyContact?: () => void;
   onDeleteMessage?: (messageId: string) => void;
   onEditMessage?: (messageId: string, newText: string) => void;
+  onForwardMessage?: (message: Message) => void;
   encryptionType?: EncryptionType;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -225,6 +227,7 @@ interface MessageListProps {
   onDeleteMessage?: (messageId: string) => void;
   onEditMessage?: (messageId: string, newText: string) => void;
   onReplyMessage?: (message: Message) => void;
+  onForwardMessage?: (message: Message) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -238,6 +241,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onDeleteMessage,
   onEditMessage,
   onReplyMessage,
+  onForwardMessage,
 }) => {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -312,6 +316,7 @@ const MessageList: React.FC<MessageListProps> = ({
               onDelete={onDeleteMessage}
               onEdit={onEditMessage}
               onReply={onReplyMessage}
+              onForward={onForwardMessage}
               showAvatar={!isOwn && showAvatar}
               partner={partner}
             />
@@ -731,6 +736,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onVerifyContact,
   onDeleteMessage,
   onEditMessage,
+  onForwardMessage,
   encryptionType,
   onLoadMore,
   hasMore,
@@ -825,6 +831,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         onDeleteMessage={onDeleteMessage}
         onEditMessage={handleStartEdit}
         onReplyMessage={setReplyTo}
+        onForwardMessage={onForwardMessage}
       />
 
       <MessageInput

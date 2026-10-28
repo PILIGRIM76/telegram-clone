@@ -63,7 +63,9 @@ db.exec(`
     deleted_at INTEGER,
     deleted_for TEXT,  -- JSON array of uids for whom message is deleted
     -- v3.17: Disappearing messages (TTL)
-    expires_at INTEGER
+    expires_at INTEGER,
+    -- v3.18: Message forwarding
+    forwarded_from TEXT  -- JSON: {original_sender_uid, original_message_id, forward_count, original_sender_name}
   );
 
   CREATE TABLE IF NOT EXISTS offline_messages (
@@ -220,9 +222,9 @@ function getIdentity(uid) {
 }
 
 // Save a message to SQLite
-function saveMessage({ senderUid, receiverUid, content, encryptedAttachments, ttl }) {
+function saveMessage({ senderUid, receiverUid, content, encryptedAttachments, ttl, forwardedFrom }) {
   const stmt = db.prepare(
-    'INSERT INTO messages (sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO messages (sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, expires_at, forwarded_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const now = new Date().toISOString();
   const nowMs = Date.now();
@@ -234,7 +236,8 @@ function saveMessage({ senderUid, receiverUid, content, encryptedAttachments, tt
     encryptedAttachments ? JSON.stringify(encryptedAttachments) : null,
     now,
     0,
-    expiresAt
+    expiresAt,
+    forwardedFrom ? JSON.stringify(forwardedFrom) : null
   );
   return result.lastID;
 }
@@ -455,7 +458,7 @@ function hasUserReacted(messageId, userUid, emoji) {
 // Get a message by ID
 function getMessage(messageId) {
   return db.prepare(
-    'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, edited_at, deleted_at, deleted_for FROM messages WHERE id = ?'
+    'SELECT id, sender_uid, receiver_uid, content, encrypted_attachments, timestamp, delivered, edited_at, deleted_at, deleted_for, expires_at, forwarded_from FROM messages WHERE id = ?'
   ).get(messageId);
 }
 
@@ -823,6 +826,78 @@ function updateGroupSettings(groupId, updatedBy, settings) {
   return true;
 }
 
+// v3.18: Message Forwarding
+// Forward a message to multiple chats
+function forwardMessage(originalMessageId, currentUserUid, targetChatIds) {
+  // Get the original message
+  const originalMessage = getMessage(originalMessageId);
+  if (!originalMessage) {
+    return { successCount: 0, error: 'Original message not found' };
+  }
+
+  // Check if user has access to the original message (participant in the chat)
+  const isParticipant = originalMessage.sender_uid === currentUserUid || originalMessage.receiver_uid === currentUserUid;
+  if (!isParticipant) {
+    return { successCount: 0, error: 'Access denied' };
+  }
+
+  // Get original sender's name
+  const originalSender = getUserByUid(originalMessage.sender_uid);
+  const originalSenderName = originalSender ? originalSender.username : 'Unknown';
+
+  // Parse existing forwarded_from if any
+  let existingForwardedFrom = null;
+  if (originalMessage.forwarded_from) {
+    try {
+      existingForwardedFrom = JSON.parse(originalMessage.forwarded_from);
+    } catch (e) {
+      console.warn('[forwardMessage] Failed to parse forwarded_from:', e);
+    }
+  }
+
+  // Calculate new forward count
+  const newForwardCount = (existingForwardedFrom?.forward_count || 0) + 1;
+
+  // Build forwarded_from data
+  const forwardedFrom = {
+    original_sender_uid: existingForwardedFrom?.original_sender_uid || originalMessage.sender_uid,
+    original_message_id: existingForwardedFrom?.original_message_id || originalMessage.id,
+    forward_count: newForwardCount,
+    original_sender_name: existingForwardedFrom?.original_sender_name || originalSenderName
+  };
+
+  // Forward to each target chat
+  let successCount = 0;
+  const nowMs = Date.now();
+
+  for (const targetChatId of targetChatIds) {
+    try {
+      // Don't forward to self
+      if (targetChatId === currentUserUid) continue;
+
+      const result = saveMessage({
+        senderUid: currentUserUid,
+        receiverUid: targetChatId,
+        content: originalMessage.content,
+        encryptedAttachments: originalMessage.encrypted_attachments ? JSON.parse(originalMessage.encrypted_attachments) : null,
+        forwardedFrom
+      });
+
+      if (result) {
+        successCount++;
+        
+        // Broadcast the new message to the target chat via WebSocket
+        // The new message will be sent when the WS handler processes it
+        // We'll handle this in server.js after calling this function
+      }
+    } catch (e) {
+      console.error(`[forwardMessage] Failed to forward to ${targetChatId}:`, e);
+    }
+  }
+
+  return { successCount, forwardedFrom };
+}
+
 module.exports = {
   db,
   createUser,
@@ -836,6 +911,8 @@ module.exports = {
   cleanupSessions,
   // v3.17: Disappearing messages cleanup
   cleanupExpiredMessages,
+  // v3.18: Message Forwarding
+  forwardMessage,
   getSessionByRefreshToken,
   deleteSession,
   createSession,

@@ -1,7 +1,7 @@
 # Active Context
 
 ## Текущая задача
-Disappearing Messages (самоудаляющиеся сообщения) — реализация завершена.
+Forward Messages (пересылка сообщений) — реализация завершена.
 
 ## Актуальный статус ветки
 feature/signal-protocol
@@ -27,4 +27,14 @@ Message Reactions (эмодзи-реакции) полностью реализ�
 - Service: `apiService.onMessageExpired()` / `offMessageExpired()`, `useWebSocket` подписывается на событие
 - App.tsx: обрабатывает `message_expired` — удаляет сообщение из локального стора; `handleSendMessage` принимает `ttl` и передаёт в `sendMessageSecure` / `sendMessage` + добавляет `disappearIn`, `timerSetAt`, `expiresAt` в локальное сообщение
 - UI: `MessageTimerSelection` (выбор таймера: Off, 5с, 30с, 1ч, 1д, 1н) интегрирован в `ChatWindow` (MessageInput); `MessageItem` показывает обратный отсчёт ⏳ рядом со временем (обновляется каждые 10 сек); при истечении клиент оптимистично скрывает сообщение, ожидая подтверждения сервера
+- Build verified: `npm run build` проходит успешно
+
+**Forward Messages (пересылка сообщений) полностью реализовано:**
+- Backend: REST endpoint `/api/messages/:id/forward`, `forwardMessage()` в databaseService.js, поле `forwarded_from` (JSON) в SQLite
+- Service: `apiService.forwardMessage(messageId, targetChatIds[])` → POST /forward
+- Types: `Message.forwardedFrom` с `originalSenderUid`, `originalMessageId`, `forwardCount`, `originalSenderName`
+- App.tsx: state `showForwardModal`, `forwardTargetMessage`; handlers `handleForwardMessage`, `handleForwardConfirm`; рендер `<ForwardModal />`
+- UI: `ForwardModal` (Search + чекбоксы контактов/групп, UserCircleIcon/UserPlusIcon); `MessageItem` контекстное меню "Переслать" (↪️); отображение "Переслано от: [Имя] (Nx)" над текстом
+- Проброс: `App` → `ChatWindow` → `MessageList` → `MessageItem` через `onForwardMessage`
+- E2EE: пересланное сообщение шифруется заново для каждого получателя через `sendMessageSecure`
 - Build verified: `npm run build` проходит успешно

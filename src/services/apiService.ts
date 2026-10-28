@@ -1045,6 +1045,39 @@ class ApiService {
       logger.error('[API] addReaction error:', e);
     }
   }
+
+  /** Forward a message to multiple chats */
+  async forwardMessage(
+    messageId: string,
+    targetChatIds: string[]
+  ): Promise<{ successCount: number }> {
+    const token =
+      localStorage.getItem('piligrim-access-token') ||
+      localStorage.getItem('cipherlink-access-token');
+    if (!token) {
+      logger.warn('[API] forwardMessage: no access token');
+      return { successCount: 0 };
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/messages/${messageId}/forward`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetChatIds }),
+      });
+      if (!response.ok) {
+        logger.warn('[API] forwardMessage failed:', response.status);
+        return { successCount: 0 };
+      }
+      const data = await response.json();
+      return { successCount: data.successCount || 0 };
+    } catch (e) {
+      logger.error('[API] forwardMessage error:', e);
+      return { successCount: 0 };
+    }
+  }
 }
 
 export const apiService = new ApiService();
