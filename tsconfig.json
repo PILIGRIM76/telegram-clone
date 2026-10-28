@@ -9,17 +9,8 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": [
-      "jest",
-      "node"
-    ]
+    "types": ["jest", "node"]
   },
-  "include": [
-    "src/**/*",
-    "vite.config.ts",
-    "electron/**/*"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src/**/*", "vite.config.ts", "electron/**/*"],
+  "exclude": ["node_modules"]
 }

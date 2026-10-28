@@ -1,5 +1,4 @@
 // v3.18: Forward Messages Modal
-// // v3.18: Forward Messages Modal
 // Модальное окно для пересылки сообщения контактам и группам.
 
 import { AnimatePresence, motion } from 'framer-motion';

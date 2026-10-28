@@ -52,7 +52,7 @@ const MessageStatusIcons: React.FC<{
   const isDecrypted = !hasEncryptedPayload || !isPlaintextFallback;
   const disappearDuration = message.disappearIn || disappearTimer;
 
-  // v3.17: Countdown timer for disappearing messages
+  // v3.17: Таймер обратного отсчёта для исчезающих сообщений
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(() => {
     if (!message.expiresAt) return null;
     const remaining = Math.ceil((message.expiresAt - Date.now()) / 1000);
@@ -66,7 +66,7 @@ const MessageStatusIcons: React.FC<{
       setRemainingSeconds(remaining > 0 ? remaining : 0);
     };
     updateRemaining();
-    // Update every 10 seconds to avoid too many re-renders
+    // Обновление каждые 10 секунд, чтобы избежать лишних перерисовок
     const interval = setInterval(updateRemaining, 10000);
     return () => clearInterval(interval);
   }, [message.expiresAt]);
@@ -76,7 +76,7 @@ const MessageStatusIcons: React.FC<{
     minute: '2-digit',
   });
 
-  // Format remaining time for display
+  // Форматирование оставшегося времени для отображения
   const formatRemaining = (seconds: number): string => {
     if (seconds <= 0) return '0с';
     if (seconds < 60) return `${seconds}с`;
@@ -319,7 +319,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
     const userReacted = existingReaction?.users?.includes(currentUid) || false;
     const action = userReacted ? 'remove' : 'add';
 
-    // Send to server - WebSocket event will update the UI
+    // Отправка на сервер - WS-событие обновит UI
     void apiService.addReaction(message.id, emoji, action);
   };
 

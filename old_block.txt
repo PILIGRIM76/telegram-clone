@@ -1,0 +1,229 @@
+{activeTab === 'chats' && (
+        <>
+          {/* Main chat layout using Layout component (Telegram Desktop style) */}
+          <Layout
+            sidebar={
+              <ContactList
+                identity={identity}
+                contacts={contacts}
+                groups={groups}
+                chats={chats}
+                selectedChatId={selectedChatId}
+                onSelectChat={handleSelectChat}
+                onAddContact={handleAddContact}
+                onCreateGroup={handleCreateGroup}
+                onMuteChat={handleMuteChat}
+                onArchiveChat={handleArchiveChat}
+                onOpenProfile={handleOpenProfile}
+                onOpenStore={handleOpenStore}
+                onOpenBoards={handleOpenBoards}
+              />
+            }
+          >
+            {selectedChatId && chats[selectedChatId] ? (
+              <ChatWindow
+                chatId={selectedChatId}
+                messages={chats[selectedChatId]?.messages || []}
+                onSendMessage={(text, attachments, replyTo) => handleSendMessage(selectedChatId, text, attachments, replyTo)}
+                partner={(() => {
+                  const c = contacts.find((c) => c.id === selectedChatId);
+                  if (c) return c;
+                  const g = groups.find((g) => g.id === selectedChatId);
+                  if (g) return { name: g.name };
+                  return undefined;
+                })()}
+                currentUserUid={identity?.uid}
+                onDeleteMessage={(messageId) => handleDeleteMessage(selectedChatId, messageId)}
+                onEditMessage={(messageId, newText) => handleEditMessage(selectedChatId, messageId, newText)}
+                onStartCall={() => {
+                  const target = contacts.find((c) => c.id === selectedChatId);
+                  if (target && target.uid) {
+                    logger.info('[PILIGRIM] Stage 6: starting call to ' + target.name + ' (' + target.uid + ')');
+                    webrtcHook.startCall(target.uid);
+                  } else {
+                    alert('Contact not found or has no UID');
+                  }
+                }}
+                callState={
+                  webrtcHook.isInCall
+                    ? 'in-call'
+                    : webrtcHook.isCalling
+                      ? 'calling'
+                      : webrtcHook.incomingCall
+                        ? 'incoming'
+                        : 'idle'
+                }
+                mutedUntil={chats[selectedChatId]?.mutedUntil}
+                onVerifyContact={() => setShowVerifyModal(true)}
+                encryptionType={chats[selectedChatId]?.encryptionType}
+              />
+            ) : (
+              <div
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-text-secondary)',
+                  padding: '24px'
+                }}
+              >
+                <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
+                  Добро пожаловать в PILIGRIM
+                </p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
+                  Выберите контакт слева или добавьте новый с помощью <strong>+</strong>
+                </p>
+                <button
+                  onClick={handleLogout}
+                  aria-label="Logout"
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem 1rem',
+                    background: 'var(--color-danger)',
+                    color: 'var(--color-on-primary)',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </Layout>
+                onVideo={() => logger.info('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
+                onSearch={() => setIsSearchOpen(true)}
+                onClose={() => setIsProfileOpen(false)}
+              />
+            );
+          })()
+        }
+      />
+      )}
+
+      {/* v3.0 Phase 2C: вкладка Звонки — CallsHistoryView с demo данными */}
+      {activeTab === 'calls' && (
+        <CallsHistoryView onViewChange={setActiveTab} />
+      )}
+
+      {/* v3.0 Phase 2C: вкладка Избранное — только verified контакты */}
+      {activeTab === 'favorites' && (
+        <FavoritesView
+          contacts={contacts}
+          onSelectContact={(uid) => {
+            setActiveTab('chats');
+            handleSelectChat(uid);
+          }}
+          onViewChange={setActiveTab}
+        />
+      )}
+
+      {/* Telegram-like: вкладка Каналы */}
+      {activeTab === 'channels' && (
+        <ChannelsView />
+      )}
+
+      {/* Batch 4: РјРѕРґР°Р»РєР° РІРµСЂРёС„РёРєР°С†РёРё РєРѕРЅС‚Р°РєС‚Р° */}
+      {showVerifyModal && selectedChatId && (() => {
+        const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+        return (
+          <VerifyModal
+            partnerName={partner?.name || 'РљРѕРЅС‚Р°РєС‚'}
+            partnerPublicKey={partner?.publicKey}
+            myPublicKey={identity ? getPublicKey(identity) : undefined}
+            partnerFingerprint={partner?.keyFingerprint}
+            myFingerprint={identity?.keyFingerprint}
+            isVerified={!!partner?.verified}
+            onConfirm={() => handleVerifyContact(selectedChatId)}
+            onClose={() => setShowVerifyModal(false)}
+          />
+        );
+      })()}
+
+      {/* Batch 4: Toast notifications */}
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
+
+      {/* v3.0 Phase 2D: Drawer (боковая штора профиля + QR-код) */}
+      <Drawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        identity={identity}
+        lang={language}
+        onToggleLang={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
+        // v3.0 Phase 2F: активная вкладка для индикатора в Drawer
+        activeView={activeTab}
+        onNavigate={(view) => setActiveTab(view)}
+        onOpenAccount={() => {
+          setIsDrawerOpen(false);
+          setShowAccountPage(true);
+        }}
+        onLogout={() => {
+          setIsDrawerOpen(false);
+          setShowLogoutModal(true);
+        }}
+      />
+
+      {/* v3.0 Security Dashboard: AccountPage (Настройки → Аккаунт) */}
+      {identity && showAccountPage && (
+        <AccountPage
+          user={{
+            name: identity.username || 'Пилигрим',
+            uid: identity.uid,
+            e2eeStatus: identity.isBIP39 ? 'verified' : 'pending',
+          }}
+          onBack={() => setShowAccountPage(false)}
+          onLogout={() => {
+            setShowAccountPage(false);
+            setShowLogoutModal(true);
+          }}
+          onBackupSeed={() => {
+            setShowAccountPage(false);
+            setShowSeedModal(true);
+          }}
+        />
+      )}
+
+      {/* v3.0 Phase 2E: Search command palette (Ctrl+K) */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        contacts={searchableContacts}
+        onContactSelect={(uid: string) => {
+          setIsSearchOpen(false);
+          setActiveTab('chats');
+          setSelectedChatId(uid);
+        }}
+      />
+
+      {/* v3.0 Logout: модалка подтверждения выхода (вызывается из RightAppBar ⋮) */}
+      <ConfirmLogoutModal
+        isOpen={showLogoutModal}
+        identityUid={identity?.uid}
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={() => {
+          setShowLogoutModal(false);
+          logout();
+        }}
+      />
+
+      {/* v3.0 Phase 1: theme indicator (правый нижний угол) */}
+      <div
+        data-testid="theme-indicator"
+        style={{
+          position: 'fixed',
+          bottom: '12px',
+          right: '12px',
+          padding: '4px 10px',
+          backgroundColor: 'var(--color-bg-elevated)',
+          color: 'var(--color-text)',
+          border: '1px solid var(--color-surface)',
+          borderRadius: '12px',
+          fontSize: '11px',
+          fontWeight: 600,
+          zIndex: 100,
+          boxShadow: 'var(--shadow-sm)'
+        }}
+        title="Адаптивная тема по времени 

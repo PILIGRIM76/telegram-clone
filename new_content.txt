@@ -1,0 +1,144 @@
+{activeTab === 'chats' && (
+        <>
+          {/* Main chat layout using Layout component (Telegram Desktop style) */}
+          <Layout
+            sidebar={
+              <ContactList
+                identity={identity}
+                contacts={contacts}
+                groups={groups}
+                chats={chats}
+                selectedChatId={selectedChatId}
+                onSelectChat={handleSelectChat}
+                onAddContact={handleAddContact}
+                onCreateGroup={handleCreateGroup}
+                onMuteChat={handleMuteChat}
+                onArchiveChat={handleArchiveChat}
+                onOpenProfile={handleOpenProfile}
+                onOpenStore={handleOpenStore}
+                onOpenBoards={handleOpenBoards}
+              />
+            }
+          >
+            {selectedChatId && chats[selectedChatId] ? (
+              <ChatWindow
+                chatId={selectedChatId}
+                messages={chats[selectedChatId]?.messages || []}
+                onSendMessage={(text, attachments, replyTo) => handleSendMessage(selectedChatId, text, attachments, replyTo)}
+                partner={(() => {
+                  const c = contacts.find((c) => c.id === selectedChatId);
+                  if (c) return c;
+                  const g = groups.find((g) => g.id === selectedChatId);
+                  if (g) return { name: g.name };
+                  return undefined;
+                })()}
+                currentUserUid={identity?.uid}
+                onDeleteMessage={(messageId) => handleDeleteMessage(selectedChatId, messageId)}
+                onEditMessage={(messageId, newText) => handleEditMessage(selectedChatId, messageId, newText)}
+                onStartCall={() => {
+                  const target = contacts.find((c) => c.id === selectedChatId);
+                  if (target && target.uid) {
+                    logger.info('[PILIGRIM] Stage 6: starting call to ' + target.name + ' (' + target.uid + ')');
+                    webrtcHook.startCall(target.uid);
+                  } else {
+                    alert('Contact not found or has no UID');
+                  }
+                }}
+                callState={
+                  webrtcHook.isInCall
+                    ? 'in-call'
+                    : webrtcHook.isCalling
+                      ? 'calling'
+                      : webrtcHook.incomingCall
+                        ? 'incoming'
+                        : 'idle'
+                }
+                mutedUntil={chats[selectedChatId]?.mutedUntil}
+                onVerifyContact={() => setShowVerifyModal(true)}
+                encryptionType={chats[selectedChatId]?.encryptionType}
+              />
+            ) : (
+              <div
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-text-secondary)',
+                  padding: '24px'
+                }}
+              >
+                <p style={{ fontSize: '1.125rem', margin: '0 0 8px' }} aria-label="Empty chat">
+                  Добро пожаловать в PILIGRIM
+                </p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: '280px', textAlign: 'center', margin: '0 0 24px' }}>
+                  Выберите контакт слева или добавьте новый с помощью <strong>+</strong>
+                </p>
+                <button
+                  onClick={handleLogout}
+                  aria-label="Logout"
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem 1rem',
+                    background: 'var(--color-danger)',
+                    color: 'var(--color-on-primary)',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </Layout>
+
+          {/* Navigation elements (rendered as siblings for positioning) */}
+          <TabletTabBar
+            activeView={activeTab}
+            onViewChange={(view) => {
+              logger.info('[PILIGRIM] Tab changed to:', view);
+              setActiveTab(view);
+            }}
+          />
+          <FloatingActionButton
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              logger.info('[PILIGRIM] FAB clicked: requested AddContactModal open');
+            }}
+          />
+          <FloatingCircleNav
+            activeView={activeTab}
+            onViewChange={setActiveTab}
+            onCompose={() => {
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              logger.info('[PILIGRIM] Circle compose clicked: requested AddContactModal open');
+            }}
+          />          <DesktopJoystick
+            activeView={activeTab}
+            onViewChange={setActiveTab}
+            onCompose={() => {
+              window.dispatchEvent(new CustomEvent('piligrim:open-add-contact'));
+              logger.info('[PILIGRIM] Joystick compose clicked: requested AddContactModal open');
+            }}
+          />
+          {(() => {
+            if (!isProfileOpen || !selectedChatId) return null;
+            const partner = contacts.find((c) => c.id === selectedChatId || c.uid === selectedChatId);
+            if (!partner) return null;
+            return (
+              <ProfilePanel
+                contactName={partner.name}
+                contactUid={partner.uid}
+                isOnline={wsStatus === 'open'}
+                onCall={() => logger.info('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
+                onVideo={() => logger.info('[PILIGRIM] Profile: Video (WebRTC Phase 6)')}
+                onSearch={() => setIsSearchOpen(true)}
+                onClose={() => setIsProfileOpen(false)}
+              />
+            );
+          })()}
+        </>
+      )}

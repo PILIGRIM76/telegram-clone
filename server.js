@@ -1,6 +1,6 @@
 
 const express = require('express');
-// Phase 2: Metadata protection — используем crypto для генерации session ID
+// Фаза 2: Защита метаданных — используем crypto для генерации session ID
 // вместо логирования IP-адресов клиентов.
 const crypto = require('crypto');
 const http = require('http');
@@ -9,17 +9,17 @@ const path = require('path');
 const url = require('url');
 const { db, STORAGE_TYPE } = require('./db/index.js');
 
-// Phase 2: SQLite persistence + JWT Auth
+// Фаза 2: SQLite персистентность + JWT аутентификация
 const sqlDb = require('./server/databaseService.js');
 const authService = require('./server/authService.js');
 
-// v3.13: Push Notifications (FCM)
+// v3.13: Push-уведомления (FCM)
 const pushService = require('./server/pushService.js');
 
-// In-memory maps for WS routing only (data persisted in SQLite)
+// In-memory карты для WS-маршрутизации (данные в SQLite)
 const wsUsers = new Map(); // uid -> ws reference
 
-// Initialize on startup
+// Инициализация при запуске
 function initStorage() {
   console.log('[STORAGE] SQLite-based storage initialized');
 }

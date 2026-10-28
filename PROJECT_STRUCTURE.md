@@ -1,63 +1,51 @@
-# CipherLink Project Structure
+# Структура проекта CipherLink
 
-## Основная структура
-```
+## Основные каталоги
+
+```text
 CipherLink/
-├── client/                 # Клиентская часть
-│   ├── web/               # Веб-приложение (React/Vite)
-│   ├── mobile/            # Мобильные приложения
-│   │   ├── android/       # Android (React Native)
-│   │   └── ios/           # iOS (React Native)
-│   └── desktop/           # Десктоп (Electron/Tauri)
-│
-├── server/                # Серверное приложение
-│   ├── relay/             # Relay сервер (маршрутизация)
-│   ├── keyserver/         # Key сервер (ключи и UID)
-│   ├── storage/           # Временное хранилище файлов
-│   └── admin-panel/       # Административная панель
-│
-├── crypto/                # Криптографические библиотеки
-│   ├── identity/          # Генерация идентичностей
-│   ├── encryption/        # Шифрование/дешифрование
-│   └── protocols/         # Протоколы (Signal, MLS)
-│
-├── shared/                # Общие компоненты
-│   ├── types/             # TypeScript типы
-│   ├── utils/             # Утилиты
-│   └── constants/         # Константы
-│
-├── docs/                  # Документация
-│   ├── architecture/      # Архитектурная документация
-│   ├── api/               # API документация
-│   └── security/          # Безопасность
-│
-├── tests/                 # Тесты
-│   ├── unit/              # Модульные тесты
-│   ├── integration/       # Интеграционные тесты
-│   └── security/          # Security тесты
-│
-├── docker/                # Docker конфигурации
-├── scripts/               # Скрипты сборки/развертывания
-└── README.md              # Основная документация
+├── src/
+│   ├── components/     # React-интерфейс и переиспользуемые компоненты
+│   ├── contexts/       # React-контексты
+│   ├── crypto/         # Криптографические модули, включая Signal
+│   ├── generated/      # Сгенерированные исходные данные
+│   ├── hooks/          # React-хуки
+│   ├── polyfills/      # Совместимость с окружениями браузера
+│   ├── services/       # API, транспорт и сервисы приложения
+│   ├── types/          # Общие типы
+│   ├── utils/          # Вспомогательные функции
+│   ├── App.tsx         # Композиция и состояние приложения
+│   ├── index.css       # Глобальные стили и CSS-переменные
+│   └── index.tsx       # Точка входа React
+├── electron/           # Main process Electron
+├── server/             # Серверные модули
+├── db/                 # Данные и компоненты базы данных
+├── android/            # Android-проект Capacitor
+├── public/             # Статические ресурсы веб-приложения
+├── test/               # Тесты
+├── scripts/            # Скрипты сборки и проверки
+├── build/              # Ресурсы сборщика приложения
+├── server.js           # Запуск backend-сервера
+├── vite.config.ts      # Конфигурация Vite и Electron-плагина
+├── tailwind.config.js  # Tailwind-токены интерфейса
+└── package.json        # Зависимости и команды проекта
 ```
 
-## Технологический стек
+## Интерфейс
 
-### Frontend (Client)
-- **Web**: React 18 + TypeScript + Vite + TailwindCSS
-- **Mobile**: React Native + Expo
-- **Desktop**: Tauri (Rust + WebView)
-- **Crypto**: libsodium, tweetnacl
+`src/App.tsx` связывает основные области приложения. Адаптивная композиция использует `src/components/ResponsiveShell.tsx`, список контактов — `ContactList.tsx`, окно активного чата — `ChatWindow.tsx`. `Layout.tsx` также присутствует как отдельный компонент раскладки, но текущая композиция `App.tsx` его не использует.
 
-### Backend (Server)
-- **Runtime**: Node.js 18+
-- **Framework**: Express.js + WebSocket (ws)
-- **Database**: PostgreSQL + Redis
-- **Storage**: MinIO (S3-compatible)
-- **Reverse Proxy**: Nginx + Tor
+Стилизация основана на React, TypeScript, Vite и Tailwind CSS. Цветовые токены Telegram-палитры объявлены в `tailwind.config.js`; глобальные стили и CSS-переменные определены в `src/index.css`.
 
-### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Orchestration**: Kubernetes (production)
-- **Monitoring**: Prometheus + Grafana
-- **Logging**: ELK Stack
+## Desktop и сервер
+
+Desktop-клиент работает на Electron: `electron/main.ts` запускает `server.js`, ожидает признак готовности backend и создаёт окно приложения. Сборку Electron конфигурирует electron-builder; статические ресурсы подаются с относительными путями для загрузки приложения через `file://`.
+
+Серверная часть включает `server.js`, каталог `server/` и каталог `db/`. Команды разработки и сборки платформ находятся в `package.json`.
+
+## Платформы и тесты
+
+- Веб-клиент собирается Vite.
+- Android-проект находится в `android/` и интегрирован через Capacitor.
+- Desktop-клиент собирается Electron Builder.
+- Тесты расположены в `test/`; команды доступны в `package.json`.

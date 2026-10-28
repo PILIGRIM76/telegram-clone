@@ -1,0 +1,92 @@
+Found )} at 21354:  crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `msg-${Date.now()}-${Math.random().toString(36).slice(2,
+---
+Found )} at 21397: omUUID()
+          : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const secureResult = await 
+---
+Found )} at 23274: ' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `msg-${Date.now()}-${Math.random().toString(36).slice(2,
+---
+Found )} at 23317: ndomUUID()
+        : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      text: trimmed,
+      encrypte
+---
+Found )} at 27110:       >
+              Р’С‹Р№С‚Рё
+            </button>
+          </div>
+        )}
+        <SeedPhraseModal
+          se
+---
+Found )} at 30259: pe="button"
+          onClick={() => setLanguage(language === 'ru' ? 'en' : 'ru')}
+          data-testid="lang-toggle"
+ 
+---
+Found )} at 32739: /}
+            <LeftAppBar
+              onMenuClick={() => setIsDrawerOpen(true)}
+              onSearchClick={() => se
+---
+Found )} at 32797: > setIsDrawerOpen(true)}
+              onSearchClick={() => setIsSearchOpen(true)}
+            />
+            {/* Scroll
+---
+Found )} at 34204:        if (g) return g.name;
+                return undefined;
+              })()}
+              contactUid={selectedCha
+---
+Found )} at 34404: wBack={!!selectedChatId}
+              onBackClick={() => setSelectedChatId(null)}
+              onCallClick={() => {
+  
+---
+Found )} at 34943:               onVideoClick={() => logger.info('[PILIGRIM] Video call (Phase 2F)')}
+              onMenuClick={() => setS
+---
+Found )} at 35002: ideo call (Phase 2F)')}
+              onMenuClick={() => setShowLogoutModal(true)}
+              // v3.0 Phase 2H: клик 
+---
+Found )} at 35143: ывает 3rd profile panel
+              onAvatarClick={() => setIsProfileOpen(true)}
+            />
+            {/* Scroll
+---
+Found )} at 35597: hments, replyTo) => handleSendMessage(selectedChatId, text, attachments, replyTo)}
+                  partner={(() => {
+ 
+---
+Found )} at 35936: rn { name: g.name };
+                    return undefined;
+                  })()}
+                  currentUserUid={ide
+---
+Found )} at 36083:    onDeleteMessage={(messageId) => handleDeleteMessage(selectedChatId, messageId)}
+                  onEditMessage={(mes
+---
+Found )} at 36195: ge={(messageId, newText) => handleEditMessage(selectedChatId, messageId, newText)}
+                  onStartCall={() => 
+---
+Found )} at 37115: d]?.mutedUntil}
+                  onVerifyContact={() => setShowVerifyModal(true)}
+                  encryptionType={cha
+---
+Found )} at 38641:         Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+ 
+---
+Found )} at 40891:            onCall={() => logger.info('[PILIGRIM] Profile: Call (WebRTC Phase 6)')}
+                onVideo={() => logger
+---

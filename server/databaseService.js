@@ -1,26 +1,26 @@
 // server/databaseService.js
-// SQLite persistence layer for CipherLink
-// Tables: users, identities, sessions, messages, offline_messages, user_profiles
+// SQLite слой персистентности для CipherLink
+// Таблицы: users, identities, sessions, messages, offline_messages, user_profiles
 
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-// Open (or create) the SQLite database
+// Открыть (или создать) базу данных SQLite
 const dbPath = path.join(__dirname, '..', 'data', 'cipherlink.db');
 
-// Ensure data directory exists
+// Убедиться, что директория для данных существует
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-// Phase 2: Use WAL mode for better concurrency
+// Фаза 2: Использовать WAL-режим для лучшей конкурентности
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// Create tables if they don't exist
+// Создать таблицы, если их нет
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     uid TEXT PRIMARY KEY,

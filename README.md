@@ -44,21 +44,19 @@ npm run dev:electron
 ```bash
 npm run build:win
 ```
-Создает:
-- `release/CipherLink Setup 1.0.0.exe` — NSIS установщик
-- `release/CipherLink 1.0.0.exe` — Portable версия
+Создаёт Portable EXE в `release/`.
 
 #### macOS
 ```bash
 npm run build:mac
 ```
-Создает `release/CipherLink-1.0.0.dmg`
+Создаёт DMG в `release/`
 
 #### Linux
 ```bash
 npm run build:linux
 ```
-Создает `AppImage` и `.deb` пакеты
+Создаёт AppImage в `release/`.
 
 ### Сервер (отдельно)
 ```bash
@@ -92,37 +90,58 @@ git push origin v1.0.1
 ## 📦 Сборка Desktop-клиента
 
 ### Автономное приложение
-Desktop-версия полностью автономна:
-- Автоматически запускает Node.js бэкенд (server.js) при старте
-- Ждет готовности бэкенда ("Сервер на порту 4000")
-- Открывает окно чата 1200×800
-- Корректно завершает бэкенд при закрытии окна
+Desktop-версия запускает Node.js бэкенд (`server.js`) вместе с приложением:
+- Main process запускает бэкенд и ожидает сообщение о готовности; предусмотрен таймаут ожидания 10 секунд.
+- После этого создаётся окно приложения размером 1200×800.
+- При закрытии приложения процесс бэкенда завершается.
 
 ### Артефакты сборки
-- **Windows**: NSIS установщик + Portable (~208 MB каждый)
+- **Windows**: Portable EXE
 - **macOS**: DMG образ
-- **Linux**: AppImage + DEB пакет
+- **Linux**: AppImage
 
 ### Команды
 ```bash
-npm run build:electron    # Все платформы
-npm run build:win         # Windows (NSIS + Portable)
+npm run build:electron    # electron-builder согласно конфигурации и текущей платформе
+npm run build:win         # Windows Portable
 npm run build:mac         # macOS DMG
-npm run build:linux       # Linux AppImage + DEB
+npm run build:linux       # Linux AppImage
 ```
 
 ## 🔧 Архитектура Desktop-клиента
 
 - **Electron Main Process** (`electron/main.ts`): управление окном, спавн бэкенда, автоопределение готовности
 - **Vite Plugin Electron**: компиляция main process через `vite-plugin-electron/simple`
-- **electron-builder**: сборка под Windows (NSIS/Portable), macOS (DMG), Linux (AppImage/DEB)
+- **electron-builder**: сборка для Windows (Portable), macOS (DMG) и Linux (AppImage) отдельными командами
 - **asarUnpack**: server.js, server/**, db/** — для работы с файловой системой
+- **Пути ресурсов**: Vite собирает с `base: './'`; плагин сборки приводит пути ресурсов к относительным для загрузки через `file://` в Electron.
+- **Обход ошибки сборки Vite**: `vite-plugin-pwa` удалён из конфигурации из-за проблемы `html-proxy`, возникавшей с inline CSS и директивами Tailwind.
+
+## 🧩 Архитектура интерфейса
+
+- **Точка входа** — `src/App.tsx`: управляет состоянием приложения и соединяет список контактов, активный чат, навигацию и модальные окна.
+- **Адаптивная оболочка** — `src/components/ResponsiveShell.tsx`: размещает левую панель и активную область; раскладка зависит от мобильного, планшетного или настольного breakpoint.
+- **Чаты** — `src/components/ContactList.tsx` отображает список контактов, а `src/components/ChatWindow.tsx` — заголовок чата, сообщения и поле отправки.
+- **`src/components/Layout.tsx`** — отдельный компонент раскладки с боковой панелью и основной областью; `App.tsx` сейчас использует `ResponsiveShell`, а не `Layout`.
+- **Вспомогательные компоненты** находятся в `src/components/`; общие React-контексты, хуки, сервисы и типы — в соответствующих каталогах `src/`.
+- **Оформление** — Tailwind CSS 3 с цветовыми классами `tg-*` и `tg-dark-*`, определёнными в `tailwind.config.js`; глобальные стили и CSS-переменные находятся в `src/index.css`.
+
+Редизайн интерфейса в направлении Telegram Desktop включён: обновлены оболочка и окно чата, список чатов, пузырьки сообщений, индикаторы статуса и адаптивные панели. Это описание направления реализации, а не утверждение о полном визуальном паритете с Telegram Desktop.
+
+## 🛠️ Версии основного стека
+
+- React `18.3.1` (диапазон в `package.json`: `^18.2.0`)
+- TypeScript `5.9.3` (диапазон в `package.json`: `^5.0.2`)
+- Vite `4.5.14` (диапазон в `package.json`: `^4.4.5`)
+- Tailwind CSS `3.4.19` (диапазон в `package.json`: `^3.3.3`)
+- Electron `44.9.3` (диапазон в `package.json`: `^44.4.5`)
+
+Установленные версии проверены 27 октября 2026 командой `npm ls react vite tailwindcss electron --depth=0`; диапазоны зависимостей берутся из `package.json`.
 
 ## 📚 Документация
 
-- [ROADMAP.md](https://github.com/...) — дорожная карта проекта
-- [Obsidian Vault](https://github.com/...) — вторая мозг проекта (Features, Architecture, Decisions, Logs)
-- [Features/Desktop-Electron-Packaging](https://github.com/...) — детали Desktop упаковки
+- [Структура проекта](PROJECT_STRUCTURE.md) — каталоги и назначение основных частей приложения
+- Заметки Obsidian хранятся во внешнем Vault и не входят в репозиторий.
 
 ## 📄 Лицензия
 MIT License — см. [LICENSE](LICENSE)
