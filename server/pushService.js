@@ -68,14 +68,16 @@ async function sendPushNotification(userUid, senderName, chatId, messageId) {
         if (!resp.success) {
           const errorCode = resp.error?.code;
           // Remove tokens that are permanently invalid
-          if (errorCode === 'messaging/registration-token-not-registered' ||
-              errorCode === 'messaging/invalid-registration-token' ||
-              errorCode === 'messaging/registration-token-invalid') {
+          if (
+            errorCode === 'messaging/registration-token-not-registered' ||
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/registration-token-invalid'
+          ) {
             failedTokens.push(tokens[idx]);
           }
         }
       });
-      
+
       if (failedTokens.length > 0) {
         console.log('[Push] Removing invalid tokens:', failedTokens);
         for (const token of failedTokens) {
@@ -84,7 +86,9 @@ async function sendPushNotification(userUid, senderName, chatId, messageId) {
       }
     }
 
-    console.log(`[Push] Successfully sent to ${response.successCount} devices (${response.failureCount} failed)`);
+    console.log(
+      `[Push] Successfully sent to ${response.successCount} devices (${response.failureCount} failed)`
+    );
   } catch (error) {
     console.error('[Push] Error sending notification:', error);
     // Don't break the main flow if push fails

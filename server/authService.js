@@ -4,7 +4,15 @@
 const jwt = require('jsonwebtoken');
 const argon2 = require('argon2');
 const crypto = require('crypto');
-const { db, createUser, createSession, getSessionByRefreshToken, deleteSession: deleteSessionDB, saveIdentity, getIdentity } = require('./databaseService');
+const {
+  db,
+  createUser,
+  createSession,
+  getSessionByRefreshToken,
+  deleteSession: deleteSessionDB,
+  saveIdentity,
+  getIdentity,
+} = require('./databaseService');
 
 // Secrets - should come from process.env in production
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'piligrim-access-dev-secret';
