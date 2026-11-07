@@ -97,7 +97,9 @@ export const DEFAULT_SIGNAL_CONFIG: SignalConfig = {
 };
 
 export function generateDeviceId(): number {
-  return Math.floor(Math.random() * 65536);
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % 65536;
 }
 
 export function bytesToHex(bytes: Uint8Array): string {

@@ -29,7 +29,9 @@ export class SignalProtocolManager {
     await this.storage.setIdentityKeyPair(identity);
     let regId = await this.storage.getOurRegistrationId();
     if (!regId) {
-      regId = Math.floor(Math.random() * 16383) + 1;
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      regId = (buf[0] % 16383) + 1;
       await this.storage.setRegistrationId(regId);
     }
     let preKeys = await SessionStore.listPreKeys();
@@ -69,7 +71,9 @@ export class SignalProtocolManager {
     const signed = this.storage.loadSignedPreKey();
     const allPreKeys = await SessionStore.listPreKeys();
     if (allPreKeys.length === 0) throw new Error('No pre-keys available');
-    const preKey = allPreKeys[Math.floor(Math.random() * allPreKeys.length)];
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const preKey = allPreKeys[buf[0] % allPreKeys.length];
     const regId = await this.storage.getOurRegistrationId();
     return {
       registrationId: regId,
