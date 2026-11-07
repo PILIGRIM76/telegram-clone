@@ -67,6 +67,41 @@ db.exec(`
     // Index already exists, ignore
   }
 
+  -- v4.0: Admin panel — role column for users
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN role TEXT DEFAULT \'user\'');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
+  } catch (e) {
+    // Index already exists, ignore
+  }
+
+  -- v4.0: Admin panel — reports table for content moderation
+  CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id TEXT NOT NULL,
+    target_user_id TEXT,
+    message_id TEXT,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (reporter_id) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (target_user_id) REFERENCES users(uid) ON DELETE SET NULL
+  );
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)');
+  } catch (e) {
+    // Index already exists, ignore
+  }
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id)');
+  } catch (e) {
+    // Index already exists, ignore
+  }
+
   CREATE TABLE IF NOT EXISTS identities (
     uid TEXT PRIMARY KEY,
     public_key TEXT NOT NULL,
@@ -1098,6 +1133,94 @@ function findUsersByPhoneHashes(phoneHashes) {
   return results;
 }
 
+// ============================================================
+// v4.0: Admin panel — helper functions
+// ============================================================
+
+// Get paginated list of users (without password_hash or private keys)
+function getUsersPaginated({ page = 1, limit = 20, search = '' }) {
+  const offset = (page - 1) * limit;
+  let query = `
+    SELECT uid, username, display_name as displayName, avatar_url as avatarUrl,
+           role, is_online as isOnline, last_seen as lastSeen, created_at as createdAt
+    FROM users
+  `;
+  const params = [];
+  if (search && search.trim().length > 0) {
+    query += ` WHERE LOWER(username) LIKE ?`;
+    params.push(`%${search.toLowerCase().trim()}%`);
+  }
+  query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+  return db.prepare(query).all(...params);
+}
+
+// Get total count of users (with optional search filter)
+function getUsersCount(search = '') {
+  let query = `SELECT COUNT(*) as count FROM users`;
+  const params = [];
+  if (search && search.trim().length > 0) {
+    query += ` WHERE LOWER(username) LIKE ?`;
+    params.push(`%${search.toLowerCase().trim()}%`);
+  }
+  const row = db.prepare(query).get(...params);
+  return row.count;
+}
+
+// Get admin dashboard statistics
+function getAdminStats() {
+  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  const activeToday = db
+    .prepare(
+      `SELECT COUNT(*) as count FROM users WHERE is_online = 1 AND last_seen > strftime('%s', 'now', '-1 day')`
+    )
+    .get().count;
+  const totalReports = db
+    .prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'pending'")
+    .get().count;
+  return { totalUsers, activeToday, totalReports };
+}
+
+// Ban a user (set role to 'banned' — hard delete of account access)
+function banUserAccount(uid) {
+  const result = db.prepare('UPDATE users SET role = ? WHERE uid = ?').run('banned', uid);
+  return result.changes > 0;
+}
+
+// Get all reports with optional status filter
+function getReports(status = 'pending') {
+  return db
+    .prepare(
+      `SELECT r.id, r.reporter_id as reporterId, r.target_user_id as targetUserId,
+              r.message_id as messageId, r.reason, r.status, r.created_at as createdAt,
+              reporter.username as reporterUsername
+       FROM reports r
+       LEFT JOIN users reporter ON r.reporter_id = reporter.uid
+       WHERE r.status = ?
+       ORDER BY r.created_at DESC`
+    )
+    .all(status);
+}
+
+// Create a new report
+function createReport({ reporterId, targetUserId, messageId, reason }) {
+  const result = db
+    .prepare(
+      `INSERT INTO reports (reporter_id, target_user_id, message_id, reason, status, created_at)
+       VALUES (?, ?, ?, ?, 'pending', datetime('now'))`
+    )
+    .run(reporterId, targetUserId || null, messageId || null, reason);
+  return { id: result.lastInsertRowid };
+}
+
+// Update report status (resolve/dismiss)
+function updateReportStatus(reportId, status) {
+  const result = db
+    .prepare('UPDATE reports SET status = ? WHERE id = ?')
+    .run(status, reportId);
+  return result.changes > 0;
+}
+
 module.exports = {
   db,
   createUser,
@@ -1171,4 +1294,12 @@ module.exports = {
   getGroupAuditLog,
   getGroupSettings,
   updateGroupSettings,
+  // v4.0: Admin panel — user management
+  getUsersPaginated,
+  getUsersCount,
+  getAdminStats,
+  banUser: banUserAccount,
+  createReport,
+  getReports,
+  updateReportStatus,
 };

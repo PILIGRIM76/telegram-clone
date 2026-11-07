@@ -39,6 +39,7 @@ import { CallsHistoryView } from './components/CallsHistoryView';
 import { DesktopJoystick } from './components/DesktopJoystick';
 import { FavoritesView } from './components/FavoritesView';
 import { ProfilePanel } from './components/ProfilePanel';
+import { AdminLayout } from './components/admin/AdminLayout';
 import type {
   Chat,
   Contact,
@@ -922,6 +923,12 @@ const App: React.FC = () => {
   // v3.0 Phase 2B-1: Responsive Layout Shell
   // 3 breakpoints: mobile (<=640), tablet (641-1024), desktop (>1024).
   // On RT9 (800x1280) -> tablet — two-column 30%/70% layout.
+  // v4.0: Admin panel — если пользователь админ, рендерим админ-интерфейс
+  const isAdmin = localStorage.getItem('cipherlink-is-admin') === 'true';
+  if (isAdmin) {
+    return <AdminLayout />;
+  }
+
   return (
     <div
       style={{
