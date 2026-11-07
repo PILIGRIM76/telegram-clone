@@ -4,9 +4,7 @@
   "import": ["@cspell/dict-ru_ru/cspell-ext.json"],
   "words": [
     "piligrim",
-    "PILIGRIM",
     "CipherLink",
-    "cipherlink",
     "signal",
     "sqlite",
     "typescript",
@@ -163,7 +161,12 @@
     "всегда",
     "сверху"
   ],
-  "ignoreRegExpList": ["/['\"`][^'\"`\\n]*['\"`]/g", "/\\/\\/.*$/gm", "/\\/\\*[\\s\\S]*?\\*\\//g", "/>[^<]*</g"],
+  "ignoreRegExpList": [
+    "/['\"\][^'\"\\n]*['\"\]/g",
+    "/\/\/.*$/gm",
+    "/\/\*[\s\S]*?\*\//g",
+    "/>[^<]*</g"
+  ],
   "ignorePaths": [
     "node_modules/**",
     "dist/**",
