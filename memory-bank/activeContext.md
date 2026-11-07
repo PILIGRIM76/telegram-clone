@@ -2,7 +2,7 @@
 
 ## Текущая задача
 
-Forward Messages (пересылка сообщений) — реализация завершена.
+Финальный технический аудит кода и инфраструктуры проекта CipherLink — завершён. Готов к релизу v1.0.4.
 
 ## Актуальный статус ветки
 
@@ -55,3 +55,32 @@ Messages (редактирование и удаление сообщений) �
 - Проброс: `App` → `ChatWindow` → `MessageList` → `MessageItem` через `onForwardMessage`
 - E2EE: пересланное сообщение шифруется заново для каждого получателя через `sendMessageSecure`
 - Build verified: `npm run build` проходит успешно
+
+**Админ-панель v4.0 — полностью реализована (включая ReportsPage и SettingsPage):**
+
+1. **Backend — БД (server/databaseService.js):**
+   - Колонка `role TEXT DEFAULT 'user'` в таблице `users`
+   - Таблица `reports` (id, reporter_id, target_user_id, message_id, reason, status, created_at)
+   - Функции: getUsersPaginated, getUsersCount, getAdminStats, banUserAccount, createReport, getReports, updateReportStatus
+
+2. **Backend — Middleware (server/middleware/adminGuard.js):** JWT + роль 'admin', 403 Forbidden если не админ
+
+3. **Backend — Роуты (server/routes/admin.routes.js):**
+   - GET /api/admin/stats, GET /api/admin/users, POST /api/admin/users/:id/ban
+   - GET /api/admin/reports, POST /api/admin/reports/:id/resolve, POST /api/admin/reports/:id/dismiss
+
+4. **Frontend — API клиент (src/services/adminService.ts):** все методы для админских эндпоинтов
+
+5. **Frontend — Страницы:**
+   - src/pages/admin/DashboardPage.tsx — статистика
+   - src/pages/admin/UsersPage.tsx — таблица пользователей с блокировкой
+   - src/pages/admin/ReportsPage.tsx — жалобы с фильтром по статусу, Resolve/Dismiss кнопки
+   - src/pages/admin/SettingsPage.tsx — системные настройки, версия, Danger Zone
+
+6. **Frontend — Layout (src/components/admin/AdminLayout.tsx):** боковое меню с навигацией между страницами, выход
+
+7. **Frontend — Интеграция (src/App.tsx):** если cipherlink-is-admin === 'true' — рендерится AdminLayout
+
+**Безопасность:** Админ видит только метаданные. Содержимое зашифрованных сообщений недоступно.
+
+**Проверка:** `npx tsc --noEmit` — Pass, `npm run build` — Pass.

@@ -11,13 +11,17 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   username?: string;
+  role?: string;
 }
 
 export const authClient = {
-  saveTokens(accessToken: string, refreshToken: string, uid: string): void {
+  saveTokens(accessToken: string, refreshToken: string, uid: string, role?: string): void {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('uid', uid);
+    if (role) {
+      localStorage.setItem('cipherlink-is-admin', role === 'admin' ? 'true' : 'false');
+    }
   },
 
   getAccessToken(): string | null {
@@ -36,6 +40,7 @@ export const authClient = {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('uid');
+    localStorage.removeItem('cipherlink-is-admin');
   },
 
   logout(): void {
@@ -53,7 +58,7 @@ export const authClient = {
       throw new Error(data.error || data.ошибка || 'Ошибка входа');
     }
     const data = await res.json();
-    this.saveTokens(data.accessToken, data.refreshToken, data.uid);
+    this.saveTokens(data.accessToken, data.refreshToken, data.uid, data.role);
     return data;
   },
 
@@ -68,7 +73,7 @@ export const authClient = {
       throw new Error(data.error || data.ошибка || 'Ошибка регистрации');
     }
     const data = await res.json();
-    this.saveTokens(data.accessToken, data.refreshToken, data.uid);
+    this.saveTokens(data.accessToken, data.refreshToken, data.uid, data.role);
     return data;
   },
 
@@ -85,7 +90,7 @@ export const authClient = {
       throw new Error('Token refresh failed');
     }
     const data = await res.json();
-    this.saveTokens(data.accessToken, data.refreshToken, data.uid);
+    this.saveTokens(data.accessToken, data.refreshToken, data.uid, data.role);
     return data;
   },
 };

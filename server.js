@@ -12,6 +12,9 @@ const { db, STORAGE_TYPE } = require('./db/index.js');
 const sqlDb = require('./server/databaseService.js');
 const authService = require('./server/authService.js');
 
+// v4.0: Admin panel routes
+const adminRoutes = require('./server/routes/admin.routes.js');
+
 // v3.13: Push-уведомления (FCM)
 const pushService = require('./server/pushService.js');
 
@@ -312,6 +315,8 @@ app.post('/login', async (req, res) => {
 
     res.json({
       uid: result.uid,
+      username: result.username,
+      role: result.role,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     });
@@ -1272,6 +1277,9 @@ app.post('/api/users/find-by-phone', (req, res) => {
   const results = sqlDb.findUsersByPhoneHashes(phoneHashes);
   res.json({ ok: true, users: results });
 });
+
+// v4.0: Mount admin routes
+app.use('/api/admin', adminRoutes);
 
 // --- WEBSOCKET LOGIK ---
 

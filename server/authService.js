@@ -144,7 +144,7 @@ async function register(username, password, uid, publicKey) {
 // Login endpoint
 async function login(username, password) {
   // 1. Find user by username
-  const user = db.prepare('SELECT uid, password_hash FROM users WHERE username = ?').get(username);
+  const user = db.prepare('SELECT uid, password_hash, role FROM users WHERE username = ?').get(username);
   if (!user) {
     throw new Error('Invalid credentials');
   }
@@ -165,6 +165,7 @@ async function login(username, password) {
   return {
     uid: user.uid,
     username,
+    role: user.role,
     accessToken,
     refreshToken,
   };
