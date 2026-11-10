@@ -1,6 +1,6 @@
 // server/databaseService.js
 // SQLite слой персистентности для CipherLink
-// Таблицы: users, identities, sessions, messages, offline_messages, user_profiles
+// Таблицы: users, identities, sessions, messages, offline_messages, user_profiles, subscriptions
 
 const Database = require('better-sqlite3');
 const path = require('path');
@@ -17,7 +17,14 @@ if (!fs.existsSync(dbDir)) {
 
 // Фаза 2: Использовать WAL-режим для лучшей конкурентности
 const db = new Database(dbPath);
+// WAL режим: параллельное чтение/запись без блокировок, лучше для многопользовательского доступа
 db.pragma('journal_mode = WAL');
+// synchronous = NORMAL: баланс между скоростью и безопасностью (данные могут потеряться только при падении ОС)
+db.pragma('synchronous = NORMAL');
+// temp_store = MEMORY: временные таблицы и индексы в RAM, быстрее чем на диске
+db.pragma('temp_store = MEMORY');
+// mmap_size = 30GB: использование memory-mapped I/O для чтения, снижает системные вызовы
+db.pragma('mmap_size = 30000000000');
 db.pragma('foreign_keys = ON');
 
 // Создать таблицы, если их нет
@@ -35,51 +42,53 @@ db.exec(`
     last_seen INTEGER DEFAULT (unixepoch()),
     is_online INTEGER DEFAULT 0
   );
+`);
 
-  // v3.19: Migration for display_name and avatar_url columns (if upgrading from older version)
-  try {
-    db.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-  try {
-    db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-  // v3.19: Create index on username for faster search
-  try {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
-  } catch (e) {
-    // Index already exists, ignore
-  }
+// v3.19: Migration for display_name and avatar_url columns (if upgrading from older version)
+try {
+  db.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
+} catch (e) {
+  // Column already exists, ignore
+}
+try {
+  db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+} catch (e) {
+  // Column already exists, ignore
+}
+// v3.19: Create index on username for faster search
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+} catch (e) {
+  // Index already exists, ignore
+}
 
-  // v3.20: Migration for phone_hash column (for phone contact sync)
-  try {
-    db.exec('ALTER TABLE users ADD COLUMN phone_hash TEXT UNIQUE');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-  // v3.20: Create index on phone_hash for faster contact lookup
-  try {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash)');
-  } catch (e) {
-    // Index already exists, ignore
-  }
+// v3.20: Migration for phone_hash column (for phone contact sync)
+try {
+  db.exec('ALTER TABLE users ADD COLUMN phone_hash TEXT UNIQUE');
+} catch (e) {
+  // Column already exists, ignore
+}
+// v3.20: Create index on phone_hash for faster contact lookup
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash)');
+} catch (e) {
+  // Index already exists, ignore
+}
 
-  -- v4.0: Admin panel — role column for users
-  try {
-    db.exec('ALTER TABLE users ADD COLUMN role TEXT DEFAULT \'user\'');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-  try {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
-  } catch (e) {
-    // Index already exists, ignore
-  }
+// v4.0: Admin panel — role column for users
+try {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+} catch (e) {
+  // Column already exists, ignore
+}
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
+} catch (e) {
+  // Index already exists, ignore
+}
 
-  -- v4.0: Admin panel — reports table for content moderation
+// v4.0: Admin panel — reports table for content moderation
+db.exec(`
   CREATE TABLE IF NOT EXISTS reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reporter_id TEXT NOT NULL,
@@ -91,17 +100,60 @@ db.exec(`
     FOREIGN KEY (reporter_id) REFERENCES users(uid) ON DELETE CASCADE,
     FOREIGN KEY (target_user_id) REFERENCES users(uid) ON DELETE SET NULL
   );
-  try {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)');
-  } catch (e) {
-    // Index already exists, ignore
-  }
-  try {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id)');
-  } catch (e) {
-    // Index already exists, ignore
-  }
+`);
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)');
+} catch (e) {
+  // Index already exists, ignore
+}
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id)');
+} catch (e) {
+  // Index already exists, ignore
+}
 
+// v5.0: Freemium subscriptions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL UNIQUE,
+    plan TEXT DEFAULT 'free',
+    status TEXT DEFAULT 'active',
+    start_date TEXT NOT NULL DEFAULT (datetime('now')),
+    end_date TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
+  );
+`);
+
+// v5.0: User contacts table (for contact count limit)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    contact_uid TEXT NOT NULL,
+    added_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (contact_uid) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE(user_id, contact_uid)
+  );
+`);
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_user_contacts_user_id ON user_contacts(user_id)');
+} catch (e) {
+  // Index already exists, ignore
+}
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id)');
+} catch (e) {
+  // Index already exists, ignore
+}
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_plan ON subscriptions(plan)');
+} catch (e) {
+  // Index already exists, ignore
+}
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS identities (
     uid TEXT PRIMARY KEY,
     public_key TEXT NOT NULL,
@@ -1221,6 +1273,76 @@ function updateReportStatus(reportId, status) {
   return result.changes > 0;
 }
 
+// v5.0: Get active subscription for a user. Returns null if no subscription or expired.
+function getSubscription(uid) {
+  const row = db
+    .prepare(
+      `SELECT id, user_id as userId, plan, status, start_date as startDate, end_date as endDate
+       FROM subscriptions
+       WHERE user_id = ?`
+    )
+    .get(uid);
+
+  if (!row) return null;
+
+  // Проверяем истечение подписки
+  if (row.status === 'active' && row.endDate) {
+    const endTs = new Date(row.endDate).getTime();
+    if (Date.now() > endTs) {
+      // Подписка истекла — помечаем как expired
+      db.prepare(`UPDATE subscriptions SET status = 'expired' WHERE user_id = ?`).run(uid);
+      return null;
+    }
+  }
+
+  return row;
+}
+
+// v5.0: Create or update subscription for a user
+function upsertSubscription(uid, plan, status, endDate) {
+  const existing = db.prepare('SELECT id FROM subscriptions WHERE user_id = ?').get(uid);
+
+  if (existing) {
+    return db
+      .prepare(
+        `UPDATE subscriptions
+         SET plan = ?, status = ?, end_date = ?, start_date = COALESCE(start_date, datetime('now'))
+         WHERE user_id = ?`
+      )
+      .run(plan, status, endDate || null, uid);
+  }
+
+  return db
+    .prepare(
+      `INSERT INTO subscriptions (user_id, plan, status, start_date, end_date)
+       VALUES (?, ?, ?, datetime('now'), ?)`
+    )
+    .run(uid, plan, status, endDate || null);
+}
+
+// v5.0: Admin grant — manually assign a plan to a user (for testing)
+function grantSubscription(uid, plan, endDate) {
+  return upsertSubscription(uid, plan, 'active', endDate);
+}
+
+// v5.0: Get count of contacts for a user
+function getUserContactsCount(uid) {
+  const row = db
+    .prepare('SELECT COUNT(*) as count FROM user_contacts WHERE user_id = ?')
+    .get(uid);
+  return row ? row.count : 0;
+}
+
+// v5.0: Add a contact for a user
+function addUserContact(userId, contactUid) {
+  return db
+    .prepare(
+      `INSERT OR IGNORE INTO user_contacts (user_id, contact_uid)
+       VALUES (?, ?)`
+    )
+    .run(userId, contactUid);
+}
+
 module.exports = {
   db,
   createUser,
@@ -1302,4 +1424,11 @@ module.exports = {
   createReport,
   getReports,
   updateReportStatus,
+  // v5.0: Freemium subscriptions
+  getSubscription,
+  upsertSubscription,
+  grantSubscription,
+  // v5.0: User contacts (for contact count limit)
+  getUserContactsCount,
+  addUserContact,
 };

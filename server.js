@@ -15,6 +15,11 @@ const authService = require('./server/authService.js');
 // v4.0: Admin panel routes
 const adminRoutes = require('./server/routes/admin.routes.js');
 
+// v5.0: Subscription routes
+const subscriptionRoutes = require('./server/routes/subscriptions.routes.js');
+const { checkLimit } = require('./server/utils/planChecker');
+const { userProfileCache, contactsCache } = require('./server/utils/cache');
+
 // v3.13: Push-уведомления (FCM)
 const pushService = require('./server/pushService.js');
 
@@ -29,6 +34,17 @@ initStorage();
 
 const app = express();
 app.use(express.json({ limit: '10mb' })); // Увеличен лимит для изображений
+
+// v6.0: Rate Limiting — защита от DDoS и брутфорса (100 запросов за 15 минут с одного IP)
+const rateLimit = require('express-rate-limit');
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 100, // максимум 100 запросов за windowMs с одного IP
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
 const сервер = http.createServer(app);
 const серверВебсокетов = new WebSocket.Server({ server: сервер });
 
@@ -42,11 +58,10 @@ const группы = new Map(); // { id: { название, участники[
 const каналы = new Map(); // { id: Channel }
 const награды = new Map(); // uid -> Reward[]
 
-// Helper: load user profile from SQLite into memory cache for WS routing
-const userProfileCache = new Map(); // uid -> { publicKey, preKeyBundle, store, boards }
-
+// Helper: загрузка профиля пользователя из SQLite в TTL-кеш для WS-маршрутизации
 function getUserProfileFromDB(uid) {
-  if (userProfileCache.has(uid)) return userProfileCache.get(uid);
+  const cached = userProfileCache.get(uid);
+  if (cached !== undefined) return cached;
   const profile = sqlDb.getUserProfile(uid);
   if (profile) userProfileCache.set(uid, profile);
   return profile;
@@ -483,8 +498,32 @@ app.get('/store/invite/:token', (req, res) => {
 // но НЕ отдаём его другим клиентам через API.
 app.post('/groups/create', (req, res) => {
   const { title, ownerId, type, encryptedMembers, members } = req.body;
+
+  // v5.0: Проверка лимита размера группы по плану подписки
+  const authToken = req.headers.authorization?.replace('Bearer ', '');
+  if (authToken) {
+    const jwt = require('jsonwebtoken');
+    const ACCESS_TOKEN_SECRET =
+      process.env.JWT_ACCESS_SECRET || 'piligrim-access-dev-secret';
+    let payload;
+    try {
+      payload = jwt.verify(authToken, ACCESS_TOKEN_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    const groupMemberCount = Array.isArray(encryptedMembers)
+      ? encryptedMembers.length
+      : Array.isArray(members)
+        ? members.length
+        : 1;
+    const limitResult = checkLimit(payload.uid, 'group_create', groupMemberCount);
+    if (!limitResult.allowed) {
+      return res.status(403).json({ error: limitResult.reason });
+    }
+  }
+
   const id = `group_${Date.now()}`;
-  const token = type === 'private' ? сгенерироватьТокен() : undefined;
+  const groupToken = type === 'private' ? сгенерироватьТокен() : undefined;
 
   // Phase 2: prefer encryptedMembers (opaque blob). Fallback to legacy members.
   const opaqueMembers = encryptedMembers || ['__legacy_placeholder__'];
@@ -495,7 +534,7 @@ app.post('/groups/create', (req, res) => {
     title,
     ownerId,
     type,
-    token,
+    token: groupToken,
     // Phase 2: opaque blob для сервера. Сервер не знает состав группы.
     encryptedMembers: opaqueMembers,
     memberCount,
@@ -503,7 +542,7 @@ app.post('/groups/create', (req, res) => {
     isLegacy: !encryptedMembers && !!members,
   });
   console.log(`[ГРУППА] Создана ${id} (encrypted=${!!encryptedMembers}, members=${memberCount})`);
-  res.json({ id, token });
+  res.json({ id, token: groupToken });
 });
 
 app.post('/groups/join', (req, res) => {
@@ -1247,7 +1286,12 @@ app.get('/api/users/:uid/preview', (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const profile = sqlDb.getUserPreview(uid);
+  // v6.0: Сначала проверяем TTL-кеш профилей
+  let profile = userProfileCache.get(uid);
+  if (!profile) {
+    profile = sqlDb.getUserPreview(uid);
+    if (profile) userProfileCache.set(uid, profile);
+  }
   if (!profile) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -1278,8 +1322,90 @@ app.post('/api/users/find-by-phone', (req, res) => {
   res.json({ ok: true, users: results });
 });
 
+// v5.0: File upload endpoint with plan-based size limit
+app.post('/api/upload', (req, res) => {
+  const authToken = req.headers.authorization?.replace('Bearer ', '');
+  if (!authToken) {
+    return res.status(401).json({ error: 'Token required' });
+  }
+
+  const jwt = require('jsonwebtoken');
+  const ACCESS_TOKEN_SECRET =
+    process.env.JWT_ACCESS_SECRET || 'piligrim-access-dev-secret';
+  let payload;
+  try {
+    payload = jwt.verify(authToken, ACCESS_TOKEN_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { fileSize, fileName } = req.body;
+  if (!fileSize || typeof fileSize !== 'number') {
+    return res.status(400).json({ error: 'fileSize (bytes) is required' });
+  }
+
+  const limitResult = checkLimit(payload.uid, 'file_upload', fileSize);
+  if (!limitResult.allowed) {
+    return res.status(403).json({ error: limitResult.reason });
+  }
+
+  res.json({
+    ok: true,
+    message: 'File size within plan limits',
+    plan: limitResult.plan,
+    maxSizeMB: limitResult.limit,
+  });
+});
+
+// v5.0: Add contact endpoint with plan-based contact count limit
+app.post('/api/contacts/add', (req, res) => {
+  const authToken = req.headers.authorization?.replace('Bearer ', '');
+  if (!authToken) {
+    return res.status(401).json({ error: 'Token required' });
+  }
+
+  const jwt = require('jsonwebtoken');
+  const ACCESS_TOKEN_SECRET =
+    process.env.JWT_ACCESS_SECRET || 'piligrim-access-dev-secret';
+  let payload;
+  try {
+    payload = jwt.verify(authToken, ACCESS_TOKEN_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { contactUid, contactName } = req.body;
+  if (!contactUid) {
+    return res.status(400).json({ error: 'contactUid is required' });
+  }
+
+  // Подсчитываем текущее количество контактов пользователя
+  const currentContacts = sqlDb.getUserContactsCount(payload.uid);
+
+  // checkLimit проверяет: value >= maxContacts (т.е. если уже maxContacts, следующее — запрещено)
+  const limitResult = checkLimit(payload.uid, 'contact_add', currentContacts + 1);
+  if (!limitResult.allowed) {
+    return res.status(403).json({ error: limitResult.reason });
+  }
+
+  // Сохраняем контакт в БД
+  sqlDb.addUserContact(payload.uid, contactUid);
+
+  res.json({
+    ok: true,
+    message: 'Contact added within plan limits',
+    plan: limitResult.plan,
+    currentContacts: currentContacts + 1,
+    maxContacts: limitResult.limit,
+    contact: { uid: contactUid, name: contactName || contactUid },
+  });
+});
+
 // v4.0: Mount admin routes
 app.use('/api/admin', adminRoutes);
+
+// v5.0: Mount subscription routes
+app.use('/api', subscriptionRoutes);
 
 // --- WEBSOCKET LOGIK ---
 
@@ -1302,6 +1428,10 @@ app.use('/api/admin', adminRoutes);
 
   const uid = payload.uid;
   ws.uid = uid;
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
   wsUsers.set(uid, ws);
 
   // v3.11: Update presence - user is now online
@@ -1845,6 +1975,22 @@ app.use('/api/admin', adminRoutes);
     broadcastPresenceUpdate(uid, false);
   });
 });
+
+// v6.0: WebSocket Heartbeat — проверка активности каждые 30 секунд.
+// Если клиент не отвечает на ping в течение 10 секунд — соединение закрывается.
+const heartbeatInterval = setInterval(() => {
+  серверВебсокетов.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log('[WS] Heartbeat timeout — terminating:', ws.uid);
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30 * 1000);
+
+// Очистка интервала при остановке сервера
+сервер.on('close', () => clearInterval(heartbeatInterval));
 
 // v3.17: Disappearing messages cleanup job - runs every minute
 setInterval(() => {

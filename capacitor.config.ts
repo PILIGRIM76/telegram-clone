@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.piligrim.app',
+  appId: 'com.piligrim.cipherlink',
   appName: 'PILIGRIM',
   webDir: 'public',
   // server Р±Р»РѕРє СѓРґР°Р»С‘РЅ вЂ” РїСЂРёР»РѕР¶РµРЅРёРµ СЂР°Р±РѕС‚Р°РµС‚ РІ offline-СЂРµР¶РёРјРµ
