@@ -2,7 +2,7 @@
 
 ## Текущая задача
 
-Финальный технический аудит кода и инфраструктуры проекта CipherLink — завершён. Готов к релизу v1.0.4.
+Финальная подготовка релиза CipherLink v1.0.6+ — Android CI/CD, оптимизация производительности бэкенда, ядро подписок (Subscription Core) и лимиты Freemium.
 
 ## Актуальный статус ветки
 
@@ -13,74 +13,34 @@ feature/signal-protocol
 1. Конфликты форматов строк (CRLF vs LF) — требуется строгое соблюдение LF
 2. Необходимость строгого соблюдения токенов tg-* в Tailwind CSS (никаких хардкодов HEX)
 3. Риск случайного изменения криптографической логики при рефакторинге
-4. **Все комментарии в кодовой базе теперь на русском языке** (переведены: src/components/ForwardModal.tsx,
-   src/components/MessageItem.tsx, server/databaseService.js, server.js)
+4. Все комментарии в кодовой базе на русском языке
 
-## Прогресс
+## ✅ Завершенные этапы (v1.0.0 - v1.0.5)
 
-Этап санитайзинга завершен. Все файлы переведены в LF. Дизайн проверен на соответствие токенам tg-*. Message Reactions
-(эмодзи-реакции) полностью реализованы: REST API, WebSocket broadcast, API service, UI в MessageItem.tsx. **Edit/Delete
-Messages (редактирование и удаление сообщений) полностью реализовано:**
+- **Core & Security:** E2EE реализовано (Signal Protocol), исправлены уязвимости RNG (`Math.random` → `crypto.getRandomValues`).
+- **UI/UX:** Редизайн под Telegram Desktop (токены `tg-*`, темная тема, адаптивность).
+- **Features:** Username Search, Reactions, Edit/Delete, Disappearing Messages.
+- **Admin Panel:** Backend API (`/api/admin/*`) + Frontend UI (Dashboard, Users, Reports, Settings). Автоматическое определение роли при логине.
+- **CI/CD Infrastructure:** Миграция на Node.js 24 (Node 20 deprecated), фиксация Ubuntu 24.04, очистка CRLF/LF конфликтов.
 
-- Backend: WS сообщения `message_edit` / `message_delete` + broadcast `message_edited` / `message_deleted`
-- Types: `Message` имеет `editedAt`, `isEdited`, `isDeleted`
-- Service: `apiService.sendMessageEdit()`, `sendMessageDelete()`, слушатели `onMessageEdited`, `onMessageDeleted`
-- UI: режим редактирования в MessageInput (баннер с кнопкой "Отмена"), контекстное меню в MessageItem
-- Интеграция: `ChatWindow` управляет состоянием `editingMessageId`, `MessageList` вызывает `handleStartEdit`
-- Build verified: `npm run build` проходит успешно
+## 🚧 Текущая разработка (v1.0.6+)
 
-**Disappearing Messages (самоудаляющиеся сообщения) полностью реализовано:**
+- **Mobile Pipeline:** Настроен GitHub Actions workflow `.github/workflows/android-build.yml` для автоматической сборки APK через Capacitor при создании тегов `v*`.
+- **Performance:**
+  - SQLite WAL Mode активирован (`journal_mode = WAL`, `synchronous = NORMAL`).
+  - Внедрен TTL-Cache (`server/utils/cache.js`) для профилей пользователей и контактов.
+  - WebSocket Heartbeat добавлен для очистки зависших соединений.
+  - Global Rate Limiting (`express-rate-limit`) подключен к серверу.
+- **Monetization (Subscription Core):**
+  - Модель данных `Subscription` создана в БД (`server/databaseService.js`, таблица `subscriptions`).
+  - Middleware `planChecker` (`server/utils/planChecker.js`) реализует лимиты Freemium (Free: 5MB файлов / 5 контактов; Pro: безлимит).
+  - Эндпоинты `GET /api/subscriptions/me` и админский грант планов (`POST /api/admin/subscriptions/grant`) готовы.
+  - Frontend интегрирован: бейджи FREE/PRO в Drawer, Toast-уведомления при превышении лимитов, метод `apiService.fetchMySubscription()`.
 
-- Backend: БД имеет `expires_at` поле, `saveMessage` рассчитывает TTL, cron job (каждую минуту) удаляет истекшие
-  сообщения и шлёт WS `message_expired` отправителю и получателю
-- Service: `apiService.onMessageExpired()` / `offMessageExpired()`, `useWebSocket` подписывается на событие
-- App.tsx: обрабатывает `message_expired` — удаляет сообщение из локального стора; `handleSendMessage` принимает `ttl` и
-  передаёт в `sendMessageSecure` / `sendMessage` + добавляет `disappearIn`, `timerSetAt`, `expiresAt` в локальное
-  сообщение
-- UI: `MessageTimerSelection` (выбор таймера: Off, 5с, 30с, 1ч, 1д, 1н) интегрирован в `ChatWindow` (MessageInput);
-  `MessageItem` показывает обратный отсчёт ⏳ рядом со временем (обновляется каждые 10 сек); при истечении клиент
-  оптимистично скрывает сообщение, ожидая подтверждения сервера
-- Build verified: `npm run build` проходит успешно
+## Проверка
 
-**Forward Messages (пересылка сообщений) полностью реализовано:**
-
-- Backend: REST endpoint `/api/messages/:id/forward`, `forwardMessage()` в databaseService.js, поле `forwarded_from`
-  (JSON) в SQLite
-- Service: `apiService.forwardMessage(messageId, targetChatIds[])` → POST /forward
-- Types: `Message.forwardedFrom` с `originalSenderUid`, `originalMessageId`, `forwardCount`, `originalSenderName`
-- App.tsx: state `showForwardModal`, `forwardTargetMessage`; handlers `handleForwardMessage`, `handleForwardConfirm`;
-  рендер `<ForwardModal />`
-- UI: `ForwardModal` (Search + чекбоксы контактов/групп, UserCircleIcon/UserPlusIcon); `MessageItem` контекстное меню
-  "Переслать" (↪️); отображение "Переслано от: [Имя] (Nx)" над текстом
-- Проброс: `App` → `ChatWindow` → `MessageList` → `MessageItem` через `onForwardMessage`
-- E2EE: пересланное сообщение шифруется заново для каждого получателя через `sendMessageSecure`
-- Build verified: `npm run build` проходит успешно
-
-**Админ-панель v4.0 — полностью реализована (включая ReportsPage и SettingsPage):**
-
-1. **Backend — БД (server/databaseService.js):**
-   - Колонка `role TEXT DEFAULT 'user'` в таблице `users`
-   - Таблица `reports` (id, reporter_id, target_user_id, message_id, reason, status, created_at)
-   - Функции: getUsersPaginated, getUsersCount, getAdminStats, banUserAccount, createReport, getReports, updateReportStatus
-
-2. **Backend — Middleware (server/middleware/adminGuard.js):** JWT + роль 'admin', 403 Forbidden если не админ
-
-3. **Backend — Роуты (server/routes/admin.routes.js):**
-   - GET /api/admin/stats, GET /api/admin/users, POST /api/admin/users/:id/ban
-   - GET /api/admin/reports, POST /api/admin/reports/:id/resolve, POST /api/admin/reports/:id/dismiss
-
-4. **Frontend — API клиент (src/services/adminService.ts):** все методы для админских эндпоинтов
-
-5. **Frontend — Страницы:**
-   - src/pages/admin/DashboardPage.tsx — статистика
-   - src/pages/admin/UsersPage.tsx — таблица пользователей с блокировкой
-   - src/pages/admin/ReportsPage.tsx — жалобы с фильтром по статусу, Resolve/Dismiss кнопки
-   - src/pages/admin/SettingsPage.tsx — системные настройки, версия, Danger Zone
-
-6. **Frontend — Layout (src/components/admin/AdminLayout.tsx):** боковое меню с навигацией между страницами, выход
-
-7. **Frontend — Интеграция (src/App.tsx):** если cipherlink-is-admin === 'true' — рендерится AdminLayout
-
-**Безопасность:** Админ видит только метаданные. Содержимое зашифрованных сообщений недоступно.
-
-**Проверка:** `npx tsc --noEmit` — Pass, `npm run build` — Pass.
+- `npx tsc --noEmit` — Pass
+- `npm run build` — Pass
+- `require('./server/databaseService.js')` — OK
+- `require('./server/utils/planChecker.js')` — OK
+- `require('./server/utils/cache.js')` — OK

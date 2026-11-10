@@ -13,9 +13,9 @@
 ## 🔧 Ключевые технологии:
 
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend:** Node.js + Express + PostgreSQL + Redis (в Docker)
-- **Mobile:** Capacitor (Android/iOS)
-- **Desktop:** Tauri (Windows/Mac/Linux)
+- **Backend:** Node.js + Express + SQLite (better-sqlite3) — файл `server/databaseService.js`
+- **Mobile:** Capacitor (Android)
+- **Desktop:** Electron (Windows/Mac/Linux)
 - **WebRTC:** simple-peer для P2P звонков
 - **E2EE:** tweetnacl (X25519 + Ed25519) + Web Crypto API (RSA-OAEP)
 - **Документация:** Obsidian (второй мозг проекта)
@@ -48,8 +48,6 @@
 - **Docker порты:**
   - `4000` — backend API
   - `4100` — frontend (production build)
-  - `5434` — PostgreSQL
-  - `6381` — Redis
 - **Vite dev-сервер:** `http://192.168.100.4:5173` (для планшета RT9)
 
 ---
@@ -61,11 +59,6 @@
 npm run dev          # Vite dev-сервер на 5173
 npm run build        # Production сборка
 npm test             # Запуск тестов (Jest)
-
-# Docker
-docker compose up -d         # Запустить все сервисы
-docker compose logs -f       # Смотреть логи
-docker compose down          # Остановить
 
 # Capacitor
 npx cap sync android         # Синхронизировать с Android

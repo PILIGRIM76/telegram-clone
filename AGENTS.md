@@ -10,6 +10,7 @@ Senior React/TS/Electron Engineer specializing in E2EE security and Telegram-lik
 2. ALL comments must be in RUSSIAN.
 3. USE Tailwind tokens (tg-*) for styling. NO hardcoded hex colors.
 4. NEVER commit binaries from release/ folder.
+5. ALL new files must be typed (.ts/.tsx).
 
 ## Workflow
 
